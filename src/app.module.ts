@@ -8,6 +8,8 @@ import { HealthModule } from './health/health.module.js';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      // Tests load only .env.test, never .env, so they cannot hit the dev DB.
+      envFilePath: process.env.NODE_ENV === 'test' ? '.env.test' : '.env',
       validate: validateEnv,
     }),
     HealthModule,

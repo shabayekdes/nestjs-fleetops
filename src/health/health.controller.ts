@@ -1,4 +1,4 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, ServiceUnavailableException } from '@nestjs/common';
 import { HealthService, type HealthStatus } from './health.service.js';
 
 @Controller('health')
@@ -6,7 +6,14 @@ export class HealthController {
   constructor(private readonly healthService: HealthService) {}
 
   @Get()
-  check(): HealthStatus {
-    return this.healthService.check();
+  async check(): Promise<HealthStatus> {
+    const health = await this.healthService.check();
+
+    // 503 lets load balancers/orchestrators take the instance out of rotation.
+    if (health.status !== 'ok') {
+      throw new ServiceUnavailableException(health);
+    }
+
+    return health;
   }
 }

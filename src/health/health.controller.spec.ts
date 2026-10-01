@@ -1,24 +1,42 @@
-import { Test, TestingModule } from '@nestjs/testing';
+import { jest } from '@jest/globals';
+import { ServiceUnavailableException } from '@nestjs/common';
+import { Test } from '@nestjs/testing';
 import { HealthController } from './health.controller.js';
-import { HealthService } from './health.service.js';
+import { HealthService, type HealthStatus } from './health.service.js';
 
 describe('HealthController', () => {
+  const check = jest.fn<() => Promise<HealthStatus>>();
   let controller: HealthController;
 
+  const health = (overrides: Partial<HealthStatus>): HealthStatus => ({
+    status: 'ok',
+    service: 'fleetops-api',
+    timestamp: new Date().toISOString(),
+    database: 'up',
+    ...overrides,
+  });
+
   beforeEach(async () => {
-    const moduleRef: TestingModule = await Test.createTestingModule({
+    const moduleRef = await Test.createTestingModule({
       controllers: [HealthController],
-      providers: [HealthService],
+      providers: [{ provide: HealthService, useValue: { check } }],
     }).compile();
 
     controller = moduleRef.get(HealthController);
   });
 
-  it('returns ok status with service name and ISO timestamp', () => {
-    const result = controller.check();
+  it('returns the health status when healthy', async () => {
+    const healthy = health({});
+    check.mockResolvedValue(healthy);
 
-    expect(result.status).toBe('ok');
-    expect(result.service).toBe('fleetops-api');
-    expect(new Date(result.timestamp).toISOString()).toBe(result.timestamp);
+    await expect(controller.check()).resolves.toEqual(healthy);
+  });
+
+  it('throws 503 when a dependency is down', async () => {
+    check.mockResolvedValue(health({ status: 'error', database: 'down' }));
+
+    await expect(controller.check()).rejects.toBeInstanceOf(
+      ServiceUnavailableException,
+    );
   });
 });

@@ -1,0 +1,63 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Organization {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  users    User[]
+  vehicles Vehicle[]
+
+  @@map("organizations")
+}
+
+model User {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  firstName      String   @map("first_name")
+  lastName       String   @map("last_name")
+  /// Stored lowercase; normalized by the application before writes.
+  email          String
+  /// Argon2id hash. Never return this field from the API.
+  passwordHash   String   @map("password_hash")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  // Tenant-scoped uniqueness. The leading organization_id column also serves
+  // as the index for "all users in an organization" queries.
+  @@unique([organizationId, email])
+  @@map("users")
+}
+
+model Vehicle {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  make           String
+  model          String
+  year           Int
+  vin            String
+  /// Nullable: vehicles may be added to a fleet before they are registered.
+  licensePlate   String?  @map("license_plate")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  // Tenant-scoped uniqueness: the same physical vehicle may legitimately exist
+  // in two organizations (e.g. after a sale), and a global constraint would leak
+  // cross-tenant existence. Both indexes lead with organization_id.
+  @@unique([organizationId, vin])
+  @@unique([organizationId, licensePlate])
+  @@map("vehicles")
+}
