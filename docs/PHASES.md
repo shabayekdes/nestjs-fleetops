@@ -14,7 +14,7 @@ Rules for working with phases:
 | 1     | Application foundation           | Done    | `4b1d372` |
 | 2     | PostgreSQL + Prisma              | Done    | `5623cff` |
 | 3     | Authentication + tenant context  | Done    | `0195815` |
-| 4     | Vehicles API                     | Done    | —         |
+| 4     | Vehicles API                     | Done    | `9e4a426` |
 | 5     | Users + roles                    | Planned | —         |
 | 6     | Drivers + vehicle assignments    | Planned | —         |
 | 7     | Maintenance + fuel records       | Planned | —         |
@@ -120,7 +120,7 @@ Rules for working with phases:
 
 ## Phase 4 — Vehicles API
 
-**Status:** Done (not yet committed)
+**Status:** Done (`9e4a426`)
 
 **Goal:** the first full CRUD resource, scoped to the caller's organization.
 
