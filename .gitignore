@@ -27,3 +27,6 @@ npm-debug.log*
 
 # Prisma generated client (regenerate with `npm run prisma:generate`)
 /src/generated
+
+# Claude Code personal settings
+.claude/settings.local.json
