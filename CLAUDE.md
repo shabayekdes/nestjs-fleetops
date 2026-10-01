@@ -3,27 +3,24 @@
 ## Engineering Organization
 
 CTO
-├── Backend Lead
-│   └── NestJS Developer
+├── Backend Lead (be-lead-shreen)
+│   └── NestJS Developer (be-dev-abdel-aziz)
 │
-├── Frontend Lead
-│   └── Next.js Developer
-│
-└── QA Lead
-    └── QA Developer
+└── QA Lead (qa-lead-nasrallah)
+    └── QA Developer (qa-dev-abdel-rahman)
 
-Agents live in `.claude/agents/`: `cto-esmail`, `backend-lead`, `nestjs-developer`, `qa-lead`, `qa-developer`, `frontend-lead`, `nextjs-developer` (frontend agents are inactive — this repo has no frontend yet).
+Agents live in `.claude/agents/`: `cto-esmail`, `be-lead-shreen`, `be-dev-abdel-aziz`, `qa-lead-nasrallah`, `qa-dev-abdel-rahman`.
 
 ### How orchestration works
 
 Subagents cannot launch other subagents. The **main conversation is the orchestrator**:
 
 1. Large or cross-cutting work → ask `cto-esmail` for a plan. Each task in the plan names an agent.
-2. The main conversation launches the named agents in order, passing each one the plan and the previous agent's output (e.g. `backend-lead` plan → `nestjs-developer`; `qa-lead` plan → `qa-developer`).
+2. The main conversation launches the named agents in order, passing each one the plan and the previous agent's output (e.g. `be-lead-shreen` plan → `be-dev-abdel-aziz`; `qa-lead-nasrallah` plan → `qa-dev-abdel-rahman`).
 3. Independent tasks may run in parallel.
 4. When implementation is done, send the results back to `cto-esmail` for the final review.
 
-Small, well-understood changes can go straight to `nestjs-developer` or `qa-developer`.
+Small, well-understood changes can go straight to `be-dev-abdel-aziz` or `qa-dev-abdel-rahman`.
 
 Leads and the CTO are read-only planners/reviewers; only developers edit files.
 

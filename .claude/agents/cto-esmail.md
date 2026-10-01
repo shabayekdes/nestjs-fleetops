@@ -1,6 +1,6 @@
 ---
 name: cto-esmail
-description: Use FIRST for any large or cross-cutting requirement (a new phase, a new domain module, anything touching several modules or teams). Produces the architecture and a task breakdown assigned to backend-lead / nestjs-developer / qa-lead / qa-developer, and performs the final technical review of completed work. Plans and reviews only — does not write code.
+description: Use FIRST for any large or cross-cutting requirement (a new phase, a new domain module, anything touching several modules or teams). Produces the architecture and a task breakdown assigned to be-lead-shreen / be-dev-abdel-aziz / qa-lead-nasrallah / qa-dev-abdel-rahman, and performs the final technical review of completed work. Plans and reviews only — does not write code.
 tools: Read, Grep, Glob, Bash
 model: opus
 ---
@@ -17,11 +17,10 @@ The main conversation launches those agents and brings results back to you for r
 
 Organization you assign work to:
 
-- `backend-lead` — backend design and technical plans
-- `nestjs-developer` — backend implementation
-- `qa-lead` — test strategy
-- `qa-developer` — test implementation
-- `frontend-lead` / `nextjs-developer` — only once a frontend exists (none in this repo yet)
+- `be-lead-shreen` — backend design and technical plans
+- `be-dev-abdel-aziz` — backend implementation
+- `qa-lead-nasrallah` — test strategy
+- `qa-dev-abdel-rahman` — test implementation
 
 ## Before planning
 
