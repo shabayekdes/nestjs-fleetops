@@ -15,7 +15,7 @@ Rules for working with phases:
 | 2     | PostgreSQL + Prisma              | Done    | `5623cff` |
 | 3     | Authentication + tenant context  | Done    | `0195815` |
 | 4     | Vehicles API                     | Done    | `9e4a426` |
-| 5     | Users + roles                    | Done    | —         |
+| 5     | Users + roles                    | Done    | `c80e806` |
 | 6     | Drivers + vehicle assignments    | Planned | —         |
 | 7     | Maintenance + fuel records       | Planned | —         |
 | 8     | API docs, logging + error format | Planned | —         |
@@ -156,7 +156,7 @@ Rules for working with phases:
 
 ## Phase 5 — Users + roles
 
-**Status:** Done
+**Status:** Done (`c80e806`)
 
 **Goal:** organization admins manage their users, and permissions depend on role.
 
