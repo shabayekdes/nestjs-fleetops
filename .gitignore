@@ -1,0 +1,25 @@
+# compiled output
+/dist
+/node_modules
+
+# logs
+logs
+*.log
+npm-debug.log*
+
+# test coverage
+/coverage
+
+# environment (keep .env.example committed)
+.env
+.env.*
+!.env.example
+
+# OS / IDE
+.DS_Store
+.idea
+.vscode/*
+!.vscode/settings.json
+
+# TypeScript incremental build info
+*.tsbuildinfo
