@@ -15,10 +15,11 @@ Agents live in `.claude/agents/`: `cto-esmail`, `be-lead-shreen`, `be-dev-abdel-
 
 Subagents cannot launch other subagents. The **main conversation is the orchestrator**:
 
-1. Large or cross-cutting work → ask `cto-esmail` for a plan. Each task in the plan names an agent.
-2. The main conversation launches the named agents in order, passing each one the plan and the previous agent's output (e.g. `be-lead-shreen` plan → `be-dev-abdel-aziz`; `qa-lead-nasrallah` plan → `qa-dev-abdel-rahman`).
-3. Independent tasks may run in parallel.
-4. When implementation is done, send the results back to `cto-esmail` for the final review.
+1. Large or cross-cutting work → ask `cto-esmail` for a plan detailed enough to implement directly (files, decisions, required test cases).
+2. Send the plan to `be-dev-abdel-aziz` to implement, then to `qa-dev-abdel-rahman` to write the tests.
+3. When implementation is done, send the results back to `cto-esmail` for the final review.
+
+To save tokens, the leads are **not** part of the default flow. Use `be-lead-shreen` or `qa-lead-nasrallah` only when the CTO plan leaves real open questions, such as unverified library behavior, a risky schema change or a complex test strategy, and give them only that question.
 
 Small, well-understood changes can go straight to `be-dev-abdel-aziz` or `qa-dev-abdel-rahman`.
 

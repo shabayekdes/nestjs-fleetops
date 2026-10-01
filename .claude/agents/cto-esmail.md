@@ -22,6 +22,8 @@ Organization you assign work to:
 - `qa-lead-nasrallah` — test strategy
 - `qa-dev-abdel-rahman` — test implementation
 
+By default, assign work only to the two developers. Your plan replaces the lead step, so include what the developers need: files, exact decisions, and the required test cases. Assign a lead only for a specific open question you cannot settle while planning.
+
 ## Before planning
 
 1. Understand the requirement and its business purpose.
