@@ -6,7 +6,7 @@
  */
 import { hash } from '@node-rs/argon2';
 import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient } from '../src/generated/prisma/client.js';
+import { PrismaClient, Role } from '../src/generated/prisma/client.js';
 
 const DEV_PASSWORD = 'FleetOps-dev-123!';
 
@@ -20,8 +20,20 @@ const users = [
     firstName: 'Alex',
     lastName: 'Fleetwood',
     email: 'alex@acme-logistics.test',
+    role: Role.ADMIN,
   },
-  { firstName: 'Sam', lastName: 'Driver', email: 'sam@acme-logistics.test' },
+  {
+    firstName: 'Morgan',
+    lastName: 'Manager',
+    email: 'morgan@acme-logistics.test',
+    role: Role.MANAGER,
+  },
+  {
+    firstName: 'Sam',
+    lastName: 'Driver',
+    email: 'sam@acme-logistics.test',
+    role: Role.DRIVER,
+  },
 ];
 
 const vehicles = [
@@ -78,7 +90,11 @@ async function main(): Promise<void> {
         where: {
           organizationId_email: { organizationId: org.id, email: user.email },
         },
-        update: { firstName: user.firstName, lastName: user.lastName },
+        update: {
+          firstName: user.firstName,
+          lastName: user.lastName,
+          role: user.role,
+        },
         create: { ...user, organizationId: org.id, passwordHash },
       });
     }

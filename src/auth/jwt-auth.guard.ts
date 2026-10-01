@@ -6,6 +6,8 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
+import { isUUID } from 'class-validator';
+import { PrismaService } from '../database/prisma.service.js';
 import type { AuthenticatedRequest, JwtPayload } from './auth.types.js';
 import { IS_PUBLIC_KEY } from './public.decorator.js';
 
@@ -14,6 +16,7 @@ export class JwtAuthGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
     private readonly jwtService: JwtService,
+    private readonly prisma: PrismaService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -41,14 +44,29 @@ export class JwtAuthGuard implements CanActivate {
     }
 
     const { sub, org } = payload;
-    if (typeof sub !== 'string' || sub === '') {
+    // Non-UUID values would make Postgres reject the query (500), so reject early.
+    if (typeof sub !== 'string' || !isUUID(sub)) {
       throw new UnauthorizedException();
     }
-    if (typeof org !== 'string' || org === '') {
+    if (typeof org !== 'string' || !isUUID(org)) {
       throw new UnauthorizedException();
     }
 
-    request.user = { userId: sub, organizationId: org };
+    // Re-read the user on every request: role changes and deletions apply
+    // immediately, even to tokens issued earlier.
+    const user = await this.prisma.user.findFirst({
+      where: { id: sub, organizationId: org },
+      select: { id: true, organizationId: true, role: true },
+    });
+    if (!user) {
+      throw new UnauthorizedException();
+    }
+
+    request.user = {
+      userId: user.id,
+      organizationId: user.organizationId,
+      role: user.role,
+    };
     return true;
   }
 

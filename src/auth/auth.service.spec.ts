@@ -1,9 +1,9 @@
 import { jest } from '@jest/globals';
-import { UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
-import { hash } from '@node-rs/argon2';
+import { hash, verify } from '@node-rs/argon2';
 import { PrismaService } from '../database/prisma.service.js';
 import { AuthService } from './auth.service.js';
 import type { LoginDto } from './dto/login.dto.js';
@@ -13,6 +13,7 @@ describe('AuthService', () => {
   let passwordHash: string;
 
   const findFirst = jest.fn<(args: unknown) => Promise<unknown>>();
+  const update = jest.fn<(args: unknown) => Promise<unknown>>();
   const signAsync = jest.fn<(payload: unknown) => Promise<string>>();
   let service: AuthService;
 
@@ -35,13 +36,14 @@ describe('AuthService', () => {
 
   beforeEach(async () => {
     findFirst.mockReset();
+    update.mockReset();
     signAsync.mockReset();
     signAsync.mockResolvedValue('signed.jwt.token');
 
     const moduleRef: TestingModule = await Test.createTestingModule({
       providers: [
         AuthService,
-        { provide: PrismaService, useValue: { user: { findFirst } } },
+        { provide: PrismaService, useValue: { user: { findFirst, update } } },
         { provide: JwtService, useValue: { signAsync } },
         { provide: ConfigService, useValue: { get: () => 900 } },
       ],
@@ -163,6 +165,7 @@ describe('AuthService', () => {
       firstName: 'Alex',
       lastName: 'Doe',
       email: 'alex@acme.test',
+      role: 'ADMIN',
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -173,6 +176,7 @@ describe('AuthService', () => {
       const result = await service.getProfile({
         userId: 'user-1',
         organizationId: 'org-1',
+        role: 'ADMIN',
       });
 
       expect(result).toBe(profile);
@@ -190,6 +194,7 @@ describe('AuthService', () => {
           'id',
           'lastName',
           'organizationId',
+          'role',
           'updatedAt',
         ].sort(),
       );
@@ -199,8 +204,112 @@ describe('AuthService', () => {
       findFirst.mockResolvedValue(null);
 
       await expect(
-        service.getProfile({ userId: 'gone', organizationId: 'org-1' }),
+        service.getProfile({
+          userId: 'gone',
+          organizationId: 'org-1',
+          role: 'ADMIN',
+        }),
       ).rejects.toBeInstanceOf(UnauthorizedException);
+    });
+  });
+  describe('changePassword', () => {
+    const NEW_PASSWORD = 'Brand-New-Password-2!';
+    const authUser = {
+      userId: 'user-1',
+      organizationId: 'org-1',
+      role: 'DRIVER' as const,
+    };
+    const body = (o: Record<string, string> = {}) => ({
+      currentPassword: PASSWORD,
+      newPassword: NEW_PASSWORD,
+      ...o,
+    });
+
+    it('updates the hash scoped by id and organizationId', async () => {
+      findFirst.mockResolvedValue({ passwordHash });
+      update.mockResolvedValue({ id: 'user-1' });
+
+      await expect(
+        service.changePassword(authUser, body()),
+      ).resolves.toBeUndefined();
+
+      expect(findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'user-1', organizationId: 'org-1' },
+        }),
+      );
+      const args = update.mock.calls[0][0] as {
+        where: unknown;
+        data: { passwordHash: string };
+      };
+      expect(args.where).toEqual({ id: 'user-1', organizationId: 'org-1' });
+      expect(Object.keys(args.data)).toEqual(['passwordHash']);
+      expect(args.data.passwordHash).not.toBe(NEW_PASSWORD);
+      expect(args.data.passwordHash).not.toBe(passwordHash);
+      await expect(verify(args.data.passwordHash, NEW_PASSWORD)).resolves.toBe(
+        true,
+      );
+      await expect(verify(args.data.passwordHash, PASSWORD)).resolves.toBe(
+        false,
+      );
+    });
+
+    it('rejects a wrong current password with 400 and no update', async () => {
+      findFirst.mockResolvedValue({ passwordHash });
+
+      const error = await service
+        .changePassword(authUser, body({ currentPassword: 'wrong-password-1' }))
+        .catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(BadRequestException);
+      expect((error as BadRequestException).message).toBe(
+        'Current password is incorrect',
+      );
+      expect(update).not.toHaveBeenCalled();
+    });
+
+    it('rejects newPassword equal to currentPassword before any lookup', async () => {
+      const error = await service
+        .changePassword(
+          authUser,
+          body({ currentPassword: NEW_PASSWORD, newPassword: NEW_PASSWORD }),
+        )
+        .catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(BadRequestException);
+      expect((error as BadRequestException).message).toBe(
+        'newPassword must differ from currentPassword',
+      );
+      expect(findFirst).not.toHaveBeenCalled();
+      expect(update).not.toHaveBeenCalled();
+    });
+
+    it('throws 401 when the user no longer exists', async () => {
+      findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.changePassword(authUser, body()),
+      ).rejects.toBeInstanceOf(UnauthorizedException);
+      expect(update).not.toHaveBeenCalled();
+    });
+
+    it('treats a malformed stored hash as a wrong password (400, not 500)', async () => {
+      findFirst.mockResolvedValue({ passwordHash: 'not-a-real-hash' });
+
+      await expect(
+        service.changePassword(authUser, body()),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(update).not.toHaveBeenCalled();
+    });
+
+    it('propagates database errors from the update', async () => {
+      findFirst.mockResolvedValue({ passwordHash });
+      const failure = new Error('db down');
+      update.mockRejectedValue(failure);
+
+      await expect(service.changePassword(authUser, body())).rejects.toBe(
+        failure,
+      );
     });
   });
 });

@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import {
+  BadRequestException,
   Injectable,
   type OnModuleInit,
   UnauthorizedException,
@@ -11,6 +12,7 @@ import type { EnvironmentVariables } from '../config/env.validation.js';
 import { PrismaService } from '../database/prisma.service.js';
 import type { Prisma } from '../generated/prisma/client.js';
 import type { AuthUser, JwtPayload } from './auth.types.js';
+import type { ChangePasswordDto } from './dto/change-password.dto.js';
 import type { LoginDto } from './dto/login.dto.js';
 import type { LoginResponseDto } from './dto/login-response.dto.js';
 import type { MeResponseDto } from './dto/me-response.dto.js';
@@ -21,6 +23,7 @@ const PROFILE_SELECT = {
   firstName: true,
   lastName: true,
   email: true,
+  role: true,
   createdAt: true,
   updatedAt: true,
 } satisfies Prisma.UserSelect;
@@ -75,6 +78,37 @@ export class AuthService implements OnModuleInit {
       throw new UnauthorizedException();
     }
     return profile;
+  }
+
+  async changePassword(user: AuthUser, dto: ChangePasswordDto): Promise<void> {
+    if (dto.newPassword === dto.currentPassword) {
+      throw new BadRequestException(
+        'newPassword must differ from currentPassword',
+      );
+    }
+
+    const record = await this.prisma.user.findFirst({
+      where: { id: user.userId, organizationId: user.organizationId },
+      select: { passwordHash: true },
+    });
+    if (!record) {
+      throw new UnauthorizedException();
+    }
+
+    const valid = await this.verifyPassword(
+      record.passwordHash,
+      dto.currentPassword,
+    );
+    if (!valid) {
+      throw new BadRequestException('Current password is incorrect');
+    }
+
+    const passwordHash = await hash(dto.newPassword);
+    await this.prisma.user.update({
+      where: { id: user.userId, organizationId: user.organizationId },
+      data: { passwordHash },
+      select: { id: true },
+    });
   }
 
   private async verifyPassword(

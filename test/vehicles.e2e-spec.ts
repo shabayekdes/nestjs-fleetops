@@ -66,6 +66,20 @@ describe('Vehicles (e2e)', () => {
     d: '',
   };
 
+  const roleTokens: Record<'MANAGER' | 'DRIVER', string> = {
+    MANAGER: '',
+    DRIVER: '',
+  };
+
+  const asRole = (
+    role: 'MANAGER' | 'DRIVER',
+    method: 'get' | 'post' | 'patch' | 'delete',
+    path: string,
+  ) =>
+    request(app.getHttpServer())
+      [method](`${BASE}${path}`)
+      .set('Authorization', `Bearer ${roleTokens[role]}`);
+
   const api = (
     method: 'get' | 'post' | 'patch' | 'delete',
     path: string,
@@ -127,6 +141,7 @@ describe('Vehicles (e2e)', () => {
           firstName: 'Test',
           lastName: 'User',
           passwordHash,
+          role: 'ADMIN',
         },
       });
       const res = await request(app.getHttpServer())
@@ -134,6 +149,25 @@ describe('Vehicles (e2e)', () => {
         .send({ organizationSlug: slug, email, password })
         .expect(200);
       tokens[key] = (res.body as Body).accessToken as string;
+    }
+
+    for (const role of ['MANAGER', 'DRIVER'] as const) {
+      const email = `${role.toLowerCase()}-${suffix}@example.test`;
+      await prisma.user.create({
+        data: {
+          organizationId: orgOf.a,
+          email,
+          firstName: 'Test',
+          lastName: role,
+          passwordHash,
+          role,
+        },
+      });
+      const res = await request(app.getHttpServer())
+        .post('/api/v1/auth/login')
+        .send({ organizationSlug: `veh-a-${suffix}`, email, password })
+        .expect(200);
+      roleTokens[role] = (res.body as Body).accessToken as string;
     }
 
     const tmp = await createVia('a');
@@ -462,6 +496,87 @@ describe('Vehicles (e2e)', () => {
     it('returns 400 for a malformed id', async () => {
       const res = await api('delete', '/abc').expect(400);
       expect((res.body as Body).message).toBe(BAD_UUID);
+    });
+  });
+
+  describe('role enforcement (org A)', () => {
+    describe('DRIVER (read-only)', () => {
+      it('GET /vehicles returns 200', async () => {
+        const res = await asRole('DRIVER', 'get', '').expect(200);
+        expect(Array.isArray((res.body as Body).data)).toBe(true);
+      });
+
+      it('GET /vehicles/:id returns 200', async () => {
+        const res = await asRole(
+          'DRIVER',
+          'get',
+          `/${vehicleA.id as string}`,
+        ).expect(200);
+        expect((res.body as Body).id).toBe(vehicleA.id);
+      });
+
+      it('POST returns 403 and creates nothing', async () => {
+        const body = payload();
+        const res = await asRole('DRIVER', 'post', '').send(body);
+        expect(res.status).toBe(403);
+        expect(res.body).toEqual({ statusCode: 403, message: 'Forbidden' });
+        expect(
+          await prisma.vehicle.findFirst({
+            where: { vin: body.vin as string },
+          }),
+        ).toBeNull();
+      });
+
+      it('PATCH returns 403 and leaves the row unchanged', async () => {
+        const created = await createVia('a');
+        const before = await dbRow(created.id as string);
+        await asRole('DRIVER', 'patch', `/${created.id as string}`)
+          .send({ make: 'Hacked' })
+          .expect(403);
+        expect(await dbRow(created.id as string)).toEqual(before);
+      });
+
+      it('DELETE returns 403 and the row survives', async () => {
+        const created = await createVia('a');
+        await asRole('DRIVER', 'delete', `/${created.id as string}`).expect(
+          403,
+        );
+        expect(await dbRow(created.id as string)).not.toBeNull();
+      });
+
+      it('POST with an invalid body returns 403, not 400', async () => {
+        await asRole('DRIVER', 'post', '').send({ make: 1 }).expect(403);
+      });
+
+      it('PATCH with a malformed id returns 403, not 400', async () => {
+        await asRole('DRIVER', 'patch', '/not-a-uuid').send({}).expect(403);
+      });
+
+      it('DELETE with a malformed id returns 403, not 400', async () => {
+        await asRole('DRIVER', 'delete', '/not-a-uuid').expect(403);
+      });
+    });
+
+    describe('MANAGER', () => {
+      it('can POST, PATCH and DELETE', async () => {
+        const created = await asRole('MANAGER', 'post', '')
+          .send(payload())
+          .expect(201);
+        const id = (created.body as Body).id as string;
+
+        const patched = await asRole('MANAGER', 'patch', `/${id}`)
+          .send({ make: 'Mgr' })
+          .expect(200);
+        expect((patched.body as Body).make).toBe('Mgr');
+
+        await asRole('MANAGER', 'delete', `/${id}`).expect(204);
+        expect(await dbRow(id)).toBeNull();
+      });
+
+      it('can read', async () => {
+        await asRole('MANAGER', 'get', '').expect(200);
+        await asRole('MANAGER', 'get', `/${vehicleA.id as string}`).expect(200);
+      });
     });
   });
 

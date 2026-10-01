@@ -15,7 +15,7 @@ Rules for working with phases:
 | 2     | PostgreSQL + Prisma              | Done    | `5623cff` |
 | 3     | Authentication + tenant context  | Done    | `0195815` |
 | 4     | Vehicles API                     | Done    | `9e4a426` |
-| 5     | Users + roles                    | Planned | —         |
+| 5     | Users + roles                    | Done    | —         |
 | 6     | Drivers + vehicle assignments    | Planned | —         |
 | 7     | Maintenance + fuel records       | Planned | —         |
 | 8     | API docs, logging + error format | Planned | —         |
@@ -156,23 +156,35 @@ Rules for working with phases:
 
 ## Phase 5 — Users + roles
 
-**Status:** Planned
+**Status:** Done
 
 **Goal:** organization admins manage their users, and permissions depend on role.
 
 **NestJS concepts:** role-based guards with metadata (`@Roles()` + `Reflector`), enum columns in Prisma.
 
-**Scope**
+**Built**
 
-- `role` on `User` (e.g. `ADMIN`, `MANAGER`, `DRIVER`) via a migration; seed updated.
-- `GET/POST /api/v1/users`, `GET/PATCH/DELETE /api/v1/users/:id`, admin only.
-- `PATCH /api/v1/auth/me/password` for users to change their own password.
-- Apply role checks to the vehicles endpoints (e.g. drivers can read but not write).
+- `Role` enum (`user_role`: ADMIN, MANAGER, DRIVER) and `users.role` column, default `DRIVER` (migration `add_user_role`). Seed: Alex ADMIN, Sam DRIVER, new Morgan MANAGER.
+- `UsersModule` in `src/users/`: 5 admin-only routes (`GET/POST /api/v1/users`, `GET/PATCH/DELETE /api/v1/users/:id`), 7-key responses, paginated list with `role` filter.
+- `PATCH /api/v1/auth/me/password` (any role, 204). `role` added to `/auth/me`.
+- `@Roles()` decorator and a global `RolesGuard`. Vehicle writes (create, update, delete) require ADMIN or MANAGER; reads are open to all roles.
 
-**Out of scope**
+**Decisions**
 
-- Custom or per-resource permissions.
-- Inviting users by email.
+- Role is not in the JWT. `JwtAuthGuard` re-reads `{ id, organizationId, role }` on every request, so role changes and deletions apply immediately (this fixes the phase 3 deleted-user item). `sub` and `org` must be UUIDs, otherwise 401 before any query.
+- `RolesGuard` is a second `APP_GUARD` registered after `JwtAuthGuard`. A route without `@Roles()` is open to any authenticated user. Guards run before pipes, so a forbidden request gets 403 even with an invalid body.
+- DB default is DRIVER (least privilege); role is required when creating a user.
+- An admin cannot delete themselves or change their own role (409).
+- Password 12 to 128 characters, not trimmed, must differ from the current one; a wrong current password is 400.
+- Duplicate email in an organization is 409; cross-tenant access is 404 (also when a PATCH email would collide).
+
+**Out of scope / deferred**
+
+- Admin password reset; token revocation after a password or role change.
+- Transactional last-admin protection against concurrent mutual demotion.
+- Rate limiting on password change (phase 8).
+- Inviting users by email; custom or per-resource permissions.
+- P2003 on user delete is not mapped: phase 6 must handle it once Driver links to User.
 
 ---
 

@@ -7,6 +7,14 @@ datasource db {
   provider = "postgresql"
 }
 
+enum Role {
+  ADMIN
+  MANAGER
+  DRIVER
+
+  @@map("user_role")
+}
+
 model Organization {
   id        String   @id @default(uuid(7)) @db.Uuid
   name      String
@@ -29,6 +37,8 @@ model User {
   email          String
   /// Argon2id hash. Never return this field from the API.
   passwordHash   String   @map("password_hash")
+  /// Least privilege by default; ADMIN manages users, MANAGER and ADMIN write vehicles.
+  role           Role     @default(DRIVER)
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 

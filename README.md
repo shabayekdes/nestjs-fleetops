@@ -115,10 +115,11 @@ npm run db:test:migrate      # apply migrations to the database in .env.test
 | -------------- | ---------------- |
 | Acme Logistics | `acme-logistics` |
 
-| User           | Email                      | Password            |
-| -------------- | -------------------------- | ------------------- |
-| Alex Fleetwood | `alex@acme-logistics.test` | `FleetOps-dev-123!` |
-| Sam Driver     | `sam@acme-logistics.test`  | `FleetOps-dev-123!` |
+| User           | Email                        | Role    | Password            |
+| -------------- | ---------------------------- | ------- | ------------------- |
+| Alex Fleetwood | `alex@acme-logistics.test`   | ADMIN   | `FleetOps-dev-123!` |
+| Morgan Manager | `morgan@acme-logistics.test` | MANAGER | `FleetOps-dev-123!` |
+| Sam Driver     | `sam@acme-logistics.test`    | DRIVER  | `FleetOps-dev-123!` |
 
 Plus three vehicles (Ford Transit, Mercedes-Benz Sprinter, Volvo FH16 — the latter without a license plate). Passwords are stored as Argon2id hashes. Records are upserted on their natural keys (`slug`, `organizationId + email`, `organizationId + vin`), so re-running the seed never duplicates data.
 
@@ -165,17 +166,23 @@ npm run format      # Prettier
 
 All routes are served under the `/api` prefix with URI versioning (default version `v1`).
 
-| Method | Path                   | Description                                      |
-| ------ | ---------------------- | ------------------------------------------------ |
-| GET    | `/api/v1`              | Confirms the API is running                      |
-| GET    | `/api/v1/health`       | Application + database health (200 / 503)        |
-| POST   | `/api/v1/auth/login`   | Public. Exchange credentials for an access token |
-| GET    | `/api/v1/auth/me`      | Bearer token. Current user profile               |
-| GET    | `/api/v1/vehicles`     | Bearer token. List vehicles (paginated, filters) |
-| POST   | `/api/v1/vehicles`     | Bearer token. Create a vehicle                   |
-| GET    | `/api/v1/vehicles/:id` | Bearer token. Get a vehicle                      |
-| PATCH  | `/api/v1/vehicles/:id` | Bearer token. Partially update a vehicle         |
-| DELETE | `/api/v1/vehicles/:id` | Bearer token. Delete a vehicle (204)             |
+| Method | Path                       | Description                                                |
+| ------ | -------------------------- | ---------------------------------------------------------- |
+| GET    | `/api/v1`                  | Confirms the API is running                                |
+| GET    | `/api/v1/health`           | Application + database health (200 / 503)                  |
+| POST   | `/api/v1/auth/login`       | Public. Exchange credentials for an access token           |
+| GET    | `/api/v1/auth/me`          | Bearer token. Current user profile (with role)             |
+| PATCH  | `/api/v1/auth/me/password` | Bearer token, any role. Change own password (204)          |
+| GET    | `/api/v1/users`            | Bearer token, ADMIN. List users (paginated, role filter)   |
+| POST   | `/api/v1/users`            | Bearer token, ADMIN. Create a user                         |
+| GET    | `/api/v1/users/:id`        | Bearer token, ADMIN. Get a user                            |
+| PATCH  | `/api/v1/users/:id`        | Bearer token, ADMIN. Partially update a user               |
+| DELETE | `/api/v1/users/:id`        | Bearer token, ADMIN. Delete a user (204)                   |
+| GET    | `/api/v1/vehicles`         | Bearer token. List vehicles (paginated, filters)           |
+| POST   | `/api/v1/vehicles`         | Bearer token, ADMIN or MANAGER. Create a vehicle           |
+| GET    | `/api/v1/vehicles/:id`     | Bearer token. Get a vehicle                                |
+| PATCH  | `/api/v1/vehicles/:id`     | Bearer token, ADMIN or MANAGER. Partially update a vehicle |
+| DELETE | `/api/v1/vehicles/:id`     | Bearer token, ADMIN or MANAGER. Delete a vehicle (204)     |
 
 Every endpoint except `/api/v1` and `/api/v1/health` requires an `Authorization: Bearer <token>` header.
 
@@ -239,3 +246,45 @@ curl -X DELETE http://localhost:3000/api/v1/vehicles/<id> -H "Authorization: Bea
 ```
 
 Rules: the VIN is 17 characters (digits and letters except I, O, Q) and is stored uppercase. The license plate is optional, stored uppercase, at most 15 characters (letters, digits, spaces, hyphens); `null` clears it on PATCH. The year must be between 1900 and next year. Lists are paginated (`page` default 1, `limit` default 20, max 100), newest first, and can be filtered by `make`, `model` (case-insensitive, exact) and `year`. Responses never include `organizationId`. Another organization's vehicle returns `404`, the same as a missing one. `:id` must be a UUIDv7 (otherwise `400`). A duplicate VIN or license plate within the organization returns `409`.
+
+### Roles
+
+Every user has one role: `ADMIN`, `MANAGER` or `DRIVER` (default `DRIVER`).
+
+| Action                          | ADMIN | MANAGER | DRIVER |
+| ------------------------------- | ----- | ------- | ------ |
+| Read vehicles                   | yes   | yes     | yes    |
+| Create, update, delete vehicles | yes   | yes     | no     |
+| Manage users (`/api/v1/users`)  | yes   | no      | no     |
+| Change own password             | yes   | yes     | yes    |
+
+A route without `@Roles()` is open to any authenticated user. A role the route does not allow returns `403 Forbidden`. Role checks run before validation, so a forbidden request gets `403` even if its body is invalid. The role is read from the database on every request, not from the token, so a role change or user deletion takes effect on the next request, even with an older token (a deleted user gets `401`).
+
+### Users
+
+All user routes require an ADMIN token and only ever see the caller's own organization. Responses contain `id, firstName, lastName, email, role, createdAt, updatedAt`; never `passwordHash` or `organizationId`.
+
+```bash
+curl -X POST http://localhost:3000/api/v1/users \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"firstName":"Jo","lastName":"Smith","email":"jo@acme-logistics.test","password":"a-long-password-123","role":"MANAGER"}'
+
+curl 'http://localhost:3000/api/v1/users?role=DRIVER&page=1&limit=20' -H "Authorization: Bearer $TOKEN"
+
+# any role, own password
+curl -X PATCH http://localhost:3000/api/v1/auth/me/password \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"currentPassword":"FleetOps-dev-123!","newPassword":"a-new-long-password-456"}'
+```
+
+Rules: passwords are 12 to 128 characters and are never trimmed. A new password must differ from the current one; a wrong current password returns `400`. Emails are trimmed and lowercased; a duplicate email in the organization returns `409`. Another organization's user returns `404`, the same as a missing one. An admin cannot delete their own account or change their own role (`409`). Existing tokens stay valid after a password change.
+
+### Upgrading to phase 5
+
+The `role` column is added by migration `add_user_role`. Existing users become `DRIVER` until re-seeded or changed by an admin.
+
+```bash
+npm run db:migrate
+npm run db:seed
+npm run db:test:migrate
+```

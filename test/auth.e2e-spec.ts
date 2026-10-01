@@ -287,6 +287,7 @@ describe('Auth (e2e)', () => {
           'id',
           'lastName',
           'organizationId',
+          'role',
           'updatedAt',
         ].sort(),
       );
@@ -294,6 +295,26 @@ describe('Auth (e2e)', () => {
       expect(body.id).toBe(userAId);
       expect(body.organizationId).toBe(orgAId);
       expect(body.email).toBe(sharedEmail);
+    });
+
+    it('returns the role stored in the database', async () => {
+      const token = await loginToken(slugA, sharedEmail, passA);
+      const res = await me(`Bearer ${token}`).expect(200);
+      expect((res.body as Body).role).toBe('DRIVER');
+
+      await prisma.user.update({
+        where: { id: userAId },
+        data: { role: 'MANAGER' },
+      });
+      try {
+        const after = await me(`Bearer ${token}`).expect(200);
+        expect((after.body as Body).role).toBe('MANAGER');
+      } finally {
+        await prisma.user.update({
+          where: { id: userAId },
+          data: { role: 'DRIVER' },
+        });
+      }
     });
 
     it('returns the org B user for an org B token', async () => {
@@ -383,6 +404,18 @@ describe('Auth (e2e)', () => {
         expectBare401(await me(`Bearer ${token}`));
       });
 
+      it.each<[string, Record<string, unknown>]>([
+        ['non-UUID sub', { sub: 'not-a-uuid' }],
+        ['non-UUID org', { org: 'not-a-uuid' }],
+        ['SQL-ish sub', { sub: "' OR 1=1 --" }],
+      ])(
+        'rejects a signed token with %s as a bare 401, not 500',
+        async (_n, o) => {
+          const token = craftToken({ ...valid(), ...o }, secret);
+          expectBare401(await me(`Bearer ${token}`));
+        },
+      );
+
       it('rejects a tampered payload', async () => {
         const token = craftToken(valid(), secret);
         const [h, , s] = token.split('.');
@@ -410,6 +443,185 @@ describe('Auth (e2e)', () => {
 
         expectBare401(await me(`Bearer ${token}`));
       });
+    });
+  });
+
+  describe('PATCH /api/v1/auth/me/password', () => {
+    const URL = '/api/v1/auth/me/password';
+    const NEW_PASS = `New-Pass-${suffix}-abc!`;
+    const pwUsers: string[] = [];
+    let pwSeq = 0;
+
+    const mkUser = async (
+      tag: string,
+      role: 'ADMIN' | 'MANAGER' | 'DRIVER' = 'DRIVER',
+    ) => {
+      const email = `pw-${tag}-${++pwSeq}-${suffix}@example.test`;
+      const password = `Orig-${tag}-${suffix}-pw!`;
+      const user = await prisma.user.create({
+        data: {
+          organizationId: orgAId,
+          email,
+          firstName: 'Pw',
+          lastName: 'User',
+          passwordHash: await hash(password),
+          role,
+        },
+      });
+      pwUsers.push(user.id);
+      const token = await loginToken(slugA, email, password);
+      return { id: user.id, email, password, token };
+    };
+
+    const change = (token: string, body: Body) =>
+      request(app.getHttpServer())
+        .patch(URL)
+        .set('Authorization', `Bearer ${token}`)
+        .send(body);
+
+    afterAll(async () => {
+      await prisma.user.deleteMany({ where: { id: { in: pwUsers } } });
+    });
+
+    it('changes the password: 204 empty, new login works, old is rejected', async () => {
+      const u = await mkUser('ok', 'MANAGER');
+
+      const res = await change(u.token, {
+        currentPassword: u.password,
+        newPassword: NEW_PASS,
+      });
+      expect(res.status).toBe(204);
+      expect(res.text).toBe('');
+
+      await login({
+        organizationSlug: slugA,
+        email: u.email,
+        password: NEW_PASS,
+      }).expect(200);
+      const old = await login({
+        organizationSlug: slugA,
+        email: u.email,
+        password: u.password,
+      });
+      expect(old.status).toBe(401);
+      expect(old.body).toEqual(INVALID_CREDENTIALS);
+    });
+
+    it('keeps the existing token valid after the change', async () => {
+      const u = await mkUser('tok');
+      await change(u.token, {
+        currentPassword: u.password,
+        newPassword: NEW_PASS,
+      }).expect(204);
+      await me(`Bearer ${u.token}`).expect(200);
+    });
+
+    it('lets a DRIVER change their own password', async () => {
+      const u = await mkUser('drv', 'DRIVER');
+      await change(u.token, {
+        currentPassword: u.password,
+        newPassword: NEW_PASS,
+      }).expect(204);
+    });
+
+    it('stores a hash, never the plain password', async () => {
+      const u = await mkUser('hash');
+      await change(u.token, {
+        currentPassword: u.password,
+        newPassword: NEW_PASS,
+      }).expect(204);
+      const row = await prisma.user.findUniqueOrThrow({ where: { id: u.id } });
+      expect(row.passwordHash).not.toBe(NEW_PASS);
+      expect(row.passwordHash.startsWith('$argon2')).toBe(true);
+    });
+
+    it('rejects a wrong current password with 400 and keeps the old one', async () => {
+      const u = await mkUser('wrong');
+      const res = await change(u.token, {
+        currentPassword: 'definitely-not-it-1',
+        newPassword: NEW_PASS,
+      });
+      expect(res.status).toBe(400);
+      expect((res.body as Body).message).toBe('Current password is incorrect');
+      await login({
+        organizationSlug: slugA,
+        email: u.email,
+        password: u.password,
+      }).expect(200);
+    });
+
+    it('rejects newPassword equal to currentPassword with 400', async () => {
+      const u = await mkUser('same');
+      const res = await change(u.token, {
+        currentPassword: u.password,
+        newPassword: u.password,
+      });
+      expect(res.status).toBe(400);
+      expect((res.body as Body).message).toBe(
+        'newPassword must differ from currentPassword',
+      );
+    });
+
+    it('rejects an 11-char newPassword with 400', async () => {
+      const u = await mkUser('short');
+      await change(u.token, {
+        currentPassword: u.password,
+        newPassword: 'a'.repeat(11),
+      }).expect(400);
+    });
+
+    it.each<[string, Body]>([
+      ['empty body', {}],
+      ['missing newPassword', { currentPassword: 'x' }],
+      ['missing currentPassword', { newPassword: 'a'.repeat(12) }],
+      [
+        'empty currentPassword',
+        { currentPassword: '', newPassword: 'a'.repeat(12) },
+      ],
+    ])('rejects %s with 400', async (_n, body) => {
+      const u = await mkUser('miss');
+      await change(u.token, body).expect(400);
+    });
+
+    it('rejects an extra field with 400', async () => {
+      const u = await mkUser('extra');
+      await change(u.token, {
+        currentPassword: u.password,
+        newPassword: NEW_PASS,
+        role: 'ADMIN',
+      }).expect(400);
+      await login({
+        organizationSlug: slugA,
+        email: u.email,
+        password: u.password,
+      }).expect(200);
+    });
+
+    it('returns a bare 401 without a token, even with an invalid body', async () => {
+      expectBare401(await request(app.getHttpServer()).patch(URL).send({}));
+    });
+
+    it('only changes the caller, not a same-email user in another org', async () => {
+      const u = await mkUser('iso');
+      const other = await prisma.user.create({
+        data: {
+          organizationId: orgBId,
+          email: u.email,
+          firstName: 'Other',
+          lastName: 'Org',
+          passwordHash: await hash(passB),
+        },
+      });
+      pwUsers.push(other.id);
+      await change(u.token, {
+        currentPassword: u.password,
+        newPassword: NEW_PASS,
+      }).expect(204);
+      await login({
+        organizationSlug: slugB,
+        email: u.email,
+        password: passB,
+      }).expect(200);
     });
   });
 

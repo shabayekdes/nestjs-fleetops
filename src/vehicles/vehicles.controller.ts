@@ -13,6 +13,8 @@ import {
 } from '@nestjs/common';
 import type { AuthUser } from '../auth/auth.types.js';
 import { CurrentUser } from '../auth/current-user.decorator.js';
+import { Roles } from '../auth/roles.decorator.js';
+import { Role } from '../generated/prisma/client.js';
 import { CreateVehicleDto } from './dto/create-vehicle.dto.js';
 import { ListVehiclesQueryDto } from './dto/list-vehicles-query.dto.js';
 import { UpdateVehicleDto } from './dto/update-vehicle.dto.js';
@@ -37,6 +39,7 @@ export class VehiclesController {
   }
 
   @Post()
+  @Roles(Role.ADMIN, Role.MANAGER)
   create(
     @CurrentUser() user: AuthUser,
     @Body() dto: CreateVehicleDto,
@@ -53,6 +56,7 @@ export class VehiclesController {
   }
 
   @Patch(':id')
+  @Roles(Role.ADMIN, Role.MANAGER)
   update(
     @CurrentUser() user: AuthUser,
     @Param('id', UUID_V7) id: string,
@@ -62,6 +66,7 @@ export class VehiclesController {
   }
 
   @Delete(':id')
+  @Roles(Role.ADMIN, Role.MANAGER)
   @HttpCode(HttpStatus.NO_CONTENT)
   remove(
     @CurrentUser() user: AuthUser,
