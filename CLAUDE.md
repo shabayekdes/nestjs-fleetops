@@ -26,6 +26,12 @@ Leads and the CTO are read-only planners/reviewers; only developers edit files.
 
 ---
 
+## Phases
+
+The project is built in phases. `docs/PHASES.md` records what each phase built, its decisions and what is still out of scope. Read it before planning new work, build only the current phase, and update it when a phase is done.
+
+---
+
 ## Project Conventions (FleetOps API)
 
 Stack: NestJS 12 · TypeScript strict · native ES modules · PostgreSQL · Prisma 7 · Jest · ESLint + Prettier.
