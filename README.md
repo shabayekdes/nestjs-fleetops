@@ -2,7 +2,7 @@
 
 Backend API for **FleetOps**, a B2B fleet management platform, built with NestJS and TypeScript.
 
-The project is developed incrementally. Current state: application foundation (bootstrap, configuration, versioned routing, global validation), a PostgreSQL database layer with Prisma and a database-aware health check, and JWT authentication with tenant context (login by organization slug, global auth guard).
+The project is developed incrementally. Current state: application foundation (bootstrap, configuration, versioned routing, global validation), a PostgreSQL database layer with Prisma and a database-aware health check, JWT authentication with tenant context (login by organization slug, global auth guard), and a tenant-scoped Vehicles CRUD API.
 
 ## Technology Stack
 
@@ -165,31 +165,23 @@ npm run format      # Prettier
 
 All routes are served under the `/api` prefix with URI versioning (default version `v1`).
 
-| Method | Path                 | Description                                      |
-| ------ | -------------------- | ------------------------------------------------ |
-| GET    | `/api/v1`            | Confirms the API is running                      |
-| GET    | `/api/v1/health`     | Application + database health (200 / 503)        |
-| POST   | `/api/v1/auth/login` | Public. Exchange credentials for an access token |
-| GET    | `/api/v1/auth/me`    | Bearer token. Current user profile               |
+| Method | Path                   | Description                                      |
+| ------ | ---------------------- | ------------------------------------------------ |
+| GET    | `/api/v1`              | Confirms the API is running                      |
+| GET    | `/api/v1/health`       | Application + database health (200 / 503)        |
+| POST   | `/api/v1/auth/login`   | Public. Exchange credentials for an access token |
+| GET    | `/api/v1/auth/me`      | Bearer token. Current user profile               |
+| GET    | `/api/v1/vehicles`     | Bearer token. List vehicles (paginated, filters) |
+| POST   | `/api/v1/vehicles`     | Bearer token. Create a vehicle                   |
+| GET    | `/api/v1/vehicles/:id` | Bearer token. Get a vehicle                      |
+| PATCH  | `/api/v1/vehicles/:id` | Bearer token. Partially update a vehicle         |
+| DELETE | `/api/v1/vehicles/:id` | Bearer token. Delete a vehicle (204)             |
 
 Every endpoint except `/api/v1` and `/api/v1/health` requires an `Authorization: Bearer <token>` header.
 
 ```bash
 curl http://localhost:3000/api/v1/health
 ```
-
-### Authentication
-
-```bash
-curl -X POST http://localhost:3000/api/v1/auth/login \
-  -H 'Content-Type: application/json' \
-  -d '{"organizationSlug":"acme-logistics","email":"alex@acme-logistics.test","password":"FleetOps-dev-123!"}'
-# {"accessToken":"<token>","tokenType":"Bearer","expiresIn":900}
-
-curl http://localhost:3000/api/v1/auth/me -H 'Authorization: Bearer <token>'
-```
-
-Invalid credentials return `401` with `{"message":"Invalid credentials","error":"Unauthorized","statusCode":401}`. A missing, malformed, expired or invalid token returns `401`.
 
 Healthy (`200 OK`):
 
@@ -212,3 +204,38 @@ Database unreachable (`503 Service Unavailable`):
   "database": "down"
 }
 ```
+
+### Authentication
+
+```bash
+curl -X POST http://localhost:3000/api/v1/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"organizationSlug":"acme-logistics","email":"alex@acme-logistics.test","password":"FleetOps-dev-123!"}'
+# {"accessToken":"<token>","tokenType":"Bearer","expiresIn":900}
+
+curl http://localhost:3000/api/v1/auth/me -H 'Authorization: Bearer <token>'
+```
+
+Invalid credentials return `401` with `{"message":"Invalid credentials","error":"Unauthorized","statusCode":401}`. A missing, malformed, expired or invalid token returns `401`.
+
+### Vehicles
+
+All vehicle routes require a Bearer token and only ever see the caller's own organization.
+
+```bash
+TOKEN=<accessToken from login>
+
+curl -X POST http://localhost:3000/api/v1/vehicles \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"make":"Ford","model":"Transit","year":2023,"vin":"1FTBW2CM5HKA12345","licensePlate":"ABC-123"}'
+
+curl 'http://localhost:3000/api/v1/vehicles?page=1&limit=20&make=ford' -H "Authorization: Bearer $TOKEN"
+
+curl -X PATCH http://localhost:3000/api/v1/vehicles/<id> \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"licensePlate":null}'
+
+curl -X DELETE http://localhost:3000/api/v1/vehicles/<id> -H "Authorization: Bearer $TOKEN"
+```
+
+Rules: the VIN is 17 characters (digits and letters except I, O, Q) and is stored uppercase. The license plate is optional, stored uppercase, at most 15 characters (letters, digits, spaces, hyphens); `null` clears it on PATCH. The year must be between 1900 and next year. Lists are paginated (`page` default 1, `limit` default 20, max 100), newest first, and can be filtered by `make`, `model` (case-insensitive, exact) and `year`. Responses never include `organizationId`. Another organization's vehicle returns `404`, the same as a missing one. `:id` must be a UUIDv7 (otherwise `400`). A duplicate VIN or license plate within the organization returns `409`.

@@ -14,7 +14,7 @@ Rules for working with phases:
 | 1     | Application foundation           | Done    | `4b1d372` |
 | 2     | PostgreSQL + Prisma              | Done    | `5623cff` |
 | 3     | Authentication + tenant context  | Done    | `0195815` |
-| 4     | Vehicles API                     | Planned | —         |
+| 4     | Vehicles API                     | Done    | —         |
 | 5     | Users + roles                    | Planned | —         |
 | 6     | Drivers + vehicle assignments    | Planned | —         |
 | 7     | Maintenance + fuel records       | Planned | —         |
@@ -120,27 +120,37 @@ Rules for working with phases:
 
 ## Phase 4 — Vehicles API
 
-**Status:** Planned
+**Status:** Done (not yet committed)
 
 **Goal:** the first full CRUD resource, scoped to the caller's organization.
 
-**NestJS concepts:** feature module structure, DTOs with class-validator, `ParseUUIDPipe`, mapping Prisma errors to HTTP exceptions, response DTOs.
+**NestJS concepts:** feature module structure, DTOs with class-validator and class-transformer, `ParseUUIDPipe`, custom validators (`ValidateBy`), mapping Prisma errors to HTTP exceptions, response DTOs.
 
-**Scope**
+**Built**
 
-- `GET/POST /api/v1/vehicles`, `GET/PATCH/DELETE /api/v1/vehicles/:id`.
-- Every query filters by the caller's `organizationId`. A vehicle in another organization returns 404, not 403.
-- Pagination (`page`, `limit`) and simple filters (e.g. `make`, `year`) on the list endpoint.
-- Duplicate VIN or license plate within the organization returns 409.
+- `VehiclesModule` in `src/vehicles/`, all routes behind the global JWT guard:
+  - `GET /api/v1/vehicles`: `{ data, meta: { page, limit, total } }`. `page` default 1; `limit` default 20, max 100. Filters `make`, `model` (case-insensitive exact match) and `year`. Newest first, ties broken by `id`.
+  - `POST /api/v1/vehicles` (201), `GET /api/v1/vehicles/:id`, `PATCH /api/v1/vehicles/:id`, `DELETE /api/v1/vehicles/:id` (204).
+- Validation: VIN 17 characters without I/O/Q, trimmed and uppercased; license plate optional, trimmed and uppercased, max 15; year 1900 to the current UTC year + 1, checked on each request; make/model trimmed, max 50, case kept.
+- Responses have exactly 8 fields (`id, make, model, year, vin, licensePlate, createdAt, updatedAt`), with no `organizationId`.
+- Unit tests (service, three DTOs) and `test/vehicles.e2e-spec.ts`, including cross-tenant read/update/delete attempts.
 
-**Out of scope**
+**Decisions**
 
-- Assigning drivers to vehicles (phase 6).
-- Vehicle status or lifecycle beyond create/update/delete.
+- **Tenant scoping in the query itself.** `findFirst`, `update` and `delete` all use `where: { id, organizationId }`. Another organization's vehicle returns the same 404 as a missing one, and it returns 404 rather than 409 even when the update would collide.
+- **Prisma errors are mapped locally** in `vehicles.service.ts` (`toHttpError`): P2025 → 404, P2002 → 409 naming VIN or license plate. With `@prisma/adapter-pg` the duplicate is identified by the index name in `meta.driverAdapterError.cause.constraint.index`, not `meta.target`. Other errors are rethrown. A shared mapper waits for a second resource or phase 8.
+- **PATCH DTO written by hand**, not `PartialType`: `null` for a required column must be a 400, not a database error. `licensePlate: null` clears the plate; an omitted field is left unchanged.
+- **Prisma `data` is built field by field**, never by spreading a DTO (with `useDefineForClassFields`, every declared DTO property exists as a key).
+- `:id` must be a UUIDv7 (`ParseUUIDPipe({ version: '7' })`), otherwise 400.
+- Hard delete. No migration: the existing unique indexes start with `organization_id`.
 
-**Acceptance criteria**
+**Out of scope (still not built)**
 
-- e2e tests prove a user cannot read or change another organization's vehicles.
+- Driver assignment (phase 6), vehicle status or lifecycle, soft delete.
+- Role checks (phase 5): any user in the organization can create, update or delete vehicles.
+- Partial-match search, sorting parameters, cursor pagination.
+- Collapsing repeated spaces in plates (`FLT 1001` and `FLT  1001` are different plates).
+- P2003 (foreign-key error, e.g. the organization deleted while a token is still valid) is not mapped and returns 500.
 
 ---
 
