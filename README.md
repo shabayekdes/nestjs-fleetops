@@ -2,7 +2,7 @@
 
 Backend API for **FleetOps**, a B2B fleet management platform, built with NestJS and TypeScript.
 
-The project is developed incrementally. Current state: application foundation (bootstrap, configuration, versioned routing, global validation) plus a PostgreSQL database layer with Prisma and a database-aware health check.
+The project is developed incrementally. Current state: application foundation (bootstrap, configuration, versioned routing, global validation), a PostgreSQL database layer with Prisma and a database-aware health check, and JWT authentication with tenant context (login by organization slug, global auth guard).
 
 ## Technology Stack
 
@@ -33,11 +33,15 @@ cp .env.test.example .env.test # only needed for e2e/integration tests
 
 Configuration is read from environment variables. Values are validated at startup and the application refuses to start if they are invalid. Real environment variables always override values from the `.env` files.
 
-| Variable       | Description                                  | Default       |
-| -------------- | -------------------------------------------- | ------------- |
-| `NODE_ENV`     | `development`, `production`, or `test`       | `development` |
-| `PORT`         | HTTP port the API listens on (1–65535)       | `3000`        |
-| `DATABASE_URL` | PostgreSQL connection string (**required**)  | —             |
+| Variable         | Description                                                                       | Default       |
+| ---------------- | --------------------------------------------------------------------------------- | ------------- |
+| `NODE_ENV`       | `development`, `production`, or `test`                                            | `development` |
+| `PORT`           | HTTP port the API listens on (1–65535)                                            | `3000`        |
+| `DATABASE_URL`   | PostgreSQL connection string (**required**)                                       | —             |
+| `JWT_SECRET`     | HS256 signing secret, at least 32 chars (**required**). `openssl rand -base64 48` | —             |
+| `JWT_EXPIRES_IN` | Access token lifetime in seconds (60–86400)                                       | `900`         |
+
+Existing `.env` and `.env.test` files created before authentication was added must be updated with a `JWT_SECRET`, otherwise the app will not start.
 
 Which file is loaded:
 
@@ -75,13 +79,13 @@ DATABASE_URL="postgresql://USER:PASSWORD@ep-xxxx.REGION.aws.neon.tech/neondb?ssl
 
 ## Database (Prisma)
 
-| File                       | Purpose                                                          |
-| -------------------------- | ---------------------------------------------------------------- |
-| `prisma/schema.prisma`     | Data model (source of truth)                                     |
-| `prisma/migrations/`       | Generated SQL migrations — committed, never edited after applied |
-| `prisma/seed.ts`           | Idempotent development seed                                      |
-| `prisma.config.ts`         | Prisma CLI config (schema/migrations paths, datasource URL, seed) |
-| `src/generated/prisma/`    | Generated client — git-ignored, rebuilt by `prisma generate`     |
+| File                    | Purpose                                                           |
+| ----------------------- | ----------------------------------------------------------------- |
+| `prisma/schema.prisma`  | Data model (source of truth)                                      |
+| `prisma/migrations/`    | Generated SQL migrations — committed, never edited after applied  |
+| `prisma/seed.ts`        | Idempotent development seed                                       |
+| `prisma.config.ts`      | Prisma CLI config (schema/migrations paths, datasource URL, seed) |
+| `src/generated/prisma/` | Generated client — git-ignored, rebuilt by `prisma generate`      |
 
 ### Commands
 
@@ -107,9 +111,9 @@ npm run db:test:migrate      # apply migrations to the database in .env.test
 
 > **DEVELOPMENT ONLY.** All data is fictional. The password is public. The seed refuses to run when `NODE_ENV=production`.
 
-| Organization     | Slug             |
-| ---------------- | ---------------- |
-| Acme Logistics   | `acme-logistics` |
+| Organization   | Slug             |
+| -------------- | ---------------- |
+| Acme Logistics | `acme-logistics` |
 
 | User           | Email                      | Password            |
 | -------------- | -------------------------- | ------------------- |
@@ -161,14 +165,31 @@ npm run format      # Prettier
 
 All routes are served under the `/api` prefix with URI versioning (default version `v1`).
 
-| Method | Path             | Description                                  |
-| ------ | ---------------- | -------------------------------------------- |
-| GET    | `/api/v1`        | Confirms the API is running                  |
-| GET    | `/api/v1/health` | Application + database health (200 / 503)    |
+| Method | Path                 | Description                                      |
+| ------ | -------------------- | ------------------------------------------------ |
+| GET    | `/api/v1`            | Confirms the API is running                      |
+| GET    | `/api/v1/health`     | Application + database health (200 / 503)        |
+| POST   | `/api/v1/auth/login` | Public. Exchange credentials for an access token |
+| GET    | `/api/v1/auth/me`    | Bearer token. Current user profile               |
+
+Every endpoint except `/api/v1` and `/api/v1/health` requires an `Authorization: Bearer <token>` header.
 
 ```bash
 curl http://localhost:3000/api/v1/health
 ```
+
+### Authentication
+
+```bash
+curl -X POST http://localhost:3000/api/v1/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"organizationSlug":"acme-logistics","email":"alex@acme-logistics.test","password":"FleetOps-dev-123!"}'
+# {"accessToken":"<token>","tokenType":"Bearer","expiresIn":900}
+
+curl http://localhost:3000/api/v1/auth/me -H 'Authorization: Bearer <token>'
+```
+
+Invalid credentials return `401` with `{"message":"Invalid credentials","error":"Unauthorized","statusCode":401}`. A missing, malformed, expired or invalid token returns `401`.
 
 Healthy (`200 OK`):
 

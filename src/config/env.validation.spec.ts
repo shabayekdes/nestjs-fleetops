@@ -1,0 +1,66 @@
+import 'reflect-metadata';
+import { validateEnv } from './env.validation.js';
+
+const base = {
+  NODE_ENV: 'test',
+  DATABASE_URL: 'postgresql://u:p@localhost:5432/db',
+  JWT_SECRET: 'a'.repeat(32),
+};
+
+describe('validateEnv', () => {
+  it('applies defaults for PORT and JWT_EXPIRES_IN', () => {
+    const env = validateEnv(base);
+    expect(env.PORT).toBe(3000);
+    expect(env.JWT_EXPIRES_IN).toBe(900);
+    expect(env.JWT_SECRET).toBe(base.JWT_SECRET);
+  });
+
+  describe('JWT_SECRET', () => {
+    it('throws when missing', () => {
+      const rest: Record<string, unknown> = { ...base };
+      delete rest.JWT_SECRET;
+      expect(() => validateEnv(rest)).toThrow(/JWT_SECRET/);
+    });
+
+    it('throws when 31 characters', () => {
+      expect(() =>
+        validateEnv({ ...base, JWT_SECRET: 'a'.repeat(31) }),
+      ).toThrow(/JWT_SECRET/);
+    });
+
+    it('accepts 32 characters', () => {
+      expect(() =>
+        validateEnv({ ...base, JWT_SECRET: 'a'.repeat(32) }),
+      ).not.toThrow();
+    });
+  });
+
+  describe('JWT_EXPIRES_IN', () => {
+    it.each([
+      ['60', 60],
+      ['86400', 86400],
+      ['900', 900],
+    ])('accepts %s', (value, expected) => {
+      expect(
+        validateEnv({ ...base, JWT_EXPIRES_IN: value }).JWT_EXPIRES_IN,
+      ).toBe(expected);
+    });
+
+    it.each(['59', '86401', 'abc', '1.5', '0'])('rejects %s', (value) => {
+      expect(() => validateEnv({ ...base, JWT_EXPIRES_IN: value })).toThrow(
+        /JWT_EXPIRES_IN/,
+      );
+    });
+  });
+
+  it('still rejects an invalid DATABASE_URL', () => {
+    expect(() => validateEnv({ ...base, DATABASE_URL: 'mysql://x' })).toThrow(
+      /DATABASE_URL/,
+    );
+  });
+
+  it('still rejects an invalid PORT', () => {
+    expect(() => validateEnv({ ...base, PORT: '70000' })).toThrow(/PORT/);
+    expect(() => validateEnv({ ...base, PORT: 'abc' })).toThrow(/PORT/);
+  });
+});

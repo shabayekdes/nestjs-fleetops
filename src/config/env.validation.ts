@@ -2,9 +2,11 @@ import { plainToInstance } from 'class-transformer';
 import {
   IsEnum,
   IsInt,
+  IsString,
   Matches,
   Max,
   Min,
+  MinLength,
   validateSync,
 } from 'class-validator';
 
@@ -27,6 +29,16 @@ export class EnvironmentVariables {
     message: 'DATABASE_URL must be a postgresql:// connection string',
   })
   DATABASE_URL: string;
+
+  @IsString()
+  @MinLength(32)
+  JWT_SECRET: string;
+
+  /** Access token lifetime in seconds. */
+  @IsInt()
+  @Min(60)
+  @Max(86400)
+  JWT_EXPIRES_IN: number = 900;
 }
 
 /**
