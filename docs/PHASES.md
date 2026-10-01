@@ -13,7 +13,7 @@ Rules for working with phases:
 | ----- | -------------------------------- | ------- | --------- |
 | 1     | Application foundation           | Done    | `4b1d372` |
 | 2     | PostgreSQL + Prisma              | Done    | `5623cff` |
-| 3     | Authentication + tenant context  | Done    | —         |
+| 3     | Authentication + tenant context  | Done    | `0195815` |
 | 4     | Vehicles API                     | Planned | —         |
 | 5     | Users + roles                    | Planned | —         |
 | 6     | Drivers + vehicle assignments    | Planned | —         |
@@ -83,7 +83,7 @@ Rules for working with phases:
 
 ## Phase 3 — Authentication + tenant context
 
-**Status:** Done (not yet committed)
+**Status:** Done (`0195815`)
 
 **Goal:** users can log in, and every protected request knows which user and organization it belongs to.
 
