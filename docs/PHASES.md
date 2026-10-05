@@ -19,7 +19,7 @@ Rules for working with phases:
 | 4     | Vehicles API                     | Done    | `9e4a426` |
 | 5     | Users + roles                    | Done    | `c80e806` |
 | 6     | Drivers + vehicle assignments    | Done    | `961d586` |
-| 7     | Maintenance + fuel records       | Done    | pending   |
+| 7     | Maintenance + fuel records       | Done    | `f12eeed` |
 | 8     | API docs, logging + error format | Planned | —         |
 | 9     | Docker, CI + deployment          | Planned | —         |
 
@@ -234,7 +234,7 @@ Rules for working with phases:
 
 ## Phase 7 — Maintenance + fuel records
 
-**Status:** Done (commit pending)
+**Status:** Done (`f12eeed`)
 
 **Goal:** track running costs and upcoming service per vehicle.
 
