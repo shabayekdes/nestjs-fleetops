@@ -1,0 +1,27 @@
+# MongoDB for the learning track only. Not part of the FleetOps stack:
+# the root docker-compose.yml is untouched. Run from learning/mongodb/.
+name: fleetops-learning
+
+services:
+  mongo:
+    # 7.0, not 8.x: MongoDB 8.0+ refuses to start on Linux kernel 6.19+
+    # (TCMalloc rseq bug, https://jira.mongodb.org/browse/SERVER-121912).
+    # Move to 8.x once a fixed release is out.
+    image: mongo:7.0.43
+    container_name: fleetops-learning-mongo
+    ports:
+      # Localhost only: no authentication is configured.
+      - '127.0.0.1:${MONGO_PORT:-27017}:27017'
+    volumes:
+      - mongo-data:/data/db
+      # Exercises are run inside the container with mongosh.
+      - ./:/learning:ro
+    healthcheck:
+      test:
+        ['CMD', 'mongosh', '--quiet', '--eval', 'db.adminCommand("ping").ok']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  mongo-data:

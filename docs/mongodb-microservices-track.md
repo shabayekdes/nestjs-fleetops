@@ -15,7 +15,7 @@ To avoid confusion with the other roadmaps, stages are always called **Learning 
 
 | Stage | Name                                 | Part                  | Status  | Commit(s) |
 | ----- | ------------------------------------ | --------------------- | ------- | --------- |
-| L1    | MongoDB fundamentals                 | A: MongoDB            | Planned | —         |
+| L1    | MongoDB fundamentals                 | A: MongoDB            | Done    | (pending) |
 | L2    | MongoDB data modeling                | A: MongoDB            | Planned | —         |
 | L3    | Indexing + query performance         | A: MongoDB            | Planned | —         |
 | L4    | MongoDB querying                     | A: MongoDB            | Planned | —         |
@@ -195,19 +195,41 @@ Commit:
 
 ## Part A — MongoDB (L1–L6)
 
-Part A is about MongoDB itself. **No FleetOps code changes.** Exercises run against a local MongoDB with synthetic data. Where the exercises and seed scripts live (e.g. a root-level `learning/mongodb/` folder, or outside the repository) is decided at L1 with the user. They never go into `apps/api/` or `apps/web/`.
+Part A is about MongoDB itself. **No FleetOps code changes.** Exercises run against a local MongoDB with synthetic data. Exercises live in [`learning/mongodb/`](../learning/mongodb/) (decided at L1). They never go into `apps/api/` or `apps/web/`.
 
 ### Learning Stage 1 — MongoDB fundamentals
 
-**Status:** Planned
+**Status:** Done (pending)
 
 **Goal:** understand MongoDB before integrating it into anything.
 
 **Topics:** MongoDB architecture; database, collection, document; BSON vs JSON; `ObjectId`; embedded documents; arrays; references; CRUD; `mongosh` and MongoDB Compass; basic filtering, sorting and projection; pagination concepts (skip/limit vs range-based "seek" pagination).
 
-**Exercises:** small, independent of FleetOps (e.g. a books or notes collection): insert, find, update, delete, project, sort, paginate.
+**What was learned** (details in [`learning/mongodb/l1-fundamentals/NOTES.md`](../learning/mongodb/l1-fundamentals/NOTES.md))
 
-**Not yet:** FleetOps data, NestJS, indexes beyond the default `_id`.
+- MongoDB enforces no schema or types by default. Wrong types are accepted silently and only show up as queries that match nothing.
+- MongoDB has no foreign keys. Rules such as "restrict delete" move into application code, where they have race windows.
+- A conditional single-document update (a condition in the filter plus `$inc`) gives atomic "take one if available" without a transaction.
+- `insertMany` is not all-or-nothing, and `replaceOne` drops the fields you leave out.
+- Range pagination examined 10 index keys where offset pagination examined 19 910 for the same page. It needs a unique sort key that every document has.
+
+**Built**
+
+- `learning/mongodb/docker-compose.yml`: a learning-only MongoDB on localhost (separate compose project `fleetops-learning`). The root `docker-compose.yml` is untouched.
+- Seven `mongosh` exercises on a neutral library data set (books, authors, loans), each with worked examples and "your turn" tasks, plus runnable solutions.
+- `NOTES.md`: the concepts, a PostgreSQL/Prisma vs MongoDB comparison and the pitfalls found.
+
+**Decisions**
+
+1. Exercises live in `learning/mongodb/`, committed per stage and never imported by the apps.
+2. MongoDB runs from a learning-only compose file, bound to `127.0.0.1` with no authentication.
+3. **MongoDB 7.0.43, not 8.x.** MongoDB 8.0 and later (8.0.32, 8.3.11 and 9.0.2 were tested) refuse to start on Linux kernel 6.19+ because of a TCMalloc bug ([SERVER-121912](https://jira.mongodb.org/browse/SERVER-121912)). Part A behaves the same on 7.0. **L7 and L14 must re-check this** for CI runners and any deployment host.
+4. No npm packages: the exercises run inside the container with the bundled `mongosh`.
+
+**Deferred**
+
+- Indexes beyond `_id` (L3), `$lookup` (L5), schema validation (L7).
+- Upgrading to MongoDB 8.x once a fixed release exists.
 
 ### Learning Stage 2 — MongoDB data modeling
 
