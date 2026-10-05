@@ -121,7 +121,14 @@ npm run db:test:migrate      # apply migrations to the database in .env.test
 | Morgan Manager | `morgan@acme-logistics.test` | MANAGER | `FleetOps-dev-123!` |
 | Sam Driver     | `sam@acme-logistics.test`    | DRIVER  | `FleetOps-dev-123!` |
 
-Plus three vehicles (Ford Transit, Mercedes-Benz Sprinter, Volvo FH16 — the latter without a license plate). Passwords are stored as Argon2id hashes. Records are upserted on their natural keys (`slug`, `organizationId + email`, `organizationId + vin`), so re-running the seed never duplicates data.
+Plus three vehicles (Ford Transit, Mercedes-Benz Sprinter, Volvo FH16 — the latter without a license plate).
+
+| Driver         | License   | Expires              | Linked user               |
+| -------------- | --------- | -------------------- | ------------------------- |
+| Sam Driver     | `DL-1001` | 1 January next year  | `sam@acme-logistics.test` |
+| Jordan Expired | `DL-1002` | 2024-01-31 (expired) | none                      |
+
+Sam is actively assigned to the Ford Transit (created only if neither Sam nor the Transit already has an active assignment). Passwords are stored as Argon2id hashes. Records are upserted on their natural keys (`slug`, `organizationId + email`, `organizationId + vin`), so re-running the seed never duplicates data.
 
 ## Running the Application
 
@@ -166,23 +173,32 @@ npm run format      # Prettier
 
 All routes are served under the `/api` prefix with URI versioning (default version `v1`).
 
-| Method | Path                       | Description                                                |
-| ------ | -------------------------- | ---------------------------------------------------------- |
-| GET    | `/api/v1`                  | Confirms the API is running                                |
-| GET    | `/api/v1/health`           | Application + database health (200 / 503)                  |
-| POST   | `/api/v1/auth/login`       | Public. Exchange credentials for an access token           |
-| GET    | `/api/v1/auth/me`          | Bearer token. Current user profile (with role)             |
-| PATCH  | `/api/v1/auth/me/password` | Bearer token, any role. Change own password (204)          |
-| GET    | `/api/v1/users`            | Bearer token, ADMIN. List users (paginated, role filter)   |
-| POST   | `/api/v1/users`            | Bearer token, ADMIN. Create a user                         |
-| GET    | `/api/v1/users/:id`        | Bearer token, ADMIN. Get a user                            |
-| PATCH  | `/api/v1/users/:id`        | Bearer token, ADMIN. Partially update a user               |
-| DELETE | `/api/v1/users/:id`        | Bearer token, ADMIN. Delete a user (204)                   |
-| GET    | `/api/v1/vehicles`         | Bearer token. List vehicles (paginated, filters)           |
-| POST   | `/api/v1/vehicles`         | Bearer token, ADMIN or MANAGER. Create a vehicle           |
-| GET    | `/api/v1/vehicles/:id`     | Bearer token. Get a vehicle                                |
-| PATCH  | `/api/v1/vehicles/:id`     | Bearer token, ADMIN or MANAGER. Partially update a vehicle |
-| DELETE | `/api/v1/vehicles/:id`     | Bearer token, ADMIN or MANAGER. Delete a vehicle (204)     |
+| Method | Path                          | Description                                                  |
+| ------ | ----------------------------- | ------------------------------------------------------------ |
+| GET    | `/api/v1`                     | Confirms the API is running                                  |
+| GET    | `/api/v1/health`              | Application + database health (200 / 503)                    |
+| POST   | `/api/v1/auth/login`          | Public. Exchange credentials for an access token             |
+| GET    | `/api/v1/auth/me`             | Bearer token. Current user profile (with role)               |
+| PATCH  | `/api/v1/auth/me/password`    | Bearer token, any role. Change own password (204)            |
+| GET    | `/api/v1/users`               | Bearer token, ADMIN. List users (paginated, role filter)     |
+| POST   | `/api/v1/users`               | Bearer token, ADMIN. Create a user                           |
+| GET    | `/api/v1/users/:id`           | Bearer token, ADMIN. Get a user                              |
+| PATCH  | `/api/v1/users/:id`           | Bearer token, ADMIN. Partially update a user                 |
+| DELETE | `/api/v1/users/:id`           | Bearer token, ADMIN. Delete a user (204)                     |
+| GET    | `/api/v1/vehicles`            | Bearer token. List vehicles (paginated, filters)             |
+| POST   | `/api/v1/vehicles`            | Bearer token, ADMIN or MANAGER. Create a vehicle             |
+| GET    | `/api/v1/vehicles/:id`        | Bearer token. Get a vehicle                                  |
+| PATCH  | `/api/v1/vehicles/:id`        | Bearer token, ADMIN or MANAGER. Partially update a vehicle   |
+| DELETE | `/api/v1/vehicles/:id`        | Bearer token, ADMIN or MANAGER. Delete a vehicle (204)       |
+| GET    | `/api/v1/drivers`             | Bearer token, ADMIN or MANAGER. List drivers (paginated)     |
+| POST   | `/api/v1/drivers`             | Bearer token, ADMIN or MANAGER. Create a driver              |
+| GET    | `/api/v1/drivers/:id`         | Bearer token, ADMIN or MANAGER. Get a driver                 |
+| PATCH  | `/api/v1/drivers/:id`         | Bearer token, ADMIN or MANAGER. Partially update a driver    |
+| DELETE | `/api/v1/drivers/:id`         | Bearer token, ADMIN or MANAGER. Delete a driver (204)        |
+| GET    | `/api/v1/assignments`         | Bearer token, ADMIN or MANAGER. List assignments (filters)   |
+| POST   | `/api/v1/assignments`         | Bearer token, ADMIN or MANAGER. Assign a driver to a vehicle |
+| GET    | `/api/v1/assignments/:id`     | Bearer token, ADMIN or MANAGER. Get an assignment            |
+| POST   | `/api/v1/assignments/:id/end` | Bearer token, ADMIN or MANAGER. End an assignment (200)      |
 
 Every endpoint except `/api/v1` and `/api/v1/health` requires an `Authorization: Bearer <token>` header.
 
@@ -256,6 +272,7 @@ Every user has one role: `ADMIN`, `MANAGER` or `DRIVER` (default `DRIVER`).
 | Read vehicles                   | yes   | yes     | yes    |
 | Create, update, delete vehicles | yes   | yes     | no     |
 | Manage users (`/api/v1/users`)  | yes   | no      | no     |
+| Manage drivers and assignments  | yes   | yes     | no     |
 | Change own password             | yes   | yes     | yes    |
 
 A route without `@Roles()` is open to any authenticated user. A role the route does not allow returns `403 Forbidden`. Role checks run before validation, so a forbidden request gets `403` even if its body is invalid. The role is read from the database on every request, not from the token, so a role change or user deletion takes effect on the next request, even with an older token (a deleted user gets `401`).
@@ -282,6 +299,38 @@ Rules: passwords are 12 to 128 characters and are never trimmed. A new password 
 ### Upgrading to phase 5
 
 The `role` column is added by migration `add_user_role`. Existing users become `DRIVER` until re-seeded or changed by an admin.
+
+```bash
+npm run db:migrate
+npm run db:seed
+npm run db:test:migrate
+```
+
+### Drivers and assignments
+
+All routes require an ADMIN or MANAGER token (DRIVER gets `403`) and only ever see the caller's own organization.
+
+```bash
+curl -X POST http://localhost:3000/api/v1/drivers \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"firstName":"Kim","lastName":"Lee","licenseNumber":"dl-2001","licenseExpiresOn":"2030-06-30"}'
+
+# assign a driver to a vehicle (start time is set by the server)
+curl -X POST http://localhost:3000/api/v1/assignments \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"vehicleId":"<vehicleId>","driverId":"<driverId>"}'
+
+# current assignment of a vehicle (drop active=true for the full history)
+curl 'http://localhost:3000/api/v1/assignments?vehicleId=<vehicleId>&active=true' -H "Authorization: Bearer $TOKEN"
+
+curl -X POST http://localhost:3000/api/v1/assignments/<id>/end -H "Authorization: Bearer $TOKEN"
+```
+
+Rules: a driver has `firstName`, `lastName`, a license number (trimmed, stored uppercase, unique per organization, at most 30 characters) and a `licenseExpiresOn` date in `YYYY-MM-DD` form. `userId` optionally links the driver to a login account of the same organization (one driver per user); `null` unlinks on PATCH. Driver responses contain `id, firstName, lastName, licenseNumber, licenseExpiresOn, userId, createdAt, updatedAt`. A license is valid through its expiry date (UTC); a driver with an expired license can be created but not assigned (`422`). A vehicle has at most one active assignment and so does a driver (`409`), enforced both in the service and by partial unique indexes in the database. Assignment times are set by the server. Ending an assignment that already ended returns `409`. Assignment lists accept `vehicleId`, `driverId` and `active=true|false`, newest first. Deleting a driver or vehicle that has any assignment returns `409`. Deleting a user unlinks their driver.
+
+### Upgrading to phase 6
+
+Migration `add_drivers_and_assignments` adds the `drivers` and `vehicle_assignments` tables. `DELETE /api/v1/vehicles/:id` now returns `409` for vehicles that have assignments.
 
 ```bash
 npm run db:migrate

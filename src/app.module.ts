@@ -1,8 +1,10 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller.js';
+import { AssignmentsModule } from './assignments/assignments.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { validateEnv } from './config/env.validation.js';
+import { DriversModule } from './drivers/drivers.module.js';
 import { HealthModule } from './health/health.module.js';
 import { UsersModule } from './users/users.module.js';
 import { VehiclesModule } from './vehicles/vehicles.module.js';
@@ -19,6 +21,8 @@ import { VehiclesModule } from './vehicles/vehicles.module.js';
     AuthModule,
     UsersModule,
     VehiclesModule,
+    DriversModule,
+    AssignmentsModule,
   ],
   controllers: [AppController],
 })

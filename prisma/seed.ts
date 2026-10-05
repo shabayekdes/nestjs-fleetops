@@ -60,6 +60,24 @@ const vehicles = [
   },
 ];
 
+const drivers = [
+  {
+    firstName: 'Sam',
+    lastName: 'Driver',
+    licenseNumber: 'DL-1001',
+    // 1st January of next year, so the seeded license is always valid.
+    licenseExpiresOn: new Date(Date.UTC(new Date().getUTCFullYear() + 1, 0, 1)),
+    userEmail: 'sam@acme-logistics.test' as string | null,
+  },
+  {
+    firstName: 'Jordan',
+    lastName: 'Expired',
+    licenseNumber: 'DL-1002',
+    licenseExpiresOn: new Date('2024-01-31T00:00:00.000Z'),
+    userEmail: null as string | null,
+  },
+];
+
 async function main(): Promise<void> {
   if (process.env.NODE_ENV === 'production') {
     throw new Error(
@@ -109,8 +127,61 @@ async function main(): Promise<void> {
       });
     }
 
+    for (const driver of drivers) {
+      const { userEmail, ...fields } = driver;
+      const linkedUser = userEmail
+        ? await prisma.user.findFirst({
+            where: { organizationId: org.id, email: userEmail },
+            select: { id: true },
+          })
+        : null;
+      await prisma.driver.upsert({
+        where: {
+          organizationId_licenseNumber: {
+            organizationId: org.id,
+            licenseNumber: fields.licenseNumber,
+          },
+        },
+        // Re-link on re-seed; unlinked drivers (userEmail null) are left as they are.
+        update: linkedUser ? { ...fields, userId: linkedUser.id } : fields,
+        create: {
+          ...fields,
+          organizationId: org.id,
+          userId: linkedUser?.id ?? null,
+        },
+      });
+    }
+
+    // One active assignment: Sam -> Ford Transit, only if neither is in use.
+    const sam = await prisma.driver.findFirstOrThrow({
+      where: { organizationId: org.id, licenseNumber: 'DL-1001' },
+      select: { id: true },
+    });
+    const transit = await prisma.vehicle.findFirstOrThrow({
+      where: { organizationId: org.id, vin: vehicles[0].vin },
+      select: { id: true },
+    });
+    const activeAssignment = await prisma.vehicleAssignment.findFirst({
+      where: {
+        organizationId: org.id,
+        endedAt: null,
+        OR: [{ vehicleId: transit.id }, { driverId: sam.id }],
+      },
+      select: { id: true },
+    });
+    if (!activeAssignment) {
+      await prisma.vehicleAssignment.create({
+        data: {
+          organizationId: org.id,
+          vehicleId: transit.id,
+          driverId: sam.id,
+          startedAt: new Date(),
+        },
+      });
+    }
+
     console.log(
-      `Seeded organization "${org.slug}" with ${users.length} users and ${vehicles.length} vehicles`,
+      `Seeded organization "${org.slug}" with ${users.length} users, ${vehicles.length} vehicles and ${drivers.length} drivers`,
     );
   } finally {
     await prisma.$disconnect();

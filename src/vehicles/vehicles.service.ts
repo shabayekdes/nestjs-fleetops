@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service.js';
+import { uniqueConstraintHints } from '../database/prisma-errors.js';
 import { Prisma } from '../generated/prisma/client.js';
 import type { CreateVehicleDto } from './dto/create-vehicle.dto.js';
 import type { ListVehiclesQueryDto } from './dto/list-vehicles-query.dto.js';
@@ -23,38 +24,6 @@ const VEHICLE_SELECT = {
   createdAt: true,
   updatedAt: true,
 } satisfies Prisma.VehicleSelect;
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null;
-
-/**
- * Constraint names / field names reported for a unique violation.
- * adapter-pg puts them in meta.driverAdapterError.cause.constraint.{index|fields};
- * meta.target is kept for non-adapter engines.
- */
-function uniqueConstraintHints(
-  meta: Record<string, unknown> | undefined,
-): string[] {
-  const hints: string[] = [];
-  const add = (value: unknown): void => {
-    if (typeof value === 'string') {
-      hints.push(value);
-    } else if (Array.isArray(value)) {
-      for (const item of value) {
-        if (typeof item === 'string') hints.push(item);
-      }
-    }
-  };
-  add(meta?.target);
-  const adapterError = meta?.driverAdapterError;
-  const cause = isRecord(adapterError) ? adapterError.cause : undefined;
-  const constraint = isRecord(cause) ? cause.constraint : undefined;
-  if (isRecord(constraint)) {
-    add(constraint.index);
-    add(constraint.fields);
-  }
-  return hints;
-}
 
 /** Maps known Prisma errors to HTTP exceptions; anything else is returned unchanged. */
 function toHttpError(error: unknown): unknown {
@@ -170,6 +139,14 @@ export class VehiclesService {
         select: { id: true },
       });
     } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2003'
+      ) {
+        throw new ConflictException(
+          'Vehicle has assignments and cannot be deleted',
+        );
+      }
       throw toHttpError(error);
     }
   }

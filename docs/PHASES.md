@@ -18,7 +18,7 @@ Rules for working with phases:
 | 3     | Authentication + tenant context  | Done    | `0195815` |
 | 4     | Vehicles API                     | Done    | `9e4a426` |
 | 5     | Users + roles                    | Done    | `c80e806` |
-| 6     | Drivers + vehicle assignments    | Planned | —         |
+| 6     | Drivers + vehicle assignments    | Done    | pending   |
 | 7     | Maintenance + fuel records       | Planned | —         |
 | 8     | API docs, logging + error format | Planned | —         |
 | 9     | Docker, CI + deployment          | Planned | —         |
@@ -186,28 +186,49 @@ Rules for working with phases:
 - Transactional last-admin protection against concurrent mutual demotion.
 - Rate limiting on password change (phase 8).
 - Inviting users by email; custom or per-resource permissions.
-- P2003 on user delete is not mapped: phase 6 must handle it once Driver links to User.
+- ~~P2003 on user delete~~ resolved in phase 6: `drivers.user_id` is `ON DELETE SET NULL`, so deleting a user needs no mapping.
 
 ---
 
 ## Phase 6 — Drivers + vehicle assignments
 
-**Status:** Planned
+**Status:** Done (commit pending)
 
 **Goal:** record which driver uses which vehicle and when.
 
-**NestJS concepts:** Prisma relations and transactions, business-rule validation in services.
+**NestJS concepts:** Prisma relations and interactive transactions, business-rule validation in services, partial unique indexes.
 
-**Scope**
+**Built**
 
-- `Driver` model (tenant-owned, optionally linked to a `User`), with license number and expiry.
-- `VehicleAssignment` model with start/end times.
-- Endpoints to assign and unassign a driver and to see the current and past assignments of a vehicle or driver.
-- Rules: a vehicle has at most one active driver; a driver with an expired license cannot be assigned.
+- Migration `add_drivers_and_assignments`: `drivers` and `vehicle_assignments` tables. Generator now uses the `partialIndexes` preview feature.
+- `DriversModule` (`src/drivers/`): `GET/POST /api/v1/drivers`, `GET/PATCH/DELETE /api/v1/drivers/:id`. 8-key responses; `licenseExpiresOn` is `YYYY-MM-DD`.
+- `AssignmentsModule` (`src/assignments/`): `GET/POST /api/v1/assignments`, `GET /api/v1/assignments/:id`, `POST /api/v1/assignments/:id/end`. List filters `vehicleId`, `driverId`, `active`. History of a vehicle is `GET /assignments?vehicleId=...`.
+- `src/database/prisma-errors.ts`: `uniqueConstraintHints` moved out of the vehicles service.
+- Seed: two drivers (Sam linked to the `sam@acme-logistics.test` user, Jordan with an expired license) and one active assignment (Sam to the Ford Transit).
 
-**Out of scope**
+**Decisions**
 
-- Trip tracking, GPS or telemetry.
+1. `Driver` is its own tenant-owned model, optionally linked to one `User` (`userId` unique, any role). `drivers.user_id` is `ON DELETE SET NULL`, a deliberate exception to Restrict: the driver and the history outlive the login account. This resolves the phase 5 deferred P2003 on user delete.
+2. Assignment times are set by the server (`startedAt` on create, `endedAt` on end). No backdating or scheduling.
+3. At most one active assignment per vehicle and per driver is enforced in the database by two partial unique indexes (`WHERE ended_at IS NULL`) declared in `schema.prisma`, and checked in the service.
+4. Create runs in one interactive transaction: vehicle exists (404), driver exists (404), license not expired (422), vehicle free (409), driver free (409). A lost race hits the partial index; its P2002 is mapped by index name to the same 409.
+5. Ending is one conditional `updateMany` (`endedAt: null`); a zero count is 404 or 409 depending on whether the row exists.
+6. History is kept: assignment foreign keys to vehicles and drivers are Restrict. Deleting a vehicle or driver with any assignment returns 409. This changes `DELETE /vehicles/:id` for vehicles that were ever assigned.
+7. A license is valid through its expiry date (UTC, inclusive). Expired drivers can be created and updated but not assigned. Active assignments are not auto-ended.
+8. All `/drivers` and `/assignments` routes are ADMIN or MANAGER; DRIVER gets 403.
+9. Prisma errors are still mapped per service; only the unique-hint parser is shared. No global filter (phase 8).
+
+- Never use `findUnique`/`update`/`delete` by `vehicleId` or `driverId` on assignments: the partial uniques only cover active rows (`ended_at IS NULL`), so with history such a lookup can match several rows. Always use `findFirst`/`updateMany` with `organizationId` (and `endedAt: null` where relevant).
+
+**Out of scope / deferred**
+
+- Client-supplied, backdated or scheduled start/end times; reassigning in one call.
+- Driver self-service and any read access for the DRIVER role.
+- Auto-ending assignments on license expiry; expiry reminders (phase 7 scheduler, later notifications).
+- Driver list filters, search, sorting; license class, issuing country.
+- Soft delete or archiving of vehicles and drivers; editing or deleting assignment history.
+- Trips, GPS, telemetry, utilization metrics.
+- Global Prisma error filter (phase 8). A P2003 race on assignment create (vehicle or driver deleted between check and insert) is unmapped and returns 500.
 
 ---
 

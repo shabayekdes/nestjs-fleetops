@@ -1,6 +1,7 @@
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  provider        = "prisma-client"
+  output          = "../src/generated/prisma"
+  previewFeatures = ["partialIndexes"]
 }
 
 datasource db {
@@ -22,8 +23,10 @@ model Organization {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  users    User[]
-  vehicles Vehicle[]
+  users              User[]
+  vehicles           Vehicle[]
+  drivers            Driver[]
+  vehicleAssignments VehicleAssignment[]
 
   @@map("organizations")
 }
@@ -43,6 +46,7 @@ model User {
   updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  driver       Driver?
 
   // Tenant-scoped uniqueness. The leading organization_id column also serves
   // as the index for "all users in an organization" queries.
@@ -62,7 +66,8 @@ model Vehicle {
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  assignments  VehicleAssignment[]
 
   // Tenant-scoped uniqueness: the same physical vehicle may legitimately exist
   // in two organizations (e.g. after a sale), and a global constraint would leak
@@ -70,4 +75,50 @@ model Vehicle {
   @@unique([organizationId, vin])
   @@unique([organizationId, licensePlate])
   @@map("vehicles")
+}
+
+model Driver {
+  id               String   @id @default(uuid(7)) @db.Uuid
+  organizationId   String   @map("organization_id") @db.Uuid
+  /// Optional login account. SetNull: the driver and its history outlive the account.
+  userId           String?  @unique @map("user_id") @db.Uuid
+  firstName        String   @map("first_name")
+  lastName         String   @map("last_name")
+  /// Stored trimmed + uppercase.
+  licenseNumber    String   @map("license_number")
+  /// Valid through this date (inclusive, UTC).
+  licenseExpiresOn DateTime @map("license_expires_on") @db.Date
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  user         User?               @relation(fields: [userId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  assignments  VehicleAssignment[]
+
+  @@unique([organizationId, licenseNumber])
+  @@map("drivers")
+}
+
+model VehicleAssignment {
+  id             String    @id @default(uuid(7)) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  vehicleId      String    @map("vehicle_id") @db.Uuid
+  driverId       String    @map("driver_id") @db.Uuid
+  /// Set by the application (not the DB clock) so endedAt >= startedAt.
+  startedAt      DateTime  @map("started_at") @db.Timestamptz(3)
+  /// null = active.
+  endedAt        DateTime? @map("ended_at") @db.Timestamptz(3)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  vehicle      Vehicle      @relation(fields: [vehicleId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  driver       Driver       @relation(fields: [driverId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  // At most one active assignment per vehicle and per driver (race-safe).
+  @@unique([vehicleId], map: "vehicle_assignments_active_vehicle_key", where: { endedAt: null })
+  @@unique([driverId], map: "vehicle_assignments_active_driver_key", where: { endedAt: null })
+  @@index([organizationId, vehicleId, startedAt])
+  @@index([organizationId, driverId, startedAt])
+  @@map("vehicle_assignments")
 }

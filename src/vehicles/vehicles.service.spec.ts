@@ -407,8 +407,17 @@ describe('VehiclesService', () => {
       );
     });
 
+    it('maps P2003 to 409', async () => {
+      del.mockRejectedValue(prismaError('P2003'));
+      const error = await rejection(service.remove(ORG, ID));
+      expect(error).toBeInstanceOf(ConflictException);
+      expect((error as ConflictException).message).toBe(
+        'Vehicle has assignments and cannot be deleted',
+      );
+    });
+
     it('rethrows other errors unchanged', async () => {
-      const e = prismaError('P2003');
+      const e = prismaError('P2000');
       del.mockRejectedValue(e);
       expect(await rejection(service.remove(ORG, ID))).toBe(e);
     });
