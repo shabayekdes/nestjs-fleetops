@@ -16,7 +16,7 @@ To avoid confusion with the other roadmaps, stages are always called **Learning 
 | Stage | Name                                 | Part                  | Status  | Commit(s) |
 | ----- | ------------------------------------ | --------------------- | ------- | --------- |
 | L1    | MongoDB fundamentals                 | A: MongoDB            | Done    | `fe09f1b` |
-| L2    | MongoDB data modeling                | A: MongoDB            | Done    | (pending) |
+| L2    | MongoDB data modeling                | A: MongoDB            | Done    | `518497c` |
 | L3    | Indexing + query performance         | A: MongoDB            | Planned | —         |
 | L4    | MongoDB querying                     | A: MongoDB            | Planned | —         |
 | L5    | Aggregation pipeline                 | A: MongoDB            | Planned | —         |
@@ -233,7 +233,7 @@ Part A is about MongoDB itself. **No FleetOps code changes.** Exercises run agai
 
 ### Learning Stage 2 — MongoDB data modeling
 
-**Status:** Done (pending)
+**Status:** Done (`518497c`)
 
 **Goal:** learn how document modeling differs from relational modeling.
 
