@@ -10,7 +10,7 @@ Conventions for `apps/web/` (Next.js). The root `CLAUDE.md` covers the organizat
 
 ## 2. Stack and pinned versions
 
-Next.js 16.3.8 (App Router), React 19.2.8, TypeScript 5.9.3 (strict), Tailwind CSS 4.3.3, Zod 4.6.5, Vitest 5.0.3 + React Testing Library, ESLint 9.39.5 + Prettier 3.9.9, openapi-typescript 7.13.0. Node 24 (root `.nvmrc`). All versions are exact (`.npmrc` has `save-exact=true`).
+Next.js 16.3.8 (App Router), React 19.2.8, TypeScript 5.9.3 (strict), Tailwind CSS 4.3.3, Zod 4.6.5, Vitest 5.0.3 + React Testing Library, Playwright 1.63.0 (e2e), ESLint 9.39.5 + Prettier 3.9.9, openapi-typescript 7.13.0. Node 24 (root `.nvmrc`). All versions are exact (`.npmrc` has `save-exact=true`).
 
 Deliberate holds:
 
@@ -24,7 +24,9 @@ Next.js 16 has APIs newer than most training data. Read `node_modules/next/dist/
 
 ## 3. Folder structure and naming
 
-- `src/app/` routes; `src/lib/` shared non-UI code (`lib/env`, `lib/api`).
+- `src/app/` routes; `src/lib/` shared non-UI code (`lib/env`, `lib/api`, `lib/auth`); `src/components/` UI shared by several routes.
+- Route groups: `(public)` (no session needed, e.g. `login`) and `(app)` (protected, its layout loads the current user). `session-expired` is a public Route Handler; `dev/` is public.
+- `src/proxy.ts` is the Next.js 16 proxy (formerly middleware). `e2e/` holds Playwright tests.
 - Files are kebab-case, components PascalCase. Tests sit next to the code (`*.test.ts(x)`).
 - Colocate components used by one route inside that route folder.
 - Import with the `@/` alias for `src/`.
@@ -43,19 +45,37 @@ Next.js 16 has APIs newer than most training data. Read `node_modules/next/dist/
 - Types come from `@/lib/api/types` (generated from OpenAPI). Callers pass the response type: `apiRequest<HealthResponse>('/health')`.
 - Failures are `ApiError` (HTTP error: `status`, `message`, `fieldErrors`, `requestId`) or `ApiConnectionError` (`reason: 'timeout' | 'unreachable'`).
 
-| Result                       | UI                                               |
-| ---------------------------- | ------------------------------------------------ |
-| 400 with `fieldErrors`       | Show messages next to the matching fields        |
-| 401                          | Session handling (FE2)                           |
-| 403                          | "You are not allowed to do this"; do not log out |
-| 404                          | `notFound()`                                     |
-| 409                          | Form-level message using the API message         |
-| 5xx and `ApiConnectionError` | Generic "service unavailable"; never raw details |
+| Result                       | UI                                                   |
+| ---------------------------- | ---------------------------------------------------- |
+| 400 with `fieldErrors`       | Show messages next to the matching fields            |
+| 401                          | Handled centrally by `sessionApiRequest`             |
+| 403                          | `NotAllowed` / `NOT_ALLOWED_MESSAGE`; do not log out |
+| 404                          | `notFound()`                                         |
+| 409                          | Form-level message using the API message             |
+| 5xx and `ApiConnectionError` | Generic "service unavailable"; never raw details     |
+
+Authenticated calls:
+
+- Use `sessionApiRequest` from `@/lib/auth/session-api`. In Server Components and layouts use the default `mode: 'render'`; in Server Actions and Route Handlers pass `mode: 'action'`.
+- Never call `apiRequest` with an `accessToken` directly, except the login action and the `/session-expired` route handler.
+- `sessionApiRequest` redirects (a thrown error) on a missing session or a 401. Code that wraps it in `try/catch` must catch only `ApiError`/`ApiConnectionError`, or call `unstable_rethrow(error)` first, so the redirect is not swallowed.
+- 403: pages catching `ApiError` with status 403 render `<NotAllowed />` (`@/components/not-allowed`); Server Actions return `{ formError: NOT_ALLOWED_MESSAGE }`. Never delete the session on 403. Do not use `forbidden()`/`unauthorized()` (experimental).
+
+## Authentication
+
+- The session is the encrypted cookie `fleetops_session` (`httpOnly`, `SameSite=Lax`, `Secure` in production), AES-256-GCM via `node:crypto` (`lib/auth/session-crypto.ts`, key derived from `SESSION_SECRET`). It holds only `{ accessToken, expiresAt }`. No auth library.
+- Treat a session as expired 30 s early (`SESSION_EXPIRY_SKEW_MS`). The access token lives 15 minutes; there is no refresh.
+- `src/proxy.ts` is an optimistic gate: it reads the cookie and never calls the API. It also sets the `x-fleetops-pathname` request header (always overwritten) for `returnTo`. Real authorization is the API's.
+- The role comes only from `getCurrentUser()` (`GET /auth/me`). Never store it in the cookie or parse the JWT.
+- Never pass the token, or anything derived from it, to Client Components, URLs or logs. `SessionExpiryNotice` receives only the remaining milliseconds.
+- Every redirect target from user input goes through `safeReturnTo`.
+- Server Actions that sign in or out call `redirect()` outside `try/catch`.
 
 ## 6. Environment variables
 
 - Validated with Zod in `src/lib/env/server.ts`; the server exits at startup if invalid (`src/instrumentation.ts`).
 - Add every new variable to the schema, `.env.example` and the README.
+- `SESSION_SECRET` (min 32 characters) encrypts the session cookie; changing it signs everyone out.
 - Never put a secret in a `NEXT_PUBLIC_` variable.
 
 ## 7. OpenAPI workflow
@@ -64,7 +84,7 @@ API change, then `npm run openapi:export` (in `apps/api`), then `npm run api:typ
 
 ## 8. Styling
 
-Tailwind utility classes only. No UI kit until the FE2/FE3 decision.
+Tailwind utility classes only. No UI kit yet; the decision moves to FE3 (the first dialog or menu).
 
 ## 9. Accessibility
 
@@ -74,11 +94,11 @@ Labels on every input, semantic landmarks and headings, keyboard-usable controls
 
 - Vitest + React Testing Library. No real network: mock with `vi.spyOn(globalThis, 'fetch')`; set env with `vi.stubEnv`.
 - Component tests start with `// @vitest-environment jsdom`. `server-only` is mocked in `vitest.setup.ts`.
-- Playwright (e2e) arrives in FE2.
+- Playwright e2e lives in `e2e/` (`npm run test:e2e`, Chromium, one worker). It starts the API (port 3100, `NODE_ENV=test`) and the web app (port 3101) itself and needs a migrated, seeded test database; see the README. `e2e/support/session.ts` imports only `lib/auth/session-crypto.ts` (which must stay free of `server-only`) to forge cookies. Vitest only includes `src/**`.
 
 ## 11. Definition of Done
 
-`npm run format:check`, `lint` (0 warnings), `typecheck`, `test` and `build` pass; `npm run api:types` produces no diff; the README is updated when commands, env vars or routes change; `docs/frontend-roadmap.md` is updated at the end of a phase.
+`npm run format:check`, `lint` (0 warnings), `typecheck`, `test`, `build` and `test:e2e` pass; `npm run api:types` produces no diff; the README is updated when commands, env vars or routes change; `docs/frontend-roadmap.md` is updated at the end of a phase.
 
 <!-- BEGIN:nextjs-agent-rules -->
 

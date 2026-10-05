@@ -13,6 +13,8 @@ export type ApiRequestOptions = {
   body?: unknown;
   timeoutMs?: number;
   signal?: AbortSignal;
+  /** Sent as `Authorization: Bearer <token>`. Server-side use only. */
+  accessToken?: string;
 };
 
 export function buildApiUrl(
@@ -42,6 +44,9 @@ export async function apiRequest<T>(
   const url = buildApiUrl(path, options.query);
 
   const headers: Record<string, string> = { Accept: 'application/json' };
+  if (options.accessToken) {
+    headers.Authorization = `Bearer ${options.accessToken}`;
+  }
   let body: string | undefined;
   if (options.body !== undefined) {
     body = JSON.stringify(options.body);

@@ -50,6 +50,26 @@ describe('apiRequest', () => {
     expect(init?.body).toBeUndefined();
   });
 
+  it('sends a bearer token when accessToken is set', async () => {
+    const fetchMock = mockFetch().mockResolvedValue(jsonResponse({}));
+    await apiRequest('/auth/me', { accessToken: 'x' });
+    const headers = fetchMock.mock.calls[0][1]?.headers as Record<
+      string,
+      string
+    >;
+    expect(headers.Authorization).toBe('Bearer x');
+  });
+
+  it('sends no Authorization header without accessToken', async () => {
+    const fetchMock = mockFetch().mockResolvedValue(jsonResponse({}));
+    await apiRequest('/health');
+    const headers = fetchMock.mock.calls[0][1]?.headers as Record<
+      string,
+      string
+    >;
+    expect(headers.Authorization).toBeUndefined();
+  });
+
   it('sends a JSON body with Content-Type', async () => {
     const fetchMock = mockFetch().mockResolvedValue(jsonResponse({ id: 1 }));
     await apiRequest('/vehicles', { method: 'POST', body: { vin: 'X' } });

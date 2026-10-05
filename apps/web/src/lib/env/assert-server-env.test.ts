@@ -23,6 +23,7 @@ describe('assertServerEnv', () => {
 
   it('does nothing when the env is valid', () => {
     vi.stubEnv('API_BASE_URL', 'http://localhost:3000');
+    vi.stubEnv('SESSION_SECRET', 'a'.repeat(32));
     const exit = vi
       .spyOn(process, 'exit')
       .mockImplementation((() => undefined) as never);

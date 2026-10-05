@@ -78,6 +78,59 @@ jobs:
       - run: npm test
       - run: npm run build
 
+  web-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: fleetops
+          POSTGRES_PASSWORD: fleetops
+          POSTGRES_DB: fleetops_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U fleetops -d fleetops_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      NEXT_TELEMETRY_DISABLED: 1
+      # Real env vars override .env.test for the API and prisma.config.ts.
+      DATABASE_URL: postgresql://fleetops:fleetops@localhost:5432/fleetops_test?schema=public
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: |
+            apps/api/package-lock.json
+            apps/web/package-lock.json
+      - name: Prepare the API and the seeded test database
+        working-directory: apps/api
+        run: |
+          npm ci
+          cp .env.test.example .env.test
+          npm run db:test:migrate
+          NODE_ENV=test npm run db:seed
+      - name: Install web dependencies and the browser
+        working-directory: apps/web
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      - name: Run e2e tests
+        working-directory: apps/web
+        run: npm run test:e2e
+      - name: Upload the Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: apps/web/playwright-report/
+          retention-days: 7
+
   docker:
     runs-on: ubuntu-latest
     timeout-minutes: 15

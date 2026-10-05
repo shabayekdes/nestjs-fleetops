@@ -10,6 +10,12 @@ const serverEnvSchema = z.object({
       return url.pathname === '/' && url.search === '' && url.hash === '';
     }, 'API_BASE_URL must be the API origin, e.g. http://localhost:3000; the client adds /api/v1')
     .transform((value) => value.replace(/\/$/, '')),
+  SESSION_SECRET: z
+    .string()
+    .min(
+      32,
+      'SESSION_SECRET must be at least 32 characters; generate with `openssl rand -base64 32`',
+    ),
 });
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;

@@ -3,3 +3,6 @@ coverage
 next-env.d.ts
 src/lib/api/generated
 package-lock.json
+test-results
+playwright-report
+playwright/.cache
