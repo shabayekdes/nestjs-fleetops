@@ -19,7 +19,7 @@ Rules for working with phases:
 | 4     | Vehicles API                     | Done    | `9e4a426` |
 | 5     | Users + roles                    | Done    | `c80e806` |
 | 6     | Drivers + vehicle assignments    | Done    | `961d586` |
-| 7     | Maintenance + fuel records       | Planned | —         |
+| 7     | Maintenance + fuel records       | Done    | pending   |
 | 8     | API docs, logging + error format | Planned | —         |
 | 9     | Docker, CI + deployment          | Planned | —         |
 
@@ -234,22 +234,49 @@ Rules for working with phases:
 
 ## Phase 7 — Maintenance + fuel records
 
-**Status:** Planned
+**Status:** Done (commit pending)
 
 **Goal:** track running costs and upcoming service per vehicle.
 
-**NestJS concepts:** scheduled jobs (`@nestjs/schedule`), events (`@nestjs/event-emitter`), aggregation queries.
+**NestJS concepts:** scheduled jobs (`@nestjs/schedule`), interactive transactions with a row lock, Prisma `Decimal`, aggregation queries.
 
-**Scope**
+**Built**
 
-- `MaintenanceRecord` and `FuelLog` models with CRUD endpoints nested under vehicles.
-- A per-vehicle cost summary endpoint (totals by month).
-- A daily scheduled job that flags vehicles with service due soon.
+- Migration `add_maintenance_and_fuel`: enums `vehicle_service_status` and `maintenance_type`, tables `maintenance_records` and `fuel_logs`, vehicle columns `next_service_due_on` and `service_status`.
+- `MaintenanceModule` (`src/maintenance/`): five CRUD routes under `/api/v1/vehicles/:vehicleId/maintenance-records`, and `ServiceStatusJob`.
+- `FuelLogsModule` (`src/fuel-logs/`): five CRUD routes under `/api/v1/vehicles/:vehicleId/fuel-logs`.
+- `CostSummaryModule` (`src/cost-summary/`): `GET /api/v1/vehicles/:vehicleId/cost-summary`.
+- `src/common/`: `date-only.ts` (date helpers and the `IsNotAfterTomorrowUtc` validator) and `decimal-string.ts` (`IsDecimalString`).
+- Vehicle responses grow from 8 to 10 keys (`nextServiceDueOn`, `serviceStatus`); `GET /vehicles` gains a `serviceStatus` filter.
+- Seed: maintenance records for two vehicles, three fuel logs for the Ford Transit.
 
-**Out of scope**
+**Decisions**
 
-- Sending email or push notifications.
+1. Money and volume use Prisma `Decimal` (`cost` and `totalCost` `Decimal(12,2)`, `liters` `Decimal(8,3)`), never floats. Input is a JSON string only; output is a fixed-scale string. One currency per organization.
+2. Dates are date-only. `performedOn` and `fueledOn` must be between 1900-01-01 and tomorrow (UTC).
+3. The odometer is informational: stored on records, not on `Vehicle`, with no cross-record checks.
+4. Service due is date-based. `Vehicle.nextServiceDueOn` is the due date of the latest record that has one; `serviceStatus` is UNKNOWN, OVERDUE (before today), DUE_SOON (today to today + 14 days) or OK. The 14 days is the constant `SERVICE_DUE_SOON_DAYS`, not an env var.
+5. Maintenance create, update and delete recompute the vehicle in the same interactive transaction, after locking the vehicle row with `SELECT ... FOR UPDATE` (a `$queryRaw` tagged template, never `$queryRawUnsafe`). The lock serializes concurrent writes per vehicle. Vehicle `updatedAt` bumps on maintenance writes. Fuel logs do not affect service status.
+6. A daily job (`@Cron('0 2 * * *')`, UTC) advances `serviceStatus` with four `updateMany` calls in one transaction and logs the counts. It is the **only cross-tenant query in the codebase**: a system job that writes only the derived `serviceStatus` column (and `updatedAt`) from each row's own `nextServiceDueOn`. It is idempotent and does not run on startup.
+7. `@nestjs/event-emitter` is not adopted: the only consumer is in the same module and must run in the same transaction. Events arrive with notifications.
+8. All new routes are ADMIN or MANAGER, reads included. Fuel logs carry no driver; driver self-service is deferred.
+9. All new foreign keys are `Restrict` and records are hard-deleted. A vehicle with any assignment, maintenance record or fuel log cannot be deleted (409, message changed to `Vehicle has related records and cannot be deleted`).
+10. New vehicle fields are not writable through the vehicle DTOs.
+11. The cost summary uses `groupBy` by date with `_sum` (one query per table), bucketed into months in JS with `Prisma.Decimal`. No raw SQL. Range default is 12 months, maximum 24.
+12. Shared helpers live in `src/common/`; `parseDateOnly` and `toDateOnly` moved there from the drivers module.
+
+**Out of scope / deferred**
+
+- Notifications and reminders (event emitter arrives with them).
+- Auto-ending assignments on license expiry (phase 6 parked it for the phase 7 scheduler; still not built).
+- DRIVER self-service fuel entry and a driver on fuel logs.
+- Odometer on `Vehicle`, odometer monotonicity, kilometer-based service intervals.
+- Recurring maintenance schedules or service plans; a configurable due-soon window.
+- Multi-currency, fuel type, price per liter, station or vendor entities.
 - File uploads (receipts, invoices).
+- Fleet-wide cost reports, CSV export, dashboards.
+- Soft delete or archiving of vehicles.
+- Running the job on startup, distributed locks for multiple instances (phase 9); global error filter (phase 8).
 
 ---
 

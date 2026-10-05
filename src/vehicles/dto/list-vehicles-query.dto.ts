@@ -1,5 +1,6 @@
 import { Transform, Type } from 'class-transformer';
 import {
+  IsEnum,
   IsInt,
   IsNotEmpty,
   IsOptional,
@@ -8,6 +9,7 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
+import { ServiceStatus } from '../../generated/prisma/client.js';
 import {
   IsNotAfterNextYear,
   MIN_VEHICLE_YEAR,
@@ -48,4 +50,8 @@ export class ListVehiclesQueryDto {
   @Min(MIN_VEHICLE_YEAR)
   @IsNotAfterNextYear()
   year?: number;
+
+  @IsOptional()
+  @IsEnum(ServiceStatus)
+  serviceStatus?: ServiceStatus;
 }

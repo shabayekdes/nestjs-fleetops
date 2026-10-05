@@ -6,7 +6,13 @@
  */
 import { hash } from '@node-rs/argon2';
 import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient, Role } from '../src/generated/prisma/client.js';
+import { addDaysUtc, todayUtc } from '../src/common/date-only.js';
+import {
+  MaintenanceType,
+  PrismaClient,
+  Role,
+} from '../src/generated/prisma/client.js';
+import { computeServiceStatus } from '../src/maintenance/service-status.js';
 
 const DEV_PASSWORD = 'FleetOps-dev-123!';
 
@@ -180,8 +186,78 @@ async function main(): Promise<void> {
       });
     }
 
+    // Maintenance and fuel records, created only if the vehicle has none yet.
+    const today = todayUtc();
+    const vehicleByVin = async (vin: string) =>
+      prisma.vehicle.findFirstOrThrow({
+        where: { organizationId: org.id, vin },
+        select: { id: true },
+      });
+
+    const maintenanceSeeds = [
+      {
+        vin: vehicles[0].vin,
+        type: MaintenanceType.OIL_CHANGE,
+        description: 'Scheduled oil change',
+        vendor: 'QuickLube',
+        performedOn: addDaysUtc(today, -120),
+        cost: '89.90',
+        nextServiceDueOn: addDaysUtc(today, 10), // DUE_SOON
+      },
+      {
+        vin: vehicles[1].vin,
+        type: MaintenanceType.INSPECTION,
+        description: 'Annual inspection',
+        vendor: 'City Inspection Center',
+        performedOn: addDaysUtc(today, -30),
+        cost: '150.00',
+        nextServiceDueOn: addDaysUtc(today, 180), // OK
+      },
+    ];
+    for (const seed of maintenanceSeeds) {
+      const { vin, ...fields } = seed;
+      const vehicle = await vehicleByVin(vin);
+      const existing = await prisma.maintenanceRecord.count({
+        where: { organizationId: org.id, vehicleId: vehicle.id },
+      });
+      if (existing === 0) {
+        await prisma.maintenanceRecord.create({
+          data: { ...fields, organizationId: org.id, vehicleId: vehicle.id },
+        });
+        // Derived fields, set only when this seed created the vehicle's first
+        // record, so re-seeding never overwrites real data.
+        await prisma.vehicle.update({
+          where: { id: vehicle.id, organizationId: org.id },
+          data: {
+            nextServiceDueOn: fields.nextServiceDueOn,
+            serviceStatus: computeServiceStatus(fields.nextServiceDueOn),
+          },
+        });
+      }
+    }
+
+    const transitFuelCount = await prisma.fuelLog.count({
+      where: { organizationId: org.id, vehicleId: transit.id },
+    });
+    if (transitFuelCount === 0) {
+      await prisma.fuelLog.createMany({
+        data: [
+          { daysAgo: 75, liters: '52.300', totalCost: '84.20', km: 41200 },
+          { daysAgo: 45, liters: '48.750', totalCost: '79.10', km: 42050 },
+          { daysAgo: 15, liters: '50.000', totalCost: '81.50', km: 42900 },
+        ].map((f) => ({
+          organizationId: org.id,
+          vehicleId: transit.id,
+          fueledOn: addDaysUtc(today, -f.daysAgo),
+          liters: f.liters,
+          totalCost: f.totalCost,
+          odometerKm: f.km,
+        })),
+      });
+    }
+
     console.log(
-      `Seeded organization "${org.slug}" with ${users.length} users, ${vehicles.length} vehicles and ${drivers.length} drivers`,
+      `Seeded organization "${org.slug}" with ${users.length} users, ${vehicles.length} vehicles and ${drivers.length} drivers, maintenance and fuel records`,
     );
   } finally {
     await prisma.$disconnect();

@@ -195,11 +195,16 @@ describe('CreateVehicleDto', () => {
     });
   });
 
-  it.each(['organizationId', 'id', 'createdAt', 'updatedAt', 'extra'])(
-    'rejects unknown/server-owned property %s',
-    async (key) => {
-      const { fields } = await run({ ...valid(), [key]: 'x' });
-      expect(fields).toContain(key);
-    },
-  );
+  it.each([
+    'organizationId',
+    'id',
+    'createdAt',
+    'updatedAt',
+    'serviceStatus',
+    'nextServiceDueOn',
+    'extra',
+  ])('rejects unknown/server-owned property %s', async (key) => {
+    const { fields } = await run({ ...valid(), [key]: 'x' });
+    expect(fields).toContain(key);
+  });
 });

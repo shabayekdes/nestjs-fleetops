@@ -1,3 +1,5 @@
+import type { ServiceStatus } from '../../generated/prisma/client.js';
+
 export class VehicleResponseDto {
   id: string;
   make: string;
@@ -5,6 +7,9 @@ export class VehicleResponseDto {
   year: number;
   vin: string;
   licensePlate: string | null;
+  /** "YYYY-MM-DD"; derived from maintenance records. */
+  nextServiceDueOn: string | null;
+  serviceStatus: ServiceStatus;
   createdAt: Date;
   updatedAt: Date;
 }

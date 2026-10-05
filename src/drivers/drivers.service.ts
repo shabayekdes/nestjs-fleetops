@@ -3,10 +3,10 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { parseDateOnly, toDateOnly } from '../common/date-only.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { uniqueConstraintHints } from '../database/prisma-errors.js';
 import { Prisma } from '../generated/prisma/client.js';
-import { parseDateOnly, toDateOnly } from './driver-license.js';
 import type { CreateDriverDto } from './dto/create-driver.dto.js';
 import type {
   DriverListResponseDto,

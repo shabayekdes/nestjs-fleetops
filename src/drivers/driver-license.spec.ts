@@ -1,8 +1,5 @@
-import {
-  isLicenseExpired,
-  parseDateOnly,
-  toDateOnly,
-} from './driver-license.js';
+import { parseDateOnly, toDateOnly } from '../common/date-only.js';
+import { isLicenseExpired } from './driver-license.js';
 
 describe('driver-license', () => {
   const now = new Date('2026-06-15T13:45:00.000Z');

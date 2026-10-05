@@ -37,6 +37,21 @@ const VIN_MSG = 'A vehicle with this VIN already exists';
 const PLATE_MSG = 'A vehicle with this license plate already exists';
 const GENERIC_MSG = 'A vehicle with this VIN or license plate already exists';
 
+const NOW = new Date('2026-06-15T10:00:00.000Z');
+const vehicleRow = (o: Record<string, unknown> = {}) => ({
+  id: ID,
+  make: 'Ford',
+  model: 'Transit',
+  year: 2023,
+  vin: '1FTBW3XM5PKA00001',
+  licensePlate: null,
+  nextServiceDueOn: null,
+  serviceStatus: 'UNKNOWN',
+  createdAt: NOW,
+  updatedAt: NOW,
+  ...o,
+});
+
 describe('VehiclesService', () => {
   const findMany = jest.fn<Fn>();
   const count = jest.fn<Fn>();
@@ -132,6 +147,39 @@ describe('VehiclesService', () => {
       });
     });
 
+    it('filters by serviceStatus alongside the organization', async () => {
+      await service.findAll(ORG, query({ serviceStatus: 'DUE_SOON' }));
+      const args = findMany.mock.calls[0][0] as { where: unknown };
+      expect(args.where).toEqual({
+        organizationId: ORG,
+        serviceStatus: 'DUE_SOON',
+      });
+      expect((count.mock.calls[0][0] as { where: unknown }).where).toEqual(
+        args.where,
+      );
+    });
+
+    it('formats nextServiceDueOn as YYYY-MM-DD and keeps null', async () => {
+      findMany.mockResolvedValue([
+        vehicleRow({
+          id: 'a',
+          nextServiceDueOn: new Date('2026-07-01T00:00:00.000Z'),
+          serviceStatus: 'DUE_SOON',
+        }),
+        vehicleRow({ id: 'b' }),
+      ]);
+      const res = await service.findAll(ORG, query());
+      expect(res.data[0]).toMatchObject({
+        nextServiceDueOn: '2026-07-01',
+        serviceStatus: 'DUE_SOON',
+      });
+      expect(res.data[1]).toMatchObject({
+        nextServiceDueOn: null,
+        serviceStatus: 'UNKNOWN',
+      });
+      expect(Object.keys(res.data[0])).toHaveLength(10);
+    });
+
     it('uses the same where for findMany and count', async () => {
       await service.findAll(ORG, query({ make: 'Ford', year: 2020 }));
       const a = findMany.mock.calls[0][0] as { where: unknown };
@@ -139,7 +187,7 @@ describe('VehiclesService', () => {
       expect(b.where).toEqual(a.where);
     });
 
-    it('orders newest first with id tie-break and selects exactly 8 fields', async () => {
+    it('orders newest first with id tie-break and selects exactly 10 fields', async () => {
       await service.findAll(ORG, query());
       const args = findMany.mock.calls[0][0] as {
         orderBy: unknown;
@@ -152,6 +200,8 @@ describe('VehiclesService', () => {
         'licensePlate',
         'make',
         'model',
+        'nextServiceDueOn',
+        'serviceStatus',
         'updatedAt',
         'vin',
         'year',
@@ -180,7 +230,7 @@ describe('VehiclesService', () => {
     );
 
     it('takes total from count, not from rows.length', async () => {
-      const rows = [{ id: 'a' }, { id: 'b' }];
+      const rows = [vehicleRow({ id: 'a' }), vehicleRow({ id: 'b' })];
       findMany.mockResolvedValue(rows);
       count.mockResolvedValue(57);
       const res = await service.findAll(ORG, query({ page: 2, limit: 2 }));
@@ -198,8 +248,8 @@ describe('VehiclesService', () => {
 
   describe('findOne', () => {
     it('queries by id and organizationId', async () => {
-      findFirst.mockResolvedValue({ id: ID });
-      await expect(service.findOne(ORG, ID)).resolves.toEqual({ id: ID });
+      findFirst.mockResolvedValue(vehicleRow());
+      await expect(service.findOne(ORG, ID)).resolves.toEqual(vehicleRow());
       expect(findFirst.mock.calls[0][0]).toMatchObject({
         where: { id: ID, organizationId: ORG },
       });
@@ -221,7 +271,7 @@ describe('VehiclesService', () => {
 
   describe('create', () => {
     it('uses the caller organizationId even if the DTO carries another', async () => {
-      create.mockResolvedValue({ id: ID });
+      create.mockResolvedValue(vehicleRow());
       const dto = {
         ...createDto(),
         organizationId: 'evil-org',
@@ -240,7 +290,7 @@ describe('VehiclesService', () => {
     });
 
     it('stores a provided plate and maps omitted/null to null', async () => {
-      create.mockResolvedValue({});
+      create.mockResolvedValue(vehicleRow());
       await service.create(ORG, createDto({ licensePlate: 'AB-1' }));
       await service.create(ORG, createDto({ licensePlate: null }));
       await service.create(ORG, createDto());
@@ -250,13 +300,13 @@ describe('VehiclesService', () => {
       expect(plates).toEqual(['AB-1', null, null]);
     });
 
-    it('selects exactly the 8 response fields', async () => {
-      create.mockResolvedValue({});
+    it('selects exactly the 10 response fields', async () => {
+      create.mockResolvedValue(vehicleRow());
       await service.create(ORG, createDto());
       const args = create.mock.calls[0][0] as {
         select: Record<string, boolean>;
       };
-      expect(Object.keys(args.select)).toHaveLength(8);
+      expect(Object.keys(args.select)).toHaveLength(10);
       expect(args.select).not.toHaveProperty('organizationId');
     });
 
@@ -325,14 +375,14 @@ describe('VehiclesService', () => {
 
   describe('update', () => {
     it('filters by exactly { id, organizationId }', async () => {
-      update.mockResolvedValue({ id: ID });
+      update.mockResolvedValue(vehicleRow());
       await service.update(ORG, ID, { make: 'Fiat' });
       const args = update.mock.calls[0][0] as { where: unknown };
       expect(args.where).toEqual({ id: ID, organizationId: ORG });
     });
 
     it('leaves omitted fields undefined and never touches organizationId', async () => {
-      update.mockResolvedValue({});
+      update.mockResolvedValue(vehicleRow());
       await service.update(ORG, ID, { make: 'Fiat' });
       const data = (
         update.mock.calls[0][0] as { data: Record<string, unknown> }
@@ -346,7 +396,7 @@ describe('VehiclesService', () => {
     });
 
     it('passes licensePlate null through to clear it', async () => {
-      update.mockResolvedValue({});
+      update.mockResolvedValue(vehicleRow());
       await service.update(ORG, ID, { licensePlate: null });
       const data = (
         update.mock.calls[0][0] as { data: Record<string, unknown> }
@@ -355,7 +405,7 @@ describe('VehiclesService', () => {
     });
 
     it('does not spread unknown DTO keys into data', async () => {
-      update.mockResolvedValue({});
+      update.mockResolvedValue(vehicleRow());
       const dto = { make: 'A', organizationId: 'evil' } as UpdateVehicleDto;
       await service.update(ORG, ID, dto);
       const data = (
@@ -412,7 +462,7 @@ describe('VehiclesService', () => {
       const error = await rejection(service.remove(ORG, ID));
       expect(error).toBeInstanceOf(ConflictException);
       expect((error as ConflictException).message).toBe(
-        'Vehicle has assignments and cannot be deleted',
+        'Vehicle has related records and cannot be deleted',
       );
     });
 

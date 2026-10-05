@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { toDateOnly } from '../common/date-only.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { uniqueConstraintHints } from '../database/prisma-errors.js';
 import { Prisma } from '../generated/prisma/client.js';
@@ -21,9 +22,28 @@ const VEHICLE_SELECT = {
   year: true,
   vin: true,
   licensePlate: true,
+  nextServiceDueOn: true,
+  serviceStatus: true,
   createdAt: true,
   updatedAt: true,
 } satisfies Prisma.VehicleSelect;
+
+type VehicleRow = Prisma.VehicleGetPayload<{ select: typeof VEHICLE_SELECT }>;
+
+const toVehicleResponse = (row: VehicleRow): VehicleResponseDto => ({
+  id: row.id,
+  make: row.make,
+  model: row.model,
+  year: row.year,
+  vin: row.vin,
+  licensePlate: row.licensePlate,
+  nextServiceDueOn: row.nextServiceDueOn
+    ? toDateOnly(row.nextServiceDueOn)
+    : null,
+  serviceStatus: row.serviceStatus,
+  createdAt: row.createdAt,
+  updatedAt: row.updatedAt,
+});
 
 /** Maps known Prisma errors to HTTP exceptions; anything else is returned unchanged. */
 function toHttpError(error: unknown): unknown {
@@ -52,7 +72,7 @@ export class VehiclesService {
     organizationId: string,
     query: ListVehiclesQueryDto,
   ): Promise<VehicleListResponseDto> {
-    const { page, limit, make, model, year } = query;
+    const { page, limit, make, model, year, serviceStatus } = query;
     const where: Prisma.VehicleWhereInput = {
       organizationId,
       ...(make !== undefined && {
@@ -62,8 +82,9 @@ export class VehiclesService {
         model: { equals: model, mode: 'insensitive' },
       }),
       ...(year !== undefined && { year }),
+      ...(serviceStatus !== undefined && { serviceStatus }),
     };
-    const [data, total] = await this.prisma.$transaction([
+    const [rows, total] = await this.prisma.$transaction([
       this.prisma.vehicle.findMany({
         where,
         select: VEHICLE_SELECT,
@@ -73,7 +94,7 @@ export class VehiclesService {
       }),
       this.prisma.vehicle.count({ where }),
     ]);
-    return { data, meta: { page, limit, total } };
+    return { data: rows.map(toVehicleResponse), meta: { page, limit, total } };
   }
 
   async findOne(
@@ -85,7 +106,7 @@ export class VehiclesService {
       select: VEHICLE_SELECT,
     });
     if (!vehicle) throw new NotFoundException('Vehicle not found');
-    return vehicle;
+    return toVehicleResponse(vehicle);
   }
 
   async create(
@@ -93,7 +114,7 @@ export class VehiclesService {
     dto: CreateVehicleDto,
   ): Promise<VehicleResponseDto> {
     try {
-      return await this.prisma.vehicle.create({
+      const vehicle = await this.prisma.vehicle.create({
         data: {
           organizationId,
           make: dto.make,
@@ -104,6 +125,7 @@ export class VehiclesService {
         },
         select: VEHICLE_SELECT,
       });
+      return toVehicleResponse(vehicle);
     } catch (error) {
       throw toHttpError(error);
     }
@@ -116,7 +138,7 @@ export class VehiclesService {
   ): Promise<VehicleResponseDto> {
     try {
       // undefined = unchanged, null (licensePlate only) = clear.
-      return await this.prisma.vehicle.update({
+      const vehicle = await this.prisma.vehicle.update({
         where: { id, organizationId },
         data: {
           make: dto.make,
@@ -127,6 +149,7 @@ export class VehiclesService {
         },
         select: VEHICLE_SELECT,
       });
+      return toVehicleResponse(vehicle);
     } catch (error) {
       throw toHttpError(error);
     }
@@ -144,7 +167,7 @@ export class VehiclesService {
         error.code === 'P2003'
       ) {
         throw new ConflictException(
-          'Vehicle has assignments and cannot be deleted',
+          'Vehicle has related records and cannot be deleted',
         );
       }
       throw toHttpError(error);

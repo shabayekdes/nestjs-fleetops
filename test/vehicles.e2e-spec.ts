@@ -18,6 +18,8 @@ const RESPONSE_KEYS = [
   'licensePlate',
   'make',
   'model',
+  'nextServiceDueOn',
+  'serviceStatus',
   'updatedAt',
   'vin',
   'year',
@@ -266,6 +268,13 @@ describe('Vehicles (e2e)', () => {
       expect(row?.organizationId).toBe(orgOf.a);
     });
 
+    it('starts with serviceStatus UNKNOWN and nextServiceDueOn null', async () => {
+      const out = (await api('post', '').send(payload()).expect(201))
+        .body as Body;
+      expect(out.serviceStatus).toBe('UNKNOWN');
+      expect(out.nextServiceDueOn).toBeNull();
+    });
+
     it('normalizes trim and case', async () => {
       const vin = newVin();
       const plate = newPlate();
@@ -367,6 +376,8 @@ describe('Vehicles (e2e)', () => {
       ['plate blank', () => payload({ licensePlate: '   ' })],
       ['make empty', () => payload({ make: '' })],
       ['unknown field', () => payload({ colour: 'red' })],
+      ['serviceStatus', () => payload({ serviceStatus: 'OK' })],
+      ['nextServiceDueOn', () => payload({ nextServiceDueOn: '2030-01-01' })],
       ['empty body', () => ({})],
     ])('returns 400 (never 500) for %s', async (_n, body) => {
       const res = await api('post', '').send(body());
@@ -467,6 +478,8 @@ describe('Vehicles (e2e)', () => {
       ['year null', { year: null }],
       ['organizationId', { organizationId: randomUUID() }],
       ['unknown field', { colour: 'red' }],
+      ['serviceStatus', { serviceStatus: 'OK' }],
+      ['nextServiceDueOn', { nextServiceDueOn: '2030-01-01' }],
     ])('returns 400 for %s', async (_n, body) => {
       const res = await api('patch', `/${vehicleA.id as string}`).send(body);
       expect(res.status).toBe(400);

@@ -635,7 +635,7 @@ describe('Assignments (e2e)', () => {
         .set('Authorization', `Bearer ${tokens.admin}`)
         .expect(409);
       expect((res.body as Body).message).toBe(
-        'Vehicle has assignments and cannot be deleted',
+        'Vehicle has related records and cannot be deleted',
       );
       expect(
         await prisma.vehicle.findUnique({ where: { id: v.id } }),

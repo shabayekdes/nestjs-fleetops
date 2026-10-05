@@ -81,10 +81,14 @@ describe('UpdateVehicleDto', () => {
     expect((await run({ [field]: value })).fields).toContain(field);
   });
 
-  it.each(['organizationId', 'id', 'createdAt', 'extra'])(
-    'rejects unknown property %s',
-    async (key) => {
-      expect((await run({ [key]: 'x' })).fields).toContain(key);
-    },
-  );
+  it.each([
+    'organizationId',
+    'id',
+    'createdAt',
+    'serviceStatus',
+    'nextServiceDueOn',
+    'extra',
+  ])('rejects unknown property %s', async (key) => {
+    expect((await run({ [key]: 'x' })).fields).toContain(key);
+  });
 });

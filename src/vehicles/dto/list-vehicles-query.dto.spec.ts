@@ -79,6 +79,22 @@ describe('ListVehiclesQueryDto', () => {
     );
   });
 
+  it.each(['UNKNOWN', 'OK', 'DUE_SOON', 'OVERDUE'])(
+    'accepts serviceStatus %s',
+    async (serviceStatus) => {
+      const { dto, errors } = await run({ serviceStatus });
+      expect(errors).toHaveLength(0);
+      expect(dto.serviceStatus).toBe(serviceStatus);
+    },
+  );
+
+  it.each(['due_soon', 'LATE', '', 'ok'])(
+    'rejects serviceStatus %j',
+    async (serviceStatus) => {
+      expect((await run({ serviceStatus })).fields).toContain('serviceStatus');
+    },
+  );
+
   it.each(['sort', 'search', 'organizationId', 'foo'])(
     'rejects unknown param %s',
     async (key) => {
