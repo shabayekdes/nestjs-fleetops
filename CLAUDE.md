@@ -20,7 +20,7 @@ Agents live in `.claude/agents/`: `cto-esmail`, `be-lead-shreen`, `be-dev-abdel-
 Monorepo. Each app has its own `package.json` and lockfile (no npm workspaces, root has no `package.json`).
 
 - `apps/api/`: NestJS API. **All API commands (`npm ...`, `npx prisma ...`) run from `apps/api/`.**
-- `apps/web/`: Next.js web app. Not created yet; its conventions will live in its own section/doc in FE1.
+- `apps/web/`: Next.js web app. Its conventions live in `apps/web/CLAUDE.md`.
 - Shared at the root: `.github/`, `.claude/`, `docs/`, `docker-compose.yml` (run `docker compose` from the root), `docker/`, `.nvmrc`, `.prettierrc`, `.gitignore`.
 
 ### How orchestration works

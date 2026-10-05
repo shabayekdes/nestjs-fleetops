@@ -1,13 +1,13 @@
 import { Controller, Get, HttpStatus, Res } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiServiceUnavailableResponse, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { Public } from '../auth/public.decorator.js';
 import {
-  HealthService,
-  type HealthStatus,
-  type LivenessStatus,
-  type ReadinessStatus,
-} from './health.service.js';
+  HealthResponseDto,
+  LivenessResponseDto,
+  ReadinessResponseDto,
+} from './health-response.dto.js';
+import { HealthService } from './health.service.js';
 
 @ApiTags('health')
 @Controller('health')
@@ -15,10 +15,15 @@ export class HealthController {
   constructor(private readonly healthService: HealthService) {}
 
   @Public()
+  @ApiServiceUnavailableResponse({
+    type: HealthResponseDto,
+    description:
+      'A dependency is down; the body is the health status, not the error format.',
+  })
   @Get()
   async check(
     @Res({ passthrough: true }) res: Response,
-  ): Promise<HealthStatus> {
+  ): Promise<HealthResponseDto> {
     const health = await this.healthService.check();
 
     // 503 lets load balancers/orchestrators take the instance out of rotation.
@@ -32,15 +37,20 @@ export class HealthController {
 
   @Public()
   @Get('live')
-  live(): LivenessStatus {
+  live(): LivenessResponseDto {
     return this.healthService.liveness();
   }
 
   @Public()
+  @ApiServiceUnavailableResponse({
+    type: ReadinessResponseDto,
+    description:
+      'A dependency is down; the body is the health status, not the error format.',
+  })
   @Get('ready')
   async ready(
     @Res({ passthrough: true }) res: Response,
-  ): Promise<ReadinessStatus> {
+  ): Promise<ReadinessResponseDto> {
     const readiness = await this.healthService.readiness();
 
     if (readiness.status !== 'ok') {

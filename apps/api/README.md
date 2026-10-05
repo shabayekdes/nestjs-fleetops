@@ -424,6 +424,16 @@ npm run db:test:migrate
 
 Swagger UI is served at `/api/docs` and the OpenAPI JSON at `/api/docs-json`. They are mounted in development and test, and not when `NODE_ENV=production`. Schemas are generated from the DTOs by the `@nestjs/swagger` Nest CLI plugin (runs in `nest build` / `nest start`, not in Jest). Protected operations show the bearer scheme.
 
+### OpenAPI contract (`openapi.json`)
+
+`apps/api/openapi.json` is the committed OpenAPI document and the contract the web app generates its types from. Regenerate it after any DTO or controller change:
+
+```bash
+npm run openapi:export   # nest build, then writes openapi.json
+```
+
+The export needs no database: the app is created but never initialised, and placeholder `DATABASE_URL` / `JWT_SECRET` values are used only when those variables are unset. CI re-exports the document and fails if `openapi.json` differs from the committed file.
+
 ### Error format
 
 Every error response has this shape (the health 503 keeps its health body):
@@ -498,7 +508,7 @@ The job takes a transaction-scoped PostgreSQL advisory lock (`pg_try_advisory_xa
 
 `.github/workflows/ci.yml` (repository root) runs on pushes to `main` and pull requests:
 
-- `api`: lint, unit tests, `db:test:migrate`, e2e tests against a `postgres:18-alpine` service, and the build.
+- `api`: lint, unit tests, `db:test:migrate`, e2e tests against a `postgres:18-alpine` service, the build, and a check that the committed `openapi.json` is up to date.
 - `docker`: builds the `migrate` target (`apps/api`) and smoke-tests `docker compose up` against `/health/ready`.
 
 Images are not published and there is no deploy job yet.

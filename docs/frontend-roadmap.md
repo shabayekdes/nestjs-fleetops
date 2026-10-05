@@ -1,6 +1,6 @@
 # FleetOps Web — Frontend Roadmap
 
-This file plans the FleetOps web frontend: a Next.js application (in this monorepo, `apps/web/`) that consumes the FleetOps NestJS REST API. It is a plan only. **Nothing in this file is built yet.**
+This file plans the FleetOps web frontend: a Next.js application (in this monorepo, `apps/web/`) that consumes the FleetOps NestJS REST API. FE1 is built (see its entry below); the later phases are plans only.
 
 > **Frontend development MUST NOT start until Backend Phase 9 — Docker, CI + Deployment — has been completed and approved.**
 
@@ -8,13 +8,13 @@ Related documents:
 
 - [`PHASES.md`](PHASES.md): the backend roadmap (Phases 1–9). It is the source of truth for what the API does.
 - [`product-roadmap.md`](product-roadmap.md): product versions after v1.0, and the master development sequence.
-- `CLAUDE.md`: backend conventions. The frontend will get its own conventions document in Frontend Phase 1.
+- `CLAUDE.md`: backend conventions. Frontend conventions are in [`apps/web/CLAUDE.md`](../apps/web/CLAUDE.md).
 
 To avoid confusion with the backend roadmap, frontend phases are always called **Frontend Phase N** (FE1–FE9). "Phase N" on its own always means a backend phase.
 
 | Frontend phase | Name                   | Status  | Commit(s) |
 | -------------- | ---------------------- | ------- | --------- |
-| FE1            | Application foundation | Planned | —         |
+| FE1            | Application foundation | Done    | —         |
 | FE2            | Authentication         | Planned | —         |
 | FE3            | Application shell      | Planned | —         |
 | FE4            | Vehicles               | Planned | —         |
@@ -75,20 +75,20 @@ For each choice: why it is needed, what it solves, why it fits, and when it is n
 
 | Technology                                                                     | Why it is needed / what it solves                                                                               | Why it fits FleetOps                                                                                                                                                                                                    | When                                                                                                                    |
 | ------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| **Next.js (App Router)**                                                       | Routing, layouts, server rendering, server-side data access and a production build in one framework.            | The server-side API access design depends on Server Components, Server Actions and Route Handlers. Nested layouts fit a dashboard with a shared shell.                                                                  | Required, FE1.                                                                                                          |
+| **Next.js (App Router)**                                                       | Routing, layouts, server rendering, server-side data access and a production build in one framework.            | The server-side API access design depends on Server Components, Server Actions and Route Handlers. Nested layouts fit a dashboard with a shared shell.                                                                  | Required, FE1. **Chosen: Next.js 16.3 (16.3.8).**                                                                       |
 | **TypeScript (strict)**                                                        | Catches contract errors with the API at compile time.                                                           | Same strictness as the backend, so types for API responses can be shared.                                                                                                                                               | Required, FE1.                                                                                                          |
 | **ESLint + Prettier**                                                          | Consistent code and a lint gate for the Definition of Done.                                                     | Same tools as the backend.                                                                                                                                                                                              | Required, FE1.                                                                                                          |
-| **Environment validation** (e.g. a small schema check at startup)              | The app should refuse to start with a missing or invalid `API_BASE_URL` or session secret, as the backend does. | Same "fail fast on bad config" decision as backend Phase 1.                                                                                                                                                             | Required, FE1. Use whatever validation library the forms use, to avoid two.                                             |
-| **Generated API types from OpenAPI** (e.g. `openapi-typescript`)               | Types for requests and responses produced from the API's OpenAPI document instead of being written by hand.     | Backend Phase 8 adds OpenAPI docs generated from the DTOs. Generated types stop the frontend and the API from drifting apart.                                                                                           | Recommended from FE1. Can be deferred if the OpenAPI output is not precise enough. Hand-written types are the fallback. |
-| **Styling: Tailwind CSS** (alternative: CSS Modules)                           | Consistent spacing, colour and responsive breakpoints without writing a CSS framework.                          | A dashboard needs many similar, responsive screens. Utility classes keep them consistent. CSS Modules (built into Next.js) is the zero-dependency alternative.                                                          | Decide at FE1.                                                                                                          |
+| **Environment validation** (e.g. a small schema check at startup)              | The app should refuse to start with a missing or invalid `API_BASE_URL` or session secret, as the backend does. | Same "fail fast on bad config" decision as backend Phase 1.                                                                                                                                                             | Required, FE1. **Chosen: Zod 4 (4.6.5)**, same library as planned for forms.                                            |
+| **Generated API types from OpenAPI** (e.g. `openapi-typescript`)               | Types for requests and responses produced from the API's OpenAPI document instead of being written by hand.     | Backend Phase 8 adds OpenAPI docs generated from the DTOs. Generated types stop the frontend and the API from drifting apart.                                                                                           | FE1. **Chosen: openapi-typescript 7.13 with a committed spec (`apps/api/openapi.json`) and committed generated types.** |
+| **Styling: Tailwind CSS** (alternative: CSS Modules)                           | Consistent spacing, colour and responsive breakpoints without writing a CSS framework.                          | A dashboard needs many similar, responsive screens. Utility classes keep them consistent. CSS Modules (built into Next.js) is the zero-dependency alternative.                                                          | FE1. **Chosen: Tailwind CSS 4 (4.3.3).**                                                                                |
 | **Accessible UI primitives** (e.g. Radix-based components such as shadcn/ui)   | Dialogs, dropdown menus, selects and toasts with correct keyboard and screen-reader behaviour.                  | These are hard to build accessibly by hand and appear from FE2 onward (user menu, delete confirmations, forms). Copy-in components avoid a heavy component-library dependency.                                          | Decide at FE2/FE3, when the first dialog or menu is needed.                                                             |
 | **Forms: native forms + Server Actions first**; React Hook Form only if needed | Submitting, showing pending state and mapping API errors to fields.                                             | Most FleetOps forms are small CRUD forms. Server Actions keep the token on the server. A form library is added only if forms with many dependent fields (e.g. assignments, maintenance) become hard to manage.          | Server Actions at FE2. Decide on a form library at FE4–FE6 based on real need.                                          |
-| **Schema validation** (e.g. Zod)                                               | One place to describe form input and environment variables, with typed results.                                 | Covers env validation (FE1) and client-side form checks.                                                                                                                                                                | FE1 for env validation, if chosen there. Otherwise defer.                                                               |
+| **Schema validation** (e.g. Zod)                                               | One place to describe form input and environment variables, with typed results.                                 | Covers env validation (FE1) and client-side form checks.                                                                                                                                                                | FE1 for env validation. **Chosen: Zod 4**; form checks follow from FE2.                                                 |
 | **Data tables** (plain table component first; TanStack Table only if needed)   | Displaying paginated lists.                                                                                     | Pagination, filtering and sorting are done by the API, so the table only renders rows. A table library is needed only if column features (resizing, column visibility, row selection) are required.                     | Plain component at FE4. Library deferred.                                                                               |
 | **Client-side data cache** (e.g. TanStack Query)                               | Client-side caching, background refetching, optimistic updates.                                                 | Not needed while data is fetched on the server per request. It may be needed for highly interactive screens.                                                                                                            | Deferred. Adopt only with a concrete screen that needs it.                                                              |
 | **Global client state library** (e.g. Zustand)                                 | Shared client-only state.                                                                                       | The current user comes from the server, and filters live in the URL. There is no known need.                                                                                                                            | Not planned.                                                                                                            |
 | **Charts** (e.g. Recharts, or a similar lightweight library)                   | Time-series and comparison charts.                                                                              | Only the cost summaries (FE7) and the dashboard (FE8) need charts.                                                                                                                                                      | Deferred to FE7/FE8. Choose based on the actual charts needed.                                                          |
-| **Unit/component tests** (e.g. Vitest or Jest + React Testing Library)         | Testing components, form behaviour and API error mapping without a browser.                                     | Matches the backend's unit-test discipline. Choose the runner that works best with the chosen Next.js version, preferring Jest if it works without friction (same runner as the backend).                               | Required, FE1.                                                                                                          |
+| **Unit/component tests** (e.g. Vitest or Jest + React Testing Library)         | Testing components, form behaviour and API error mapping without a browser.                                     | Matches the backend's unit-test discipline. Choose the runner that works best with the chosen Next.js version, preferring Jest if it works without friction (same runner as the backend).                               | Required, FE1. **Chosen: Vitest 5 + React Testing Library** (the user chose it over Jest).                              |
 | **End-to-end tests** (e.g. Playwright)                                         | Testing real flows (login, CRUD, role behaviour) in a browser against a running API.                            | The most important frontend risks (session expiry, 401/403 handling, tenant isolation in the UI) only show up end to end.                                                                                               | Setup at FE2 (first real flow). Expanded at FE9.                                                                        |
 | **Authentication library** (e.g. Auth.js)                                      | —                                                                                                               | **Not planned.** The API already authenticates users and issues tokens. A small custom session (an encrypted cookie holding the access token) is simpler than adapting an auth library to an external bearer-token API. | Not needed.                                                                                                             |
 
@@ -96,7 +96,7 @@ For each choice: why it is needed, what it solves, why it fits, and when it is n
 
 ## Frontend Phase 1 — Application foundation
 
-**Status:** Planned
+**Status:** Done (commit pending)
 
 **Goal:** a running Next.js application with the configuration, API client, layout and conventions that every later phase relies on.
 
@@ -117,14 +117,55 @@ For each choice: why it is needed, what it solves, why it fits, and when it is n
 - Frontend conventions document (the frontend's equivalent of `CLAUDE.md`): folder structure, naming, Server vs Client Component rules, how to call the API, testing rules, Definition of Done.
 - README: install, env vars, run, test, build.
 
-**Decisions to make**
+**Built**
 
-- Styling approach; unit test runner; generated vs hand-written API types.
+- `apps/web/`: Next.js 16.3.8 (App Router), React 19.2.8, strict TypeScript 5.9.3, Tailwind CSS 4, ESLint 9 + Prettier, with its own `package.json` (no workspaces). Dev server and `next start` use port 3001.
+- Environment: `src/lib/env/server.ts` validates `API_BASE_URL` with Zod 4. `src/instrumentation.ts` runs `assertServerEnv()` at startup and exits with `process.exit(1)` if the value is missing or invalid. `.env.example` included.
+- Server-only API client (`src/lib/api/client.ts`, `apiRequest`): builds URLs from `API_BASE_URL` + `/api/v1`, handles JSON, returns typed responses and applies a request timeout. Failures are `ApiError` (`status`, `message`, `fieldErrors`, `requestId`) or `ApiConnectionError` (`reason: 'timeout' | 'unreachable'`).
+- Generated types: `src/lib/api/generated/openapi.ts` is produced by `npm run api:types` from `apps/api/openapi.json`; `src/lib/api/types.ts` exposes them. A typed `/health` helper lives in `src/lib/api/health.ts`.
+- App shell: root layout, minimal public home page, and global `error.tsx`, `global-error.tsx`, `loading.tsx` and `not-found.tsx`.
+- `/dev/api-health`: a development-only page that calls `/api/v1/health` and shows the API status.
+- Vitest 5 + React Testing Library setup, with tests for the env schema, env assertion, API client, error conversion, health helper, health status component and `not-found`.
+- Conventions document `apps/web/CLAUDE.md` and `apps/web/README.md` (install, env vars, run, test, build).
+- CI jobs for the web app (format check, lint, typecheck, test, build, generated-types drift check).
 
-**Out of scope**
+**Decisions**
+
+- Exact pins (`.npmrc` `save-exact=true`), with four deliberate holds:
+  - React 19.2.8, not 19.3: create-next-app 16.3.8 pins it.
+  - TypeScript 5.9.3: openapi-typescript 7.13 has a `^5` peer. The API uses TypeScript 6, which is fine.
+  - ESLint 9: the plugins in eslint-config-next 16.3.8 allow at most 9. A deprecation notice is accepted.
+  - `@types/node` 24: matches the Node 24 runtime.
+- The OpenAPI spec (`apps/api/openapi.json`) and the generated types are both committed. CI checks drift on both sides: the API job re-exports the spec and fails on a diff, and the web job regenerates the types and fails on a diff.
+- The OpenAPI export needs no database: the Nest app is created but never `init()`'d, so no lifecycle hook (including the Prisma connection) runs.
+- Health responses became DTO classes so the generated health types are precise instead of `unknown`.
+- `API_BASE_URL` must be the origin only (for example `http://localhost:3000`). The client adds `/api/v1`.
+- Fail-fast env: invalid configuration stops the server at startup through `instrumentation.ts` and `process.exit(1)`, like the backend.
+- `ApiError` and `ApiConnectionError` messages never include the base URL, so internal addresses do not leak into pages or logs shown to users.
+- `/dev/api-health` is development-only. It is blocked in production by a production-only `rewrites().beforeFiles` rule in `next.config.ts` that sends `/dev/*` to a route that does not exist. The page guards itself too, but `notFound()` called after the root `loading.tsx` has started streaming returns status 200. A rewrite was chosen over moving `loading.tsx` because any future loading boundary would bring the problem back.
+- Dev server on port 3001, so it does not clash with the API on 3000.
+- Frontend conventions live in `apps/web/CLAUDE.md`, separate from the backend `CLAUDE.md`.
+- No CI path filters yet: every job runs on every change.
+- `npm audit` reports 5 high findings. They are one `braces` advisory (no patched release) in the dev-only lint chain under `eslint-config-next`. `npm audit --omit=dev` reports 0. Never apply `npm audit fix --force`: it downgrades `eslint-config-next` to 14.
+
+**Backend changes made for FE1**
+
+- Health DTO classes (`health-response.dto.ts`) and `503` documentation on the health endpoint.
+- `createOpenApiDocument` helper in `swagger.ts`.
+- `src/scripts/export-openapi.ts` and the `npm run openapi:export` script, which write `apps/api/openapi.json`.
+- An API CI step that re-exports the spec and fails on drift.
+- No behavior or schema change.
+
+**Out of scope / deferred**
 
 - Login and any authenticated page (FE2).
 - Navigation shell (FE3).
+- Compose `web` service and a web Dockerfile (FE9).
+- Playwright e2e tests (FE2).
+- CI path filters.
+- Upgrades to ESLint 10, TypeScript 6+ and React 19.3, once `eslint-config-next` and openapi-typescript support them.
+- An `API_BASE_URL` with a path prefix (revisit in FE9).
+- A possible argon2-related flake in API unit tests under heavy load. It was not reproduced; capture the output if it recurs.
 
 ---
 

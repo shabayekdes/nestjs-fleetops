@@ -2,22 +2,24 @@ import { jest } from '@jest/globals';
 import type { Response } from 'express';
 import { Test } from '@nestjs/testing';
 import { HealthController } from './health.controller.js';
-import {
-  HealthService,
-  type HealthStatus,
-  type LivenessStatus,
-  type ReadinessStatus,
-} from './health.service.js';
+import type {
+  HealthResponseDto,
+  LivenessResponseDto,
+  ReadinessResponseDto,
+} from './health-response.dto.js';
+import { HealthService } from './health.service.js';
 
 describe('HealthController', () => {
-  const check = jest.fn<() => Promise<HealthStatus>>();
-  const liveness = jest.fn<() => LivenessStatus>();
-  const readiness = jest.fn<() => Promise<ReadinessStatus>>();
+  const check = jest.fn<() => Promise<HealthResponseDto>>();
+  const liveness = jest.fn<() => LivenessResponseDto>();
+  const readiness = jest.fn<() => Promise<ReadinessResponseDto>>();
   let controller: HealthController;
   const status = jest.fn();
   const res = { status } as unknown as Response;
 
-  const health = (overrides: Partial<HealthStatus>): HealthStatus => ({
+  const health = (
+    overrides: Partial<HealthResponseDto>,
+  ): HealthResponseDto => ({
     status: 'ok',
     service: 'fleetops-api',
     timestamp: new Date().toISOString(),
@@ -55,7 +57,7 @@ describe('HealthController', () => {
 
   describe('live', () => {
     it('returns the liveness result and never sets a status', () => {
-      const body: LivenessStatus = {
+      const body: LivenessResponseDto = {
         status: 'ok',
         service: 'fleetops-api',
         timestamp: new Date().toISOString(),
@@ -68,7 +70,9 @@ describe('HealthController', () => {
   });
 
   describe('ready', () => {
-    const ready = (overrides: Partial<ReadinessStatus>): ReadinessStatus => ({
+    const ready = (
+      overrides: Partial<ReadinessResponseDto>,
+    ): ReadinessResponseDto => ({
       ...health({}),
       migrations: 'applied',
       ...overrides,

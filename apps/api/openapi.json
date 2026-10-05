@@ -1,0 +1,3157 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/api/v1": {
+      "get": {
+        "operationId": "AppController_getRoot_v1",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "root"
+        ]
+      }
+    },
+    "/api/v1/health": {
+      "get": {
+        "operationId": "HealthController_check_v1",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponseDto"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "A dependency is down; the body is the health status, not the error format.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/api/v1/health/live": {
+      "get": {
+        "operationId": "HealthController_live_v1",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LivenessResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/api/v1/health/ready": {
+      "get": {
+        "operationId": "HealthController_ready_v1",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadinessResponseDto"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "A dependency is down; the body is the health status, not the error format.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadinessResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "operationId": "AuthController_login_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/me": {
+      "get": {
+        "operationId": "AuthController_me_v1",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/me/password": {
+      "patch": {
+        "operationId": "AuthController_changePassword_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/users": {
+      "get": {
+        "operationId": "UsersController_findAll_v1",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "role",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ADMIN",
+                "MANAGER",
+                "DRIVER"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserListResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "users"
+        ]
+      },
+      "post": {
+        "operationId": "UsersController_create_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUserDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "users"
+        ]
+      }
+    },
+    "/api/v1/users/{id}": {
+      "get": {
+        "operationId": "UsersController_findOne_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "users"
+        ]
+      },
+      "patch": {
+        "operationId": "UsersController_update_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "users"
+        ]
+      },
+      "delete": {
+        "operationId": "UsersController_remove_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "users"
+        ]
+      }
+    },
+    "/api/v1/vehicles": {
+      "get": {
+        "operationId": "VehiclesController_findAll_v1",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "make",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxLength": 50,
+              "type": "string"
+            }
+          },
+          {
+            "name": "model",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxLength": 50,
+              "type": "string"
+            }
+          },
+          {
+            "name": "year",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1900,
+              "type": "number"
+            }
+          },
+          {
+            "name": "serviceStatus",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "UNKNOWN",
+                "OK",
+                "DUE_SOON",
+                "OVERDUE"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VehicleListResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "vehicles"
+        ]
+      },
+      "post": {
+        "operationId": "VehiclesController_create_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateVehicleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VehicleResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "vehicles"
+        ]
+      }
+    },
+    "/api/v1/vehicles/{id}": {
+      "get": {
+        "operationId": "VehiclesController_findOne_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VehicleResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "vehicles"
+        ]
+      },
+      "patch": {
+        "operationId": "VehiclesController_update_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateVehicleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VehicleResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "vehicles"
+        ]
+      },
+      "delete": {
+        "operationId": "VehiclesController_remove_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "vehicles"
+        ]
+      }
+    },
+    "/api/v1/drivers": {
+      "get": {
+        "operationId": "DriversController_findAll_v1",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DriverListResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "drivers"
+        ]
+      },
+      "post": {
+        "operationId": "DriversController_create_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDriverDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DriverResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "drivers"
+        ]
+      }
+    },
+    "/api/v1/drivers/{id}": {
+      "get": {
+        "operationId": "DriversController_findOne_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DriverResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "drivers"
+        ]
+      },
+      "patch": {
+        "operationId": "DriversController_update_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDriverDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DriverResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "drivers"
+        ]
+      },
+      "delete": {
+        "operationId": "DriversController_remove_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "drivers"
+        ]
+      }
+    },
+    "/api/v1/assignments": {
+      "get": {
+        "operationId": "AssignmentsController_findAll_v1",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "vehicleId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "driverId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "active",
+            "required": false,
+            "in": "query",
+            "description": "true = only current assignments, false = only ended ones.",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssignmentListResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "assignments"
+        ]
+      },
+      "post": {
+        "operationId": "AssignmentsController_create_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAssignmentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssignmentResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "assignments"
+        ]
+      }
+    },
+    "/api/v1/assignments/{id}": {
+      "get": {
+        "operationId": "AssignmentsController_findOne_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssignmentResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "assignments"
+        ]
+      }
+    },
+    "/api/v1/assignments/{id}/end": {
+      "post": {
+        "operationId": "AssignmentsController_end_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssignmentResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "assignments"
+        ]
+      }
+    },
+    "/api/v1/vehicles/{vehicleId}/maintenance-records": {
+      "get": {
+        "operationId": "MaintenanceRecordsController_findAll_v1",
+        "parameters": [
+          {
+            "name": "vehicleId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "OIL_CHANGE",
+                "TIRES",
+                "BRAKES",
+                "INSPECTION",
+                "REPAIR",
+                "OTHER"
+              ]
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "Inclusive lower bound on performedOn.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "Inclusive upper bound on performedOn.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MaintenanceRecordListResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "maintenance-records"
+        ]
+      },
+      "post": {
+        "operationId": "MaintenanceRecordsController_create_v1",
+        "parameters": [
+          {
+            "name": "vehicleId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateMaintenanceRecordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MaintenanceRecordResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "maintenance-records"
+        ]
+      }
+    },
+    "/api/v1/vehicles/{vehicleId}/maintenance-records/{id}": {
+      "get": {
+        "operationId": "MaintenanceRecordsController_findOne_v1",
+        "parameters": [
+          {
+            "name": "vehicleId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MaintenanceRecordResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "maintenance-records"
+        ]
+      },
+      "patch": {
+        "operationId": "MaintenanceRecordsController_update_v1",
+        "parameters": [
+          {
+            "name": "vehicleId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMaintenanceRecordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MaintenanceRecordResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "maintenance-records"
+        ]
+      },
+      "delete": {
+        "operationId": "MaintenanceRecordsController_remove_v1",
+        "parameters": [
+          {
+            "name": "vehicleId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "maintenance-records"
+        ]
+      }
+    },
+    "/api/v1/vehicles/{vehicleId}/fuel-logs": {
+      "get": {
+        "operationId": "FuelLogsController_findAll_v1",
+        "parameters": [
+          {
+            "name": "vehicleId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "Inclusive lower bound on fueledOn.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "Inclusive upper bound on fueledOn.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FuelLogListResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "fuel-logs"
+        ]
+      },
+      "post": {
+        "operationId": "FuelLogsController_create_v1",
+        "parameters": [
+          {
+            "name": "vehicleId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateFuelLogDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FuelLogResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "fuel-logs"
+        ]
+      }
+    },
+    "/api/v1/vehicles/{vehicleId}/fuel-logs/{id}": {
+      "get": {
+        "operationId": "FuelLogsController_findOne_v1",
+        "parameters": [
+          {
+            "name": "vehicleId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FuelLogResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "fuel-logs"
+        ]
+      },
+      "patch": {
+        "operationId": "FuelLogsController_update_v1",
+        "parameters": [
+          {
+            "name": "vehicleId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateFuelLogDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FuelLogResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "fuel-logs"
+        ]
+      },
+      "delete": {
+        "operationId": "FuelLogsController_remove_v1",
+        "parameters": [
+          {
+            "name": "vehicleId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "fuel-logs"
+        ]
+      }
+    },
+    "/api/v1/vehicles/{vehicleId}/cost-summary": {
+      "get": {
+        "operationId": "CostSummaryController_getSummary_v1",
+        "parameters": [
+          {
+            "name": "vehicleId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "First month, inclusive. Default: 11 months before `to`.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "Last month, inclusive. Default: the current UTC month.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CostSummaryResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "cost-summary"
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "FleetOps API",
+    "description": "",
+    "version": "v1",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [],
+  "components": {
+    "securitySchemes": {
+      "bearer": {
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "type": "http"
+      }
+    },
+    "schemas": {
+      "ValidationErrorDetailDto": {
+        "type": "object",
+        "properties": {
+          "field": {
+            "type": "string",
+            "description": "Dotted path of the invalid field, for example `items.0.name`."
+          },
+          "messages": {
+            "description": "Validation messages for the field.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "field",
+          "messages"
+        ]
+      },
+      "ErrorResponseDto": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "number",
+            "description": "HTTP status code."
+          },
+          "error": {
+            "type": "string",
+            "description": "HTTP reason phrase, for example `Not Found`."
+          },
+          "message": {
+            "type": "string",
+            "description": "Human readable summary."
+          },
+          "requestId": {
+            "type": "string",
+            "description": "Equals the X-Request-Id response header."
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "ISO 8601 time the error was produced."
+          },
+          "path": {
+            "type": "string",
+            "description": "Request path without the query string."
+          },
+          "details": {
+            "description": "Per-field problems. Only present on validation errors.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ValidationErrorDetailDto"
+            }
+          }
+        },
+        "required": [
+          "statusCode",
+          "error",
+          "message",
+          "requestId",
+          "timestamp",
+          "path"
+        ]
+      },
+      "HealthResponseDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "description": "`error` when a dependency is down.",
+            "enum": [
+              "error",
+              "ok"
+            ],
+            "type": "string"
+          },
+          "service": {
+            "type": "string",
+            "description": "Service name."
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "ISO 8601 time the check ran."
+          },
+          "database": {
+            "description": "Database connectivity.",
+            "enum": [
+              "up",
+              "down"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "service",
+          "timestamp",
+          "database"
+        ]
+      },
+      "LivenessResponseDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "Always `ok`: the process is running.",
+            "enum": [
+              "ok"
+            ]
+          },
+          "service": {
+            "type": "string",
+            "description": "Service name."
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "ISO 8601 time the check ran."
+          }
+        },
+        "required": [
+          "status",
+          "service",
+          "timestamp"
+        ]
+      },
+      "ReadinessResponseDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "description": "`error` when a dependency is down.",
+            "enum": [
+              "error",
+              "ok"
+            ],
+            "type": "string"
+          },
+          "service": {
+            "type": "string",
+            "description": "Service name."
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "ISO 8601 time the check ran."
+          },
+          "database": {
+            "description": "Database connectivity.",
+            "enum": [
+              "up",
+              "down"
+            ],
+            "type": "string"
+          },
+          "migrations": {
+            "description": "Whether every migration shipped in this build is applied.",
+            "enum": [
+              "unknown",
+              "applied",
+              "pending"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "service",
+          "timestamp",
+          "database",
+          "migrations"
+        ]
+      },
+      "LoginDto": {
+        "type": "object",
+        "properties": {
+          "organizationSlug": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "email": {
+            "type": "string",
+            "maxLength": 254,
+            "format": "email"
+          },
+          "password": {
+            "type": "string",
+            "description": "Never trimmed or case-folded.",
+            "maxLength": 128
+          }
+        },
+        "required": [
+          "organizationSlug",
+          "email",
+          "password"
+        ]
+      },
+      "LoginResponseDto": {
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string"
+          },
+          "tokenType": {
+            "type": "string",
+            "enum": [
+              "Bearer"
+            ]
+          },
+          "expiresIn": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "accessToken",
+          "tokenType",
+          "expiresIn"
+        ]
+      },
+      "MeResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "organizationId": {
+            "type": "string"
+          },
+          "firstName": {
+            "type": "string"
+          },
+          "lastName": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "ADMIN",
+              "MANAGER",
+              "DRIVER"
+            ]
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "organizationId",
+          "firstName",
+          "lastName",
+          "email",
+          "role",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "ChangePasswordDto": {
+        "type": "object",
+        "properties": {
+          "currentPassword": {
+            "type": "string",
+            "maxLength": 128
+          },
+          "newPassword": {
+            "type": "string",
+            "minLength": 12,
+            "maxLength": 128
+          }
+        },
+        "required": [
+          "currentPassword",
+          "newPassword"
+        ]
+      },
+      "UserResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "firstName": {
+            "type": "string"
+          },
+          "lastName": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "role": {
+            "enum": [
+              "ADMIN",
+              "MANAGER",
+              "DRIVER"
+            ],
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "firstName",
+          "lastName",
+          "email",
+          "role",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "UserListResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserResponseDto"
+            }
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "page": {
+                "type": "number"
+              },
+              "limit": {
+                "type": "number"
+              },
+              "total": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "page",
+              "limit",
+              "total"
+            ]
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      },
+      "CreateUserDto": {
+        "type": "object",
+        "properties": {
+          "firstName": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "lastName": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "email": {
+            "type": "string",
+            "maxLength": 254,
+            "format": "email"
+          },
+          "password": {
+            "type": "string",
+            "description": "Never trimmed or case-folded.",
+            "minLength": 12,
+            "maxLength": 128
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "ADMIN",
+              "MANAGER",
+              "DRIVER"
+            ]
+          }
+        },
+        "required": [
+          "firstName",
+          "lastName",
+          "email",
+          "password",
+          "role"
+        ]
+      },
+      "UpdateUserDto": {
+        "type": "object",
+        "properties": {
+          "firstName": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "lastName": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "email": {
+            "type": "string",
+            "maxLength": 254,
+            "format": "email"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "ADMIN",
+              "MANAGER",
+              "DRIVER"
+            ]
+          }
+        }
+      },
+      "VehicleResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "make": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "year": {
+            "type": "number"
+          },
+          "vin": {
+            "type": "string"
+          },
+          "licensePlate": {
+            "type": "string",
+            "nullable": true
+          },
+          "nextServiceDueOn": {
+            "type": "string",
+            "nullable": true,
+            "description": "\"YYYY-MM-DD\"; derived from maintenance records."
+          },
+          "serviceStatus": {
+            "enum": [
+              "UNKNOWN",
+              "OK",
+              "DUE_SOON",
+              "OVERDUE"
+            ],
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "make",
+          "model",
+          "year",
+          "vin",
+          "licensePlate",
+          "nextServiceDueOn",
+          "serviceStatus",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "VehicleListResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VehicleResponseDto"
+            }
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "page": {
+                "type": "number"
+              },
+              "limit": {
+                "type": "number"
+              },
+              "total": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "page",
+              "limit",
+              "total"
+            ]
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      },
+      "CreateVehicleDto": {
+        "type": "object",
+        "properties": {
+          "make": {
+            "type": "string",
+            "maxLength": 50
+          },
+          "model": {
+            "type": "string",
+            "maxLength": 50
+          },
+          "year": {
+            "type": "number",
+            "description": "JSON number only; no @Type, so \"2023\" is rejected.",
+            "minimum": 1900
+          },
+          "vin": {
+            "type": "string"
+          },
+          "licensePlate": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 15
+          }
+        },
+        "required": [
+          "make",
+          "model",
+          "year",
+          "vin"
+        ]
+      },
+      "UpdateVehicleDto": {
+        "type": "object",
+        "properties": {
+          "make": {
+            "type": "string",
+            "maxLength": 50
+          },
+          "model": {
+            "type": "string",
+            "maxLength": 50
+          },
+          "year": {
+            "type": "number",
+            "minimum": 1900
+          },
+          "vin": {
+            "type": "string"
+          },
+          "licensePlate": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 15
+          }
+        }
+      },
+      "DriverResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "firstName": {
+            "type": "string"
+          },
+          "lastName": {
+            "type": "string"
+          },
+          "licenseNumber": {
+            "type": "string"
+          },
+          "licenseExpiresOn": {
+            "type": "string",
+            "description": "\"YYYY-MM-DD\""
+          },
+          "userId": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "firstName",
+          "lastName",
+          "licenseNumber",
+          "licenseExpiresOn",
+          "userId",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "DriverListResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DriverResponseDto"
+            }
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "page": {
+                "type": "number"
+              },
+              "limit": {
+                "type": "number"
+              },
+              "total": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "page",
+              "limit",
+              "total"
+            ]
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      },
+      "CreateDriverDto": {
+        "type": "object",
+        "properties": {
+          "firstName": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "lastName": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "licenseNumber": {
+            "type": "string",
+            "maxLength": 30
+          },
+          "licenseExpiresOn": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Optional login account of this driver; null/omitted = not linked.",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "firstName",
+          "lastName",
+          "licenseNumber",
+          "licenseExpiresOn"
+        ]
+      },
+      "UpdateDriverDto": {
+        "type": "object",
+        "properties": {
+          "firstName": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "lastName": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "licenseNumber": {
+            "type": "string",
+            "maxLength": 30
+          },
+          "licenseExpiresOn": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          }
+        }
+      },
+      "AssignmentResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "startedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "endedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true,
+            "description": "null while the assignment is active."
+          },
+          "vehicle": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "make": {
+                "type": "string"
+              },
+              "model": {
+                "type": "string"
+              },
+              "vin": {
+                "type": "string"
+              },
+              "licensePlate": {
+                "type": "string",
+                "nullable": true
+              }
+            },
+            "required": [
+              "id",
+              "make",
+              "model",
+              "vin",
+              "licensePlate"
+            ]
+          },
+          "driver": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "firstName": {
+                "type": "string"
+              },
+              "lastName": {
+                "type": "string"
+              },
+              "licenseNumber": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "firstName",
+              "lastName",
+              "licenseNumber"
+            ]
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "startedAt",
+          "endedAt",
+          "vehicle",
+          "driver",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "AssignmentListResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssignmentResponseDto"
+            }
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "page": {
+                "type": "number"
+              },
+              "limit": {
+                "type": "number"
+              },
+              "total": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "page",
+              "limit",
+              "total"
+            ]
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      },
+      "CreateAssignmentDto": {
+        "type": "object",
+        "properties": {
+          "vehicleId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "driverId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "vehicleId",
+          "driverId"
+        ]
+      },
+      "MaintenanceRecordResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "vehicleId": {
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "OIL_CHANGE",
+              "TIRES",
+              "BRAKES",
+              "INSPECTION",
+              "REPAIR",
+              "OTHER"
+            ],
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "vendor": {
+            "type": "string",
+            "nullable": true
+          },
+          "performedOn": {
+            "type": "string",
+            "description": "\"YYYY-MM-DD\""
+          },
+          "odometerKm": {
+            "type": "number",
+            "nullable": true
+          },
+          "cost": {
+            "type": "string",
+            "description": "Fixed-scale decimal string, 2 decimal places."
+          },
+          "nextServiceDueOn": {
+            "type": "string",
+            "nullable": true,
+            "description": "\"YYYY-MM-DD\""
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "vehicleId",
+          "type",
+          "description",
+          "vendor",
+          "performedOn",
+          "odometerKm",
+          "cost",
+          "nextServiceDueOn",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "MaintenanceRecordListResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MaintenanceRecordResponseDto"
+            }
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "page": {
+                "type": "number"
+              },
+              "limit": {
+                "type": "number"
+              },
+              "total": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "page",
+              "limit",
+              "total"
+            ]
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      },
+      "CreateMaintenanceRecordDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "OIL_CHANGE",
+              "TIRES",
+              "BRAKES",
+              "INSPECTION",
+              "REPAIR",
+              "OTHER"
+            ]
+          },
+          "performedOn": {
+            "type": "string"
+          },
+          "cost": {
+            "type": "string",
+            "description": "Decimal string, e.g. \"89.90\". JSON numbers are rejected."
+          },
+          "odometerKm": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 9999999
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "vendor": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "nextServiceDueOn": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "performedOn",
+          "cost"
+        ]
+      },
+      "UpdateMaintenanceRecordDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "OIL_CHANGE",
+              "TIRES",
+              "BRAKES",
+              "INSPECTION",
+              "REPAIR",
+              "OTHER"
+            ]
+          },
+          "performedOn": {
+            "type": "string"
+          },
+          "cost": {
+            "type": "string"
+          },
+          "odometerKm": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 0,
+            "maximum": 9999999
+          },
+          "description": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 500
+          },
+          "vendor": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 100
+          },
+          "nextServiceDueOn": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "FuelLogResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "vehicleId": {
+            "type": "string"
+          },
+          "fueledOn": {
+            "type": "string",
+            "description": "\"YYYY-MM-DD\""
+          },
+          "liters": {
+            "type": "string",
+            "description": "Fixed-scale decimal string, 3 decimal places."
+          },
+          "totalCost": {
+            "type": "string",
+            "description": "Fixed-scale decimal string, 2 decimal places."
+          },
+          "odometerKm": {
+            "type": "number",
+            "nullable": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "vehicleId",
+          "fueledOn",
+          "liters",
+          "totalCost",
+          "odometerKm",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "FuelLogListResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FuelLogResponseDto"
+            }
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "page": {
+                "type": "number"
+              },
+              "limit": {
+                "type": "number"
+              },
+              "total": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "page",
+              "limit",
+              "total"
+            ]
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      },
+      "CreateFuelLogDto": {
+        "type": "object",
+        "properties": {
+          "fueledOn": {
+            "type": "string"
+          },
+          "liters": {
+            "type": "string",
+            "description": "Decimal string, positive, up to 3 decimal places, e.g. \"45.500\"."
+          },
+          "totalCost": {
+            "type": "string",
+            "description": "Decimal string, up to 2 decimal places, e.g. \"80.00\"."
+          },
+          "odometerKm": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 9999999
+          }
+        },
+        "required": [
+          "fueledOn",
+          "liters",
+          "totalCost"
+        ]
+      },
+      "UpdateFuelLogDto": {
+        "type": "object",
+        "properties": {
+          "fueledOn": {
+            "type": "string"
+          },
+          "liters": {
+            "type": "string"
+          },
+          "totalCost": {
+            "type": "string"
+          },
+          "odometerKm": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 0,
+            "maximum": 9999999
+          }
+        }
+      },
+      "CostSummaryMonthDto": {
+        "type": "object",
+        "properties": {
+          "month": {
+            "type": "string",
+            "description": "\"YYYY-MM\""
+          },
+          "maintenanceCost": {
+            "type": "string"
+          },
+          "fuelCost": {
+            "type": "string"
+          },
+          "fuelLiters": {
+            "type": "string"
+          },
+          "totalCost": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "month",
+          "maintenanceCost",
+          "fuelCost",
+          "fuelLiters",
+          "totalCost"
+        ]
+      },
+      "CostSummaryTotalsDto": {
+        "type": "object",
+        "properties": {
+          "maintenanceCost": {
+            "type": "string"
+          },
+          "fuelCost": {
+            "type": "string"
+          },
+          "fuelLiters": {
+            "type": "string"
+          },
+          "totalCost": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "maintenanceCost",
+          "fuelCost",
+          "fuelLiters",
+          "totalCost"
+        ]
+      },
+      "CostSummaryResponseDto": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          },
+          "months": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CostSummaryMonthDto"
+            }
+          },
+          "totals": {
+            "$ref": "#/components/schemas/CostSummaryTotalsDto"
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "months",
+          "totals"
+        ]
+      }
+    }
+  }
+}

@@ -52,7 +52,7 @@ services:
       migrate:
         condition: service_completed_successfully
 
-  # web: Next.js app (apps/web) is added here in FE1.
+  # web: Next.js app (apps/web) is added here in FE9 (production readiness).
 
 volumes:
   postgres-data: {}

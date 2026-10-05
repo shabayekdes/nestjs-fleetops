@@ -8,6 +8,7 @@
   "type": "module",
   "scripts": {
     "build": "nest build",
+    "openapi:export": "nest build && node dist/scripts/export-openapi.js",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\" \"prisma/**/*.ts\"",
     "start": "nest start",
     "start:dev": "nest start --watch",
@@ -97,7 +98,8 @@
     "collectCoverageFrom": [
       "**/*.ts",
       "!main.ts",
-      "!generated/**"
+      "!generated/**",
+      "!scripts/**"
     ],
     "coverageDirectory": "../coverage",
     "testEnvironment": "node"

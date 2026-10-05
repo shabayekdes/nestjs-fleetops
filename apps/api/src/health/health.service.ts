@@ -1,27 +1,16 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { readdir } from 'node:fs/promises';
 import { PrismaService } from '../database/prisma.service.js';
+import {
+  type DependencyStatus,
+  HealthResponseDto,
+  LivenessResponseDto,
+  type MigrationsStatus,
+  ReadinessResponseDto,
+} from './health-response.dto.js';
 
 /** DI token for the directory holding the migrations this build ships. */
 export const MIGRATIONS_DIR = 'MIGRATIONS_DIR';
-
-export type DependencyStatus = 'up' | 'down';
-export type MigrationsStatus = 'applied' | 'pending' | 'unknown';
-
-export type HealthStatus = {
-  status: 'ok' | 'error';
-  service: string;
-  timestamp: string;
-  database: DependencyStatus;
-};
-
-export type LivenessStatus = {
-  status: 'ok';
-  service: string;
-  timestamp: string;
-};
-
-export type ReadinessStatus = HealthStatus & { migrations: MigrationsStatus };
 
 @Injectable()
 export class HealthService {
@@ -32,7 +21,7 @@ export class HealthService {
     @Inject(MIGRATIONS_DIR) private readonly migrationsDir: string,
   ) {}
 
-  async check(): Promise<HealthStatus> {
+  async check(): Promise<HealthResponseDto> {
     const database = await this.checkDatabase();
 
     return {
@@ -44,7 +33,7 @@ export class HealthService {
   }
 
   /** Touches no dependency: a database outage must never restart the process. */
-  liveness(): LivenessStatus {
+  liveness(): LivenessResponseDto {
     return {
       status: 'ok',
       service: 'fleetops-api',
@@ -52,7 +41,7 @@ export class HealthService {
     };
   }
 
-  async readiness(): Promise<ReadinessStatus> {
+  async readiness(): Promise<ReadinessResponseDto> {
     const database = await this.checkDatabase();
     const migrations =
       database === 'up' ? await this.checkMigrations() : 'unknown';

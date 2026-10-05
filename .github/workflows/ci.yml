@@ -51,6 +51,32 @@ jobs:
       - run: npm run db:test:migrate
       - run: npm run test:e2e
       - run: npm run build
+      - name: Check committed OpenAPI document is up to date
+        run: node dist/scripts/export-openapi.js && git diff --exit-code -- openapi.json
+
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: apps/web
+    env:
+      NEXT_TELEMETRY_DISABLED: 1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - run: npm ci
+      - name: Check generated API types are up to date
+        run: npm run api:types && git diff --exit-code -- src/lib/api/generated
+      - run: npm run format:check
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
 
   docker:
     runs-on: ubuntu-latest
