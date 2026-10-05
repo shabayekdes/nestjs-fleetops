@@ -8,6 +8,7 @@ import { AppModule } from '../src/app.module.js';
 import { configureApp } from '../src/app.setup.js';
 import { PrismaService } from '../src/database/prisma.service.js';
 import { maxVehicleYear } from '../src/vehicles/dto/vehicle-normalizers.js';
+import { errorBody, stableError } from './utils/error-body.js';
 
 type Body = Record<string, unknown>;
 
@@ -24,11 +25,7 @@ const RESPONSE_KEYS = [
   'vin',
   'year',
 ];
-const NOT_FOUND = {
-  statusCode: 404,
-  message: 'Vehicle not found',
-  error: 'Not Found',
-};
+const NOT_FOUND = errorBody(404, 'Vehicle not found');
 const UUID_V7_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const BAD_UUID = 'Validation failed (uuid v 7 is expected)';
@@ -235,7 +232,7 @@ describe('Vehicles (e2e)', () => {
     ])('%s %s without a token returns 401', async (method, path) => {
       const res = await api(method, path, null);
       expect(res.status).toBe(401);
-      expect(res.body).toEqual({ statusCode: 401, message: 'Unauthorized' });
+      expect(res.body).toEqual(errorBody(401, 'Unauthorized'));
     });
 
     it('rejects a garbage token', async () => {
@@ -532,7 +529,7 @@ describe('Vehicles (e2e)', () => {
         const body = payload();
         const res = await asRole('DRIVER', 'post', '').send(body);
         expect(res.status).toBe(403);
-        expect(res.body).toEqual({ statusCode: 403, message: 'Forbidden' });
+        expect(res.body).toEqual(errorBody(403, 'Forbidden'));
         expect(
           await prisma.vehicle.findFirst({
             where: { vin: body.vin as string },
@@ -624,7 +621,7 @@ describe('Vehicles (e2e)', () => {
         .expect(404);
       expect(res.body).toEqual(NOT_FOUND);
       const missing = await api('patch', `/${missingId}`).send({}).expect(404);
-      expect(res.body).toEqual(missing.body);
+      expect(stableError(res.body)).toEqual(stableError(missing.body));
       expect(await dbRow(vehicleB.id as string)).toEqual(before);
     });
 

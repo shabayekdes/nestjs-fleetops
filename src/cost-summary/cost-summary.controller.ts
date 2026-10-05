@@ -1,4 +1,5 @@
 import { Controller, Get, Param, ParseUUIDPipe, Query } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import type { AuthUser } from '../auth/auth.types.js';
 import { CurrentUser } from '../auth/current-user.decorator.js';
 import { Roles } from '../auth/roles.decorator.js';
@@ -7,6 +8,8 @@ import { CostSummaryService } from './cost-summary.service.js';
 import { CostSummaryQueryDto } from './dto/cost-summary-query.dto.js';
 import type { CostSummaryResponseDto } from './dto/cost-summary-response.dto.js';
 
+@ApiTags('cost-summary')
+@ApiBearerAuth()
 @Controller('vehicles/:vehicleId/cost-summary')
 @Roles(Role.ADMIN, Role.MANAGER)
 export class CostSummaryController {

@@ -33,13 +33,17 @@ cp .env.test.example .env.test # only needed for e2e/integration tests
 
 Configuration is read from environment variables. Values are validated at startup and the application refuses to start if they are invalid. Real environment variables always override values from the `.env` files.
 
-| Variable         | Description                                                                       | Default       |
-| ---------------- | --------------------------------------------------------------------------------- | ------------- |
-| `NODE_ENV`       | `development`, `production`, or `test`                                            | `development` |
-| `PORT`           | HTTP port the API listens on (1–65535)                                            | `3000`        |
-| `DATABASE_URL`   | PostgreSQL connection string (**required**)                                       | —             |
-| `JWT_SECRET`     | HS256 signing secret, at least 32 chars (**required**). `openssl rand -base64 48` | —             |
-| `JWT_EXPIRES_IN` | Access token lifetime in seconds (60–86400)                                       | `900`         |
+| Variable               | Description                                                                         | Default       |
+| ---------------------- | ----------------------------------------------------------------------------------- | ------------- |
+| `NODE_ENV`             | `development`, `production`, or `test`                                              | `development` |
+| `PORT`                 | HTTP port the API listens on (1–65535)                                              | `3000`        |
+| `DATABASE_URL`         | PostgreSQL connection string (**required**)                                         | —             |
+| `JWT_SECRET`           | HS256 signing secret, at least 32 chars (**required**). `openssl rand -base64 48`   | —             |
+| `JWT_EXPIRES_IN`       | Access token lifetime in seconds (60–86400)                                         | `900`         |
+| `LOG_LEVEL`            | `fatal`, `error`, `warn`, `log`, `debug` or `verbose`                               | `log`         |
+| `THROTTLE_TTL_SECONDS` | Rate-limit window in seconds (1–3600)                                               | `60`          |
+| `THROTTLE_LIMIT`       | Attempts per window: per account+IP on login, per user on password change (1–10000) | `5`           |
+| `THROTTLE_IP_LIMIT`    | Attempts per window per IP on both routes (1–10000)                                 | `30`          |
 
 Existing `.env` and `.env.test` files created before authentication was added must be updated with a `JWT_SECRET`, otherwise the app will not start.
 
@@ -390,4 +394,41 @@ npm install
 npm run db:migrate
 npm run db:seed
 npm run db:test:migrate
+```
+
+### API docs
+
+Swagger UI is served at `/api/docs` and the OpenAPI JSON at `/api/docs-json`. They are mounted in development and test, and not when `NODE_ENV=production`. Schemas are generated from the DTOs by the `@nestjs/swagger` Nest CLI plugin (runs in `nest build` / `nest start`, not in Jest). Protected operations show the bearer scheme.
+
+### Error format
+
+Every error response has this shape (the health 503 keeps its health body):
+
+```json
+{
+  "statusCode": 404,
+  "error": "Not Found",
+  "message": "Vehicle not found",
+  "requestId": "0b9f...",
+  "timestamp": "2026-10-05T10:00:00.000Z",
+  "path": "/api/v1/vehicles/..."
+}
+```
+
+Validation errors (400) have `message: "Validation failed"` and a `details` array of `{ "field": "email", "messages": ["email must be an email"] }`; nested fields use dotted paths (`items.0.name`). Unexpected errors return 500 `Internal server error`; the original message is never sent, only logged. Unmapped Prisma errors map to 409 (P2002, P2003) and 404 (P2025).
+
+### Request IDs and logging
+
+Every response has an `X-Request-Id` header (an incoming value is kept only if it matches `[A-Za-z0-9._-]{1,64}`, otherwise a UUID is generated) and the error body carries the same `requestId`. One `HTTP` log line is written per completed request with method, path (no query string), status, duration, user, organization and IP. Headers, bodies and query strings are never logged. Logs are JSON when `NODE_ENV=production` and text otherwise; `LOG_LEVEL` sets the minimum level.
+
+### Rate limiting
+
+`POST /api/v1/auth/login` and `PATCH /api/v1/auth/me/password` return `429 Too many requests, please try again later` with a `Retry-After` header beyond the limits: `THROTTLE_LIMIT` per window per account+IP (login) or per user (password change), and `THROTTLE_IP_LIMIT` per IP. Other routes are not throttled. The counters are in memory, per instance, and `req.ip` is the proxy address until a trust-proxy setting is added in phase 9.
+
+### Upgrading to phase 8
+
+New dependencies: `@nestjs/swagger` and `@nestjs/throttler`. Add `LOG_LEVEL=warn`, `THROTTLE_LIMIT=1000` and `THROTTLE_IP_LIMIT=1000` to `.env.test` (the e2e suites log in many times from one IP). Error bodies gain `requestId`, `timestamp` and `path`; validation errors move from a `message` array to `message` plus `details`; the health 503 body is unchanged.
+
+```bash
+npm install
 ```

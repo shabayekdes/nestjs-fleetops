@@ -1,4 +1,5 @@
-import { uniqueConstraintHints } from './prisma-errors.js';
+import { Prisma } from '../generated/prisma/client.js';
+import { mapPrismaError, uniqueConstraintHints } from './prisma-errors.js';
 
 const adapter = (constraint: unknown) => ({
   driverAdapterError: { cause: { constraint } },
@@ -59,4 +60,33 @@ describe('uniqueConstraintHints', () => {
   ])('returns [] when %s', (_name, meta) => {
     expect(uniqueConstraintHints(meta)).toEqual([]);
   });
+});
+
+describe('mapPrismaError', () => {
+  const known = (code: string) =>
+    new Prisma.PrismaClientKnownRequestError('x', {
+      code,
+      clientVersion: 'test',
+    });
+
+  it.each([
+    ['P2002', 409, 'Resource already exists'],
+    ['P2003', 409, 'The request conflicts with related records'],
+    ['P2025', 404, 'Resource not found'],
+  ])('maps %s', (code, status, message) => {
+    const mapped = mapPrismaError(known(code));
+    expect(mapped?.getStatus()).toBe(status);
+    expect(mapped?.message).toBe(message);
+  });
+
+  it('returns undefined for other Prisma codes', () => {
+    expect(mapPrismaError(known('P2010'))).toBeUndefined();
+  });
+
+  it.each([new Error('x'), 'P2002', { code: 'P2002' }, null, undefined])(
+    'returns undefined for non-Prisma value %p',
+    (value) => {
+      expect(mapPrismaError(value)).toBeUndefined();
+    },
+  );
 });

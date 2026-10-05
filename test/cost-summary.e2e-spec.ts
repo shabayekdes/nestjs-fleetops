@@ -7,13 +7,14 @@ import { App } from 'supertest/types.js';
 import { AppModule } from '../src/app.module.js';
 import { configureApp } from '../src/app.setup.js';
 import { PrismaService } from '../src/database/prisma.service.js';
+import { errorBody } from './utils/error-body.js';
 
 type Body = Record<string, unknown>;
 type Actor = 'admin' | 'manager' | 'driver' | 'adminB';
 type Method = 'get' | 'post' | 'patch' | 'delete';
 
-const FORBIDDEN = { statusCode: 403, message: 'Forbidden' };
-const UNAUTHORIZED = { statusCode: 401, message: 'Unauthorized' };
+const FORBIDDEN = errorBody(403, 'Forbidden');
+const UNAUTHORIZED = errorBody(401, 'Unauthorized');
 const BAD_UUID = 'Validation failed (uuid v 7 is expected)';
 
 // "Now" is computed once. Month helpers are relative to the current UTC month

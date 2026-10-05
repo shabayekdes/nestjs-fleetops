@@ -1,6 +1,8 @@
+import type { LogLevel } from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
 import {
   IsEnum,
+  IsIn,
   IsInt,
   IsString,
   Matches,
@@ -39,6 +41,27 @@ export class EnvironmentVariables {
   @Min(60)
   @Max(86400)
   JWT_EXPIRES_IN: number = 900;
+
+  @IsIn(['fatal', 'error', 'warn', 'log', 'debug', 'verbose'])
+  LOG_LEVEL: LogLevel = 'log';
+
+  /** Rate-limit window in seconds. */
+  @IsInt()
+  @Min(1)
+  @Max(3600)
+  THROTTLE_TTL_SECONDS: number = 60;
+
+  /** Per account+IP on login, per user on password change, per window. */
+  @IsInt()
+  @Min(1)
+  @Max(10000)
+  THROTTLE_LIMIT: number = 5;
+
+  /** Per IP on login and password change, per window. */
+  @IsInt()
+  @Min(1)
+  @Max(10000)
+  THROTTLE_IP_LIMIT: number = 30;
 }
 
 /**

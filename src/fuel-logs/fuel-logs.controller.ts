@@ -11,6 +11,7 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import type { AuthUser } from '../auth/auth.types.js';
 import { CurrentUser } from '../auth/current-user.decorator.js';
 import { Roles } from '../auth/roles.decorator.js';
@@ -26,6 +27,8 @@ import { FuelLogsService } from './fuel-logs.service.js';
 
 const UUID_V7 = new ParseUUIDPipe({ version: '7' });
 
+@ApiTags('fuel-logs')
+@ApiBearerAuth()
 @Controller('vehicles/:vehicleId/fuel-logs')
 @Roles(Role.ADMIN, Role.MANAGER)
 export class FuelLogsController {

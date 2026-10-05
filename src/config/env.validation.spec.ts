@@ -15,6 +15,53 @@ describe('validateEnv', () => {
     expect(env.JWT_SECRET).toBe(base.JWT_SECRET);
   });
 
+  it('applies defaults for logging and throttling', () => {
+    const env = validateEnv(base);
+    expect(env.LOG_LEVEL).toBe('log');
+    expect(env.THROTTLE_TTL_SECONDS).toBe(60);
+    expect(env.THROTTLE_LIMIT).toBe(5);
+    expect(env.THROTTLE_IP_LIMIT).toBe(30);
+  });
+
+  describe('LOG_LEVEL and throttling', () => {
+    it.each(['fatal', 'error', 'warn', 'log', 'debug', 'verbose'])(
+      'accepts LOG_LEVEL %s',
+      (value) => {
+        expect(validateEnv({ ...base, LOG_LEVEL: value }).LOG_LEVEL).toBe(
+          value,
+        );
+      },
+    );
+
+    it('rejects a bad LOG_LEVEL', () => {
+      expect(() => validateEnv({ ...base, LOG_LEVEL: 'loud' })).toThrow(
+        /LOG_LEVEL/,
+      );
+    });
+
+    it.each([
+      ['THROTTLE_TTL_SECONDS', '3600', 3600],
+      ['THROTTLE_LIMIT', '10000', 10000],
+      ['THROTTLE_IP_LIMIT', '1', 1],
+    ])('accepts %s=%s', (key, value, expected) => {
+      expect(
+        validateEnv({ ...base, [key]: value })[key as 'THROTTLE_LIMIT'],
+      ).toBe(expected);
+    });
+
+    it.each([
+      ['THROTTLE_TTL_SECONDS', ['0', '3601', '1.5', 'abc']],
+      ['THROTTLE_LIMIT', ['0', '10001', '1.5', 'abc']],
+      ['THROTTLE_IP_LIMIT', ['0', '10001', '1.5', 'abc']],
+    ])('rejects bad %s', (key, values) => {
+      for (const value of values) {
+        expect(() => validateEnv({ ...base, [key]: value })).toThrow(
+          new RegExp(key),
+        );
+      }
+    });
+  });
+
   describe('JWT_SECRET', () => {
     it('throws when missing', () => {
       const rest: Record<string, unknown> = { ...base };

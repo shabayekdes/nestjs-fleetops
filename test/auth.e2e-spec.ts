@@ -9,6 +9,7 @@ import { AppModule } from '../src/app.module.js';
 import { configureApp } from '../src/app.setup.js';
 import type { EnvironmentVariables } from '../src/config/env.validation.js';
 import { PrismaService } from '../src/database/prisma.service.js';
+import { errorBody } from './utils/error-body.js';
 
 type Body = Record<string, unknown>;
 
@@ -31,11 +32,7 @@ function craftToken(
 
 const now = (): number => Math.floor(Date.now() / 1000);
 
-const INVALID_CREDENTIALS = {
-  statusCode: 401,
-  message: 'Invalid credentials',
-  error: 'Unauthorized',
-};
+const INVALID_CREDENTIALS = errorBody(401, 'Invalid credentials');
 
 describe('Auth (e2e)', () => {
   let app: INestApplication<App>;
@@ -78,7 +75,7 @@ describe('Auth (e2e)', () => {
 
   const expectBare401 = (res: { status: number; body: unknown }) => {
     expect(res.status).toBe(401);
-    expect(res.body).toEqual({ statusCode: 401, message: 'Unauthorized' });
+    expect(res.body).toEqual(errorBody(401, 'Unauthorized'));
   };
 
   beforeAll(async () => {

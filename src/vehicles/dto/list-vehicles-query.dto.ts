@@ -1,3 +1,4 @@
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
   IsEnum,
@@ -17,12 +18,14 @@ import {
 } from './vehicle-normalizers.js';
 
 export class ListVehiclesQueryDto {
+  @ApiPropertyOptional()
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
   page: number = 1;
 
+  @ApiPropertyOptional()
   @IsOptional()
   @Type(() => Number)
   @IsInt()

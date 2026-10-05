@@ -1,3 +1,10 @@
+import {
+  ConflictException,
+  HttpException,
+  NotFoundException,
+} from '@nestjs/common';
+import { Prisma } from '../generated/prisma/client.js';
+
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
 
@@ -28,4 +35,26 @@ export function uniqueConstraintHints(
     add(constraint.fields);
   }
   return hints;
+}
+
+/**
+ * Global safety net for Prisma errors no service mapped itself.
+ * Returns undefined for anything that is not a known mapped error.
+ */
+export function mapPrismaError(error: unknown): HttpException | undefined {
+  if (!(error instanceof Prisma.PrismaClientKnownRequestError)) {
+    return undefined;
+  }
+  switch (error.code) {
+    case 'P2002':
+      return new ConflictException('Resource already exists');
+    case 'P2003':
+      return new ConflictException(
+        'The request conflicts with related records',
+      );
+    case 'P2025':
+      return new NotFoundException('Resource not found');
+    default:
+      return undefined;
+  }
 }

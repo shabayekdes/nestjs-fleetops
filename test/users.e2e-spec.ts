@@ -7,6 +7,7 @@ import { App } from 'supertest/types.js';
 import { AppModule } from '../src/app.module.js';
 import { configureApp } from '../src/app.setup.js';
 import { PrismaService } from '../src/database/prisma.service.js';
+import { errorBody } from './utils/error-body.js';
 
 type Body = Record<string, unknown>;
 type Role = 'ADMIN' | 'MANAGER' | 'DRIVER';
@@ -23,13 +24,9 @@ const RESPONSE_KEYS = [
   'role',
   'updatedAt',
 ];
-const NOT_FOUND = {
-  statusCode: 404,
-  message: 'User not found',
-  error: 'Not Found',
-};
-const FORBIDDEN = { statusCode: 403, message: 'Forbidden' };
-const UNAUTHORIZED = { statusCode: 401, message: 'Unauthorized' };
+const NOT_FOUND = errorBody(404, 'User not found');
+const FORBIDDEN = errorBody(403, 'Forbidden');
+const UNAUTHORIZED = errorBody(401, 'Unauthorized');
 const UUID_V7_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 

@@ -20,7 +20,7 @@ Rules for working with phases:
 | 5     | Users + roles                    | Done    | `c80e806` |
 | 6     | Drivers + vehicle assignments    | Done    | `961d586` |
 | 7     | Maintenance + fuel records       | Done    | `f12eeed` |
-| 8     | API docs, logging + error format | Planned | —         |
+| 8     | API docs, logging + error format | Done    | TBD       |
 | 9     | Docker, CI + deployment          | Planned | —         |
 
 ---
@@ -282,22 +282,41 @@ Rules for working with phases:
 
 ## Phase 8 — API docs, logging + error format
 
-**Status:** Planned
+**Status:** Done (commit TBD)
 
 **Goal:** make the API easy to use and to debug.
 
-**NestJS concepts:** `@nestjs/swagger`, interceptors, exception filters, middleware.
+**NestJS concepts:** `@nestjs/swagger` (CLI plugin), exception filters, middleware, `@nestjs/throttler` guards.
 
-**Scope**
+**Built**
 
-- OpenAPI/Swagger docs generated from the DTOs, served in development.
-- One JSON error shape for every error response.
-- Structured request logging with a request ID.
-- Rate limiting on the login endpoint (`@nestjs/throttler`).
+- Swagger UI `/api/docs`, JSON `/api/docs-json` (not mounted in production). `@ApiTags` on all controllers, `@ApiBearerAuth` on protected ones.
+- `AllExceptionsFilter` and one error shape (`src/common/http/`), with `details` for validation errors.
+- `requestContextMiddleware`: `X-Request-Id` and one `HTTP` log line per request. `createAppLogger` (`ConsoleLogger`, JSON in production).
+- Rate limiting on login and password change (`src/auth/throttling.ts`).
+- `mapPrismaError` global safety net; health 503 returns the health body via `@Res({ passthrough: true })`.
+- Env vars `LOG_LEVEL`, `THROTTLE_TTL_SECONDS`, `THROTTLE_LIMIT`, `THROTTLE_IP_LIMIT`.
 
-**Out of scope**
+**Decisions**
 
+1. Only two dependencies added: `@nestjs/swagger` and `@nestjs/throttler`. No pino; the built-in `ConsoleLogger` is enough.
+2. Swagger schemas come from the Nest CLI plugin (`introspectComments`), not hand-written `@ApiProperty`; only `@ApiPropertyOptional` on list-query `page`/`limit`. ts-jest does not run the plugin.
+3. The error shape is `statusCode`, `error`, `message` (always one string), `requestId`, `timestamp`, `path`, optional `details`. A 500 never reveals the original message.
+4. The filter is registered with `useGlobalFilters`, not `APP_FILTER`. Per-service Prisma mappers stay; the filter maps leftovers (P2002/P2003 to 409, P2025 to 404).
+5. Request ID is middleware (registered first), so guard 401/403/429 and unknown-route 404s also get one.
+6. Throttling is not global: `ThrottlerGuard` only on login and password change, with two throttlers (account key and IP). In-memory storage.
+7. Request logs never include headers, bodies or query strings.
+8. Health 503 intentionally keeps the health body.
+9. Nest mounts its not-found handler only under the global prefix, so `configureApp` adds a middleware (right after the request-context one) that returns the standard 404 for any path outside `/api`. Everything is served under `/api`, including the docs.
+10. Jest needs `test/utils/preload-esm.ts` (e2e `setupFiles`) because the CommonJS throttler `require()`s the ESM Nest packages.
+
+**Out of scope / deferred**
+
+- Redis-backed throttling and trust proxy (phase 9); distributed multi-IP attacks are not limited.
+- Request ID in service logs (needs AsyncLocalStorage); aborted requests are not logged.
+- Unknown-route 404 message echoes the URL including the query string (Nest default).
 - External monitoring or tracing services.
+- Resolved here: phase 3 and 5 rate-limit items, phase 4 and 6 P2003 items (now 409 via the filter), phase 7 global error filter.
 
 ---
 
