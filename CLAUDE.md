@@ -43,6 +43,8 @@ Leads and the CTO are read-only planners/reviewers; only developers edit files.
 
 The project is built in phases. `docs/PHASES.md` records what each phase built, its decisions and what is still out of scope. Read it before planning new work, build only the current phase, and update it when a phase is done.
 
+Phase 9 is the last backend phase (there is no Phase 10). `docs/mongodb-microservices-track.md` is a separate learning track (L1–L15) that runs in parallel with the frontend. Follow its rules and working rules, do one stage at a time, and get the user's approval before each stage.
+
 ---
 
 ## Project Conventions (FleetOps API, `apps/api/`)

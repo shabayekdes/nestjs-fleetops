@@ -8,6 +8,7 @@ Related documents:
 
 - [`PHASES.md`](PHASES.md): the backend roadmap (Phases 1–9). It is the source of truth for what the API does.
 - [`product-roadmap.md`](product-roadmap.md): product versions after v1.0, and the master development sequence.
+- [`mongodb-microservices-track.md`](mongodb-microservices-track.md): a learning track that runs **in parallel** with the frontend. The frontend does not depend on it, and no frontend phase waits for it.
 - `CLAUDE.md`: backend conventions. Frontend conventions are in [`apps/web/CLAUDE.md`](../apps/web/CLAUDE.md).
 
 To avoid confusion with the backend roadmap, frontend phases are always called **Frontend Phase N** (FE1–FE9). "Phase N" on its own always means a backend phase.
@@ -374,7 +375,7 @@ Every frontend phase depends on the backend phases below. All backend phases mus
 
 ## Development sequence
 
-The full sequence across backend, frontend and product is at the end of [`product-roadmap.md`](product-roadmap.md#master-development-sequence). For the frontend: **backend Phase 9 done and approved → FE1 → FE2 → … → FE9 → FleetOps v1.0.** Phases are done in order, one at a time.
+The full sequence across backend, frontend and product is at the end of [`product-roadmap.md`](product-roadmap.md#master-development-sequence). For the frontend: **backend Phase 9 done and approved → FE1 → FE2 → … → FE9 → FleetOps v1.0.** Phases are done in order, one at a time. The MongoDB + microservices learning track runs alongside; it is not a step in this sequence and is not required for v1.0.
 
 ---
 

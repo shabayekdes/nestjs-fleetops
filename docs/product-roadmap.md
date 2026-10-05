@@ -8,6 +8,8 @@ This roadmap starts only after:
 2. Frontend Phases FE1–FE9 are complete ([`frontend-roadmap.md`](frontend-roadmap.md)).
 3. FleetOps has reached a usable **v1.0** product.
 
+The [MongoDB + microservices learning track](mongodb-microservices-track.md) is **not** a prerequisite for v1.0. It runs in parallel with the frontend and feeds v2.x GPS + telematics.
+
 Every version below is directional. Before any version starts, its scope is validated (see "Principles"), confirmed with the user, and planned with `cto-esmail` the same way backend phases are. Technologies named here are candidates to evaluate at that time, not decisions.
 
 | Version | Name                        | Status                                    |
@@ -39,7 +41,7 @@ A roadmap item is not automatically worth building. Before a version or feature 
 
 ### 2. Do not over-engineer early
 
-Do not introduce microservices, Kubernetes, event-driven architecture everywhere, complex ML systems or complex permission systems unless actual product requirements justify them. The modular monolith from the backend roadmap is the default for as long as it works.
+Do not introduce microservices, Kubernetes, event-driven architecture everywhere, complex ML systems or complex permission systems unless actual product requirements justify them. The modular monolith from the backend roadmap is the default for as long as it works. Microservices and MongoDB are explored in the [learning track](mongodb-microservices-track.md) on telemetry only; that track does not change this default for the core.
 
 ### 3. Keep the modular architecture
 
@@ -308,8 +310,26 @@ FleetOps (trips, alerts, reports)
 ```
 
 - Ingestion may become a separate service, because its scaling and availability needs differ from the main API. This is the first point where splitting out a service may be justified, and only for this workload.
-- Storage for time-series data (e.g. PostgreSQL partitioning or a time-series extension) is decided based on real volume.
+- Storage for time-series data (e.g. MongoDB, PostgreSQL partitioning or a time-series extension) is decided based on real volume.
 - Location data is personal data about drivers; retention, access control and privacy obligations are designed before collection starts.
+
+**Input from the learning track**
+
+The [MongoDB + microservices learning track](mongodb-microservices-track.md) prepares for this version:
+
+```text
+MongoDB + microservices learning
+                ↓
+Telemetry prototype
+                ↓
+Microservices architecture (telemetry only)
+                ↓
+GPS / telematics product capability
+```
+
+It provides a telemetry prototype, experience with service extraction and events, and an architecture decision record comparing PostgreSQL and MongoDB for telemetry (Learning Stage 15).
+
+> The learning implementation does not automatically become the final production architecture. The production architecture will be decided after validating actual product requirements, traffic, data volume, and operational needs.
 
 ---
 
@@ -348,7 +368,7 @@ Start with simple, explainable statistics (averages, thresholds, trends). Introd
 
 ## Master development sequence
 
-The order below is **intentional**. Each step depends on the one before it being complete, tested, reviewed and approved. Steps are not skipped and not run in parallel, unless the user explicitly decides otherwise.
+The order below is **intentional**. Within each track, every step depends on the one before it being complete, tested, reviewed and approved, and steps are not skipped. After backend Phase 9, two tracks run **in parallel**: the frontend roadmap and the MongoDB + microservices learning track. Neither blocks the other.
 
 ```text
 Backend
@@ -372,24 +392,28 @@ Phase 8 — API docs, logging + error format
 Phase 9 — Docker, CI + deployment
    ↓
 Backend production ready
-   ↓
-Frontend roadmap (FE1 → FE9)
-   ↓
-Frontend production ready
-   ↓
-FleetOps v1.0
-   ↓
-Product roadmap
-   ↓
-v1.1 Monetization
-   ↓
-v1.2 Automation
-   ↓
-v1.3 Analytics
-   ↓
-v1.4 Enterprise
-   ↓
-v2.x Fleet operations / telematics
+   │
+   ├──────────────────────────────┐
+   ↓                              ↓
+Frontend roadmap (FE1 → FE9)   MongoDB + microservices learning track
+   ↓                           (L1 → L15, see mongodb-microservices-track.md)
+Frontend production ready         │
+   ↓                              │
+FleetOps v1.0                     │
+   ↓                              │
+Product roadmap                   │
+   ↓                              │
+v1.1 Monetization                 │
+   ↓                              │
+v1.2 Automation                   │
+   ↓                              │
+v1.3 Analytics                    │
+   ↓                              │
+v1.4 Enterprise                   │
+   ↓                              │
+v2.0 Fleet operations             │
+   ↓                              │
+v2.x GPS + telematics  ←──────────┘
    ↓
 v3.0 AI / intelligence
 ```
@@ -397,9 +421,10 @@ v3.0 AI / intelligence
 Why this order:
 
 - **Backend before frontend:** the frontend consumes a finished, documented and deployed API instead of a moving target.
+- **Learning track in parallel, not in the v1.0 path:** it teaches MongoDB and microservices on telemetry without delaying the product or changing the core. Its results are input to v2.x, not a prerequisite for anything earlier.
 - **v1.0 before monetization:** there must be a product worth paying for before adding plans and billing.
 - **Monetization before automation, analytics and enterprise:** later features can then be offered as plan entitlements.
 - **Enterprise before fleet operations:** audit logs, API keys and webhooks make trips and telematics safer to integrate.
 - **Telematics and AI last:** they have the highest cost and complexity, and they depend on real customers and real data.
 
-At the time of writing, backend Phases 1–5 are done and Phase 6 is next.
+At the time of writing, backend Phases 1–9 are done, Frontend Phase 1 is done, and the learning track has not started.
