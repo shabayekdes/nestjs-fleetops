@@ -7,7 +7,10 @@ import { App } from 'supertest/types.js';
 import { AppModule } from '../src/app.module.js';
 import { configureApp } from '../src/app.setup.js';
 import { PrismaService } from '../src/database/prisma.service.js';
-import { ServiceStatusJob } from '../src/maintenance/service-status.job.js';
+import {
+  SERVICE_STATUS_LOCK_KEY,
+  ServiceStatusJob,
+} from '../src/maintenance/service-status.job.js';
 import { errorBody } from './utils/error-body.js';
 
 type Body = Record<string, unknown>;
@@ -829,6 +832,8 @@ describe('Maintenance records (e2e)', () => {
       });
 
       const result = await job.refreshServiceStatuses();
+      expect(result).not.toBeNull();
+      if (!result) return;
       expect(result.overdue).toBeGreaterThanOrEqual(1);
       expect(result.dueSoon).toBeGreaterThanOrEqual(1);
 
@@ -846,6 +851,38 @@ describe('Maintenance records (e2e)', () => {
       for (const row of again) {
         expect(row).toEqual(byId.get(row.id));
       }
+    });
+  });
+
+  describe('daily service status job lock', () => {
+    it('skips while another transaction holds the lock, then runs after it commits', async () => {
+      const job = app.get(ServiceStatusJob);
+      const stale = await mkVehicle();
+      await prisma.vehicle.update({
+        where: { id: stale.id },
+        data: { nextServiceDueOn: new Date(day(-1)), serviceStatus: 'OK' },
+      });
+
+      let skipped: unknown = 'not run';
+      await prisma.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${SERVICE_STATUS_LOCK_KEY}))::text`;
+        skipped = await job.refreshServiceStatuses();
+      });
+
+      expect(skipped).toBeNull();
+      // The skipped run must not have touched the stale row.
+      const afterSkip = await prisma.vehicle.findUnique({
+        where: { id: stale.id },
+      });
+      expect(afterSkip?.serviceStatus).toBe('OK');
+
+      const result = await job.refreshServiceStatuses();
+      expect(result).not.toBeNull();
+      expect(result?.overdue).toBeGreaterThanOrEqual(1);
+      const afterRun = await prisma.vehicle.findUnique({
+        where: { id: stale.id },
+      });
+      expect(afterRun?.serviceStatus).toBe('OVERDUE');
     });
   });
 

@@ -62,6 +62,16 @@ export class EnvironmentVariables {
   @Min(1)
   @Max(10000)
   THROTTLE_IP_LIMIT: number = 30;
+
+  /**
+   * Number of trusted reverse proxies / load balancers in front of the API.
+   * 0 ignores X-Forwarded-For. Booleans are deliberately unsupported: trusting
+   * every hop lets any client spoof req.ip.
+   */
+  @IsInt()
+  @Min(0)
+  @Max(10)
+  TRUST_PROXY: number = 0;
 }
 
 /**

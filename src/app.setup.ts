@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createAppLogger } from './common/app-logger.js';
-import type { NextFunction, Request, Response } from 'express';
+import type { Application, NextFunction, Request, Response } from 'express';
 import {
   AllExceptionsFilter,
   sendErrorResponse,
@@ -21,6 +21,13 @@ import { isSwaggerEnabled, setupSwagger } from './swagger.js';
  * tests exercise the same prefix, versioning and validation as production.
  */
 export function configureApp(app: INestApplication): void {
+  // Before any middleware so req.ip is correct everywhere (throttler, logs).
+  const config = app.get(ConfigService<EnvironmentVariables, true>);
+  (app.getHttpAdapter().getInstance() as Application).set(
+    'trust proxy',
+    config.get('TRUST_PROXY', { infer: true }),
+  );
+
   // First, so the request ID exists for body-parser errors, guards and 404s.
   app.use(requestContextMiddleware);
 
@@ -34,7 +41,6 @@ export function configureApp(app: INestApplication): void {
     );
   });
 
-  const config = app.get(ConfigService<EnvironmentVariables, true>);
   const nodeEnv = config.get('NODE_ENV', { infer: true });
   app.useLogger(
     createAppLogger(nodeEnv, config.get('LOG_LEVEL', { infer: true })),

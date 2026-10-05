@@ -11,17 +11,17 @@ Rules for working with phases:
 - Conventions live in `CLAUDE.md`. This file covers scope and history only.
 - Planned phases are a direction, not a spec. Before starting one, confirm its scope with the user, then ask `cto-esmail` for a plan. The order and content of planned phases may change.
 
-| Phase | Name                             | Status  | Commit(s) |
-| ----- | -------------------------------- | ------- | --------- |
-| 1     | Application foundation           | Done    | `4b1d372` |
-| 2     | PostgreSQL + Prisma              | Done    | `5623cff` |
-| 3     | Authentication + tenant context  | Done    | `0195815` |
-| 4     | Vehicles API                     | Done    | `9e4a426` |
-| 5     | Users + roles                    | Done    | `c80e806` |
-| 6     | Drivers + vehicle assignments    | Done    | `961d586` |
-| 7     | Maintenance + fuel records       | Done    | `f12eeed` |
-| 8     | API docs, logging + error format | Done    | `2395d09` |
-| 9     | Docker, CI + deployment          | Planned | —         |
+| Phase | Name                             | Status | Commit(s) |
+| ----- | -------------------------------- | ------ | --------- |
+| 1     | Application foundation           | Done   | `4b1d372` |
+| 2     | PostgreSQL + Prisma              | Done   | `5623cff` |
+| 3     | Authentication + tenant context  | Done   | `0195815` |
+| 4     | Vehicles API                     | Done   | `9e4a426` |
+| 5     | Users + roles                    | Done   | `c80e806` |
+| 6     | Drivers + vehicle assignments    | Done   | `961d586` |
+| 7     | Maintenance + fuel records       | Done   | `f12eeed` |
+| 8     | API docs, logging + error format | Done   | `2395d09` |
+| 9     | Docker, CI + deployment          | Done   | —         |
 
 ---
 
@@ -276,7 +276,7 @@ Rules for working with phases:
 - File uploads (receipts, invoices).
 - Fleet-wide cost reports, CSV export, dashboards.
 - Soft delete or archiving of vehicles.
-- Running the job on startup, distributed locks for multiple instances (phase 9); global error filter (phase 8).
+- Running the job on startup. Resolved later: distributed lock (phase 9, advisory lock), global error filter (phase 8).
 
 ---
 
@@ -312,7 +312,7 @@ Rules for working with phases:
 
 **Out of scope / deferred**
 
-- Redis-backed throttling and trust proxy (phase 9); distributed multi-IP attacks are not limited.
+- Redis-backed throttling (still deferred after phase 9); distributed multi-IP attacks are not limited. Trust proxy: resolved in phase 9 (`TRUST_PROXY`).
 - Request ID in service logs (needs AsyncLocalStorage); aborted requests are not logged.
 - Unknown-route 404 message echoes the URL including the query string (Nest default).
 - External monitoring or tracing services.
@@ -322,20 +322,35 @@ Rules for working with phases:
 
 ## Phase 9 — Docker, CI + deployment
 
-**Status:** Planned
+**Status:** Done (commit pending)
 
 **Goal:** the API can be built, tested and deployed automatically.
 
-**Scope**
+**Built**
 
-- Multi-stage `Dockerfile` and a `docker-compose.yml` with PostgreSQL for local development.
-- CI pipeline (e.g. GitHub Actions) that runs lint, unit tests, e2e tests against a PostgreSQL service, and the build.
-- `prisma migrate deploy` as part of the deployment.
-- A production readiness check on top of `/api/v1/health`.
+- Multi-stage `Dockerfile` (`deps`, `build`, `prod-deps`, `migrate`, `runtime`), `.dockerignore`, `docker-compose.yml` (PostgreSQL 18 with `fleetops_dev` and `fleetops_test`, one-off `migrate`, `api`), `.nvmrc`.
+- `.github/workflows/ci.yml`: `test` job (lint, unit, migrate, e2e, build against a PostgreSQL service) and `docker` smoke job.
+- `GET /health/live` and `GET /health/ready`; `TRUST_PROXY` env var; advisory lock in `ServiceStatusJob`.
 
-**Out of scope**
+**Decisions**
 
-- Kubernetes or multi-region infrastructure.
+1. `/health` is unchanged. `/health/live` always returns 200 and touches no dependency. `/health/ready` returns 200 only with the database up and migrations applied, otherwise 503 with the same body (not the error shape).
+2. "Migrations applied" is a subset check: every migration directory shipped in the build must be finished and not rolled back in `_prisma_migrations`; unknown newer rows are ignored. The directory comes from the `MIGRATIONS_DIR` token (`process.cwd()/prisma/migrations`). `unknown` (database down, directory missing or empty, query error) means not ready. Pending names are only logged.
+3. Migrations are a separate one-off release step, never run by the container entrypoint (no N-fold runs, no crash loops, no Prisma CLI or DDL rights in the runtime image).
+4. Runtime image: production dependencies only, non-root, `node` as PID 1 for SIGTERM, files root-owned, health check on readiness.
+5. `.dockerignore` excludes `*.tsbuildinfo` (a stale incremental build info can make tsc emit nothing), `.env*` and `src/generated`.
+6. Compose ignores `.env`, sets variables per service with defaults, and uses a clearly dev-only `JWT_SECRET` default.
+7. CI uses real env vars (`DATABASE_URL`) over `.env.test` copied from the example. Node version comes from `.nvmrc`.
+8. `TRUST_PROXY` is a hop count (0-10, default 0), applied in `configureApp`; booleans are unsupported to prevent `req.ip` spoofing.
+9. The daily job runs in an interactive transaction (timeout 60 s) guarded by `pg_try_advisory_xact_lock`; it returns `null` when skipped.
+10. Throttler storage stays in memory: limits are per instance.
+11. No schema change, migration or new dependency.
+
+**Out of scope / deferred**
+
+- Redis throttling, Kubernetes, multi-region, image registry publishing, an actual deploy target.
+- Excluding probes from request logs, request ID in service logs, running the job on startup.
+- The GitHub workflow is proven only on its first run.
 
 ---
 

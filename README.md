@@ -20,6 +20,7 @@ The project is developed incrementally. Current state: application foundation (b
 - Node.js >= 22 (developed on Node 24)
 - npm >= 10
 - PostgreSQL 14+ (developed against PostgreSQL 18), local or hosted (e.g. Neon)
+- Docker with Compose v2 (optional): local PostgreSQL and the container image
 
 ## Installation
 
@@ -33,17 +34,18 @@ cp .env.test.example .env.test # only needed for e2e/integration tests
 
 Configuration is read from environment variables. Values are validated at startup and the application refuses to start if they are invalid. Real environment variables always override values from the `.env` files.
 
-| Variable               | Description                                                                         | Default       |
-| ---------------------- | ----------------------------------------------------------------------------------- | ------------- |
-| `NODE_ENV`             | `development`, `production`, or `test`                                              | `development` |
-| `PORT`                 | HTTP port the API listens on (1–65535)                                              | `3000`        |
-| `DATABASE_URL`         | PostgreSQL connection string (**required**)                                         | —             |
-| `JWT_SECRET`           | HS256 signing secret, at least 32 chars (**required**). `openssl rand -base64 48`   | —             |
-| `JWT_EXPIRES_IN`       | Access token lifetime in seconds (60–86400)                                         | `900`         |
-| `LOG_LEVEL`            | `fatal`, `error`, `warn`, `log`, `debug` or `verbose`                               | `log`         |
-| `THROTTLE_TTL_SECONDS` | Rate-limit window in seconds (1–3600)                                               | `60`          |
-| `THROTTLE_LIMIT`       | Attempts per window: per account+IP on login, per user on password change (1–10000) | `5`           |
-| `THROTTLE_IP_LIMIT`    | Attempts per window per IP on both routes (1–10000)                                 | `30`          |
+| Variable               | Description                                                                          | Default       |
+| ---------------------- | ------------------------------------------------------------------------------------ | ------------- |
+| `NODE_ENV`             | `development`, `production`, or `test`                                               | `development` |
+| `PORT`                 | HTTP port the API listens on (1–65535)                                               | `3000`        |
+| `DATABASE_URL`         | PostgreSQL connection string (**required**)                                          | —             |
+| `JWT_SECRET`           | HS256 signing secret, at least 32 chars (**required**). `openssl rand -base64 48`    | —             |
+| `JWT_EXPIRES_IN`       | Access token lifetime in seconds (60–86400)                                          | `900`         |
+| `LOG_LEVEL`            | `fatal`, `error`, `warn`, `log`, `debug` or `verbose`                                | `log`         |
+| `THROTTLE_TTL_SECONDS` | Rate-limit window in seconds (1–3600)                                                | `60`          |
+| `THROTTLE_LIMIT`       | Attempts per window: per account+IP on login, per user on password change (1–10000)  | `5`           |
+| `THROTTLE_IP_LIMIT`    | Attempts per window per IP on both routes (1–10000)                                  | `30`          |
+| `TRUST_PROXY`          | Trusted reverse-proxy hops in front of the API (0–10). `0` ignores `X-Forwarded-For` | `0`           |
 
 Existing `.env` and `.env.test` files created before authentication was added must be updated with a `JWT_SECRET`, otherwise the app will not start.
 
@@ -80,6 +82,23 @@ Use the **direct** connection string (host without `-pooler`). Prisma Migrate ne
 ```dotenv
 DATABASE_URL="postgresql://USER:PASSWORD@ep-xxxx.REGION.aws.neon.tech/neondb?sslmode=verify-full"
 ```
+
+### Option C — Docker Compose
+
+```bash
+docker compose up -d postgres
+```
+
+This starts PostgreSQL 18 and creates `fleetops_dev` and `fleetops_test` (role `fleetops`, password `fleetops`, a superuser so `prisma migrate dev` can create its shadow database).
+
+```dotenv
+# .env
+DATABASE_URL="postgresql://fleetops:fleetops@localhost:5432/fleetops_dev?schema=public"
+# .env.test
+DATABASE_URL="postgresql://fleetops:fleetops@localhost:5432/fleetops_test?schema=public"
+```
+
+The init script runs only when the data volume is empty. With an existing volume, create the test database once: `docker compose exec postgres createdb -U fleetops fleetops_test`.
 
 ## Database (Prisma)
 
@@ -185,6 +204,8 @@ All routes are served under the `/api` prefix with URI versioning (default versi
 | ------ | ----------------------------------------------------- | ----------------------------------------------------------------------------- |
 | GET    | `/api/v1`                                             | Confirms the API is running                                                   |
 | GET    | `/api/v1/health`                                      | Application + database health (200 / 503)                                     |
+| GET    | `/api/v1/health/live`                                 | Liveness: always 200, touches no dependency                                   |
+| GET    | `/api/v1/health/ready`                                | Readiness: database up and migrations applied (200 / 503)                     |
 | POST   | `/api/v1/auth/login`                                  | Public. Exchange credentials for an access token                              |
 | GET    | `/api/v1/auth/me`                                     | Bearer token. Current user profile (with role)                                |
 | PATCH  | `/api/v1/auth/me/password`                            | Bearer token, any role. Change own password (204)                             |
@@ -219,7 +240,7 @@ All routes are served under the `/api` prefix with URI versioning (default versi
 | DELETE | `/api/v1/vehicles/:vehicleId/fuel-logs/:id`           | Bearer token, ADMIN or MANAGER. Delete a fuel log (204)                       |
 | GET    | `/api/v1/vehicles/:vehicleId/cost-summary`            | Bearer token, ADMIN or MANAGER. Monthly maintenance and fuel costs            |
 
-Every endpoint except `/api/v1` and `/api/v1/health` requires an `Authorization: Bearer <token>` header.
+Every endpoint except `/api/v1` and `/api/v1/health*` requires an `Authorization: Bearer <token>` header.
 
 ```bash
 curl http://localhost:3000/api/v1/health
@@ -421,9 +442,14 @@ Validation errors (400) have `message: "Validation failed"` and a `details` arra
 
 Every response has an `X-Request-Id` header (an incoming value is kept only if it matches `[A-Za-z0-9._-]{1,64}`, otherwise a UUID is generated) and the error body carries the same `requestId`. One `HTTP` log line is written per completed request with method, path (no query string), status, duration, user, organization and IP. Headers, bodies and query strings are never logged. Logs are JSON when `NODE_ENV=production` and text otherwise; `LOG_LEVEL` sets the minimum level.
 
+### Health probes
+
+- `GET /api/v1/health/live` always returns `200 {"status":"ok","service","timestamp"}`. Use it for liveness probes: a database outage must not restart the process.
+- `GET /api/v1/health/ready` returns `{"status","service","timestamp","database":"up|down","migrations":"applied|pending|unknown"}`: `200` only when the database is up and every migration shipped in this build is applied (newer unknown rows are ignored, so old instances stay ready during a rolling deploy), otherwise `503` with the same body. Migration names are only logged. Use it for readiness probes. It reads `prisma/migrations` relative to the working directory, so run the app from the project root (`/app` in the image); otherwise `migrations` is `unknown` and the instance is never ready.
+
 ### Rate limiting
 
-`POST /api/v1/auth/login` and `PATCH /api/v1/auth/me/password` return `429 Too many requests, please try again later` with a `Retry-After` header beyond the limits: `THROTTLE_LIMIT` per window per account+IP (login) or per user (password change), and `THROTTLE_IP_LIMIT` per IP. Other routes are not throttled. The counters are in memory, per instance, and `req.ip` is the proxy address until a trust-proxy setting is added in phase 9.
+`POST /api/v1/auth/login` and `PATCH /api/v1/auth/me/password` return `429 Too many requests, please try again later` with a `Retry-After` header beyond the limits: `THROTTLE_LIMIT` per window per account+IP (login) or per user (password change), and `THROTTLE_IP_LIMIT` per IP. Other routes are not throttled. The counters are in memory and per instance, so with N instances the effective limit is up to N times higher (Redis-backed storage is deferred). Behind a load balancer set `TRUST_PROXY` to the number of proxy hops (for example `1`), otherwise every client shares the proxy's IP. With `0` `X-Forwarded-For` is ignored. Only a hop count is accepted, never `true`, because trusting every hop lets clients spoof their IP and bypass the IP limit.
 
 ### Upgrading to phase 8
 
@@ -432,3 +458,43 @@ New dependencies: `@nestjs/swagger` and `@nestjs/throttler`. Add `LOG_LEVEL=warn
 ```bash
 npm install
 ```
+
+### Upgrading to phase 9
+
+No migration and no new dependency. Optionally add `TRUST_PROXY=0` to `.env` and `.env.test`.
+
+## Docker
+
+The `Dockerfile` has these targets (base `node:24-bookworm-slim`; keep `NODE_VERSION` in sync with `.nvmrc`):
+
+- `runtime` (default): production dependencies only, runs as the non-root `node` user with `node dist/main.js`, health check on `/api/v1/health/ready`.
+- `migrate`: full dependencies, runs `prisma migrate deploy`; also usable for `prisma db seed`.
+
+```bash
+docker compose up --build                                  # postgres + migrate (once) + api on :3000
+docker compose up -d postgres                              # database only, for host development
+docker compose run --rm migrate npx prisma db seed         # seed the dev database
+```
+
+Compose does not pass `.env` into the containers (each service sets its own variables, and `DATABASE_URL` always points at the compose database), but it does use `.env` and shell variables for `${...}` interpolation: `API_PORT` (3000), `POSTGRES_PORT` (5432), `POSTGRES_USER`/`POSTGRES_PASSWORD` (fleetops), `JWT_SECRET` (an insecure dev-only default is used otherwise), `LOG_LEVEL`. The compose API runs with `NODE_ENV=development` (Swagger on); the image default is `production`.
+
+## Deployment
+
+1. Build the image.
+2. Run the `migrate` target once with the production `DATABASE_URL` (`prisma migrate deploy`). Migrations are never run by the container entrypoint, so several replicas do not race and a failed migration does not crash-loop the fleet.
+3. Roll out the `runtime` target. Readiness gates traffic: a new instance is not ready until its migrations are applied.
+
+Probes: `/api/v1/health/live` for liveness, `/api/v1/health/ready` for readiness. Set `TRUST_PROXY` behind a load balancer and provide `DATABASE_URL` and `JWT_SECRET` through the platform's secret store.
+
+### Daily service-status job with several instances
+
+The job takes a transaction-scoped PostgreSQL advisory lock (`pg_try_advisory_xact_lock`). If another instance is already running it, the run is skipped and logged. No extra infrastructure is needed.
+
+## CI
+
+`.github/workflows/ci.yml` runs on pushes to `main` and pull requests:
+
+- `test`: lint, unit tests, `db:test:migrate`, e2e tests against a `postgres:18-alpine` service, and the build.
+- `docker`: builds the `migrate` target and smoke-tests `docker compose up` against `/health/ready`.
+
+Images are not published and there is no deploy job yet.

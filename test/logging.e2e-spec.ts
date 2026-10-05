@@ -110,4 +110,15 @@ describe('Request logging (e2e)', () => {
       statusCode: 404,
     });
   });
+
+  it('ignores X-Forwarded-For by default (TRUST_PROXY=0)', async () => {
+    await request(app.getHttpServer())
+      .get('/api/v1/nope')
+      .set('X-Forwarded-For', '203.0.113.7');
+    const entries = httpEntries();
+    expect(entries).toHaveLength(1);
+    expect(entries[0].ip).toEqual(expect.any(String));
+    expect(entries[0].ip).not.toBe('203.0.113.7');
+    expect(String(entries[0].ip)).not.toContain('203.0.113.7');
+  });
 });

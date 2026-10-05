@@ -62,6 +62,28 @@ describe('validateEnv', () => {
     });
   });
 
+  describe('TRUST_PROXY', () => {
+    it('defaults to 0', () => {
+      expect(validateEnv(base).TRUST_PROXY).toBe(0);
+    });
+
+    it.each([
+      ['0', 0],
+      ['1', 1],
+      ['10', 10],
+    ])('accepts %s as a number', (value, expected) => {
+      expect(validateEnv({ ...base, TRUST_PROXY: value }).TRUST_PROXY).toBe(
+        expected,
+      );
+    });
+
+    it.each(['-1', '11', '1.5', 'abc', 'true'])('rejects %s', (value) => {
+      expect(() => validateEnv({ ...base, TRUST_PROXY: value })).toThrow(
+        /TRUST_PROXY/,
+      );
+    });
+  });
+
   describe('JWT_SECRET', () => {
     it('throws when missing', () => {
       const rest: Record<string, unknown> = { ...base };

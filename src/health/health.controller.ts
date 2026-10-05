@@ -2,7 +2,12 @@ import { Controller, Get, HttpStatus, Res } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { Public } from '../auth/public.decorator.js';
-import { HealthService, type HealthStatus } from './health.service.js';
+import {
+  HealthService,
+  type HealthStatus,
+  type LivenessStatus,
+  type ReadinessStatus,
+} from './health.service.js';
 
 @ApiTags('health')
 @Controller('health')
@@ -23,5 +28,25 @@ export class HealthController {
     }
 
     return health;
+  }
+
+  @Public()
+  @Get('live')
+  live(): LivenessStatus {
+    return this.healthService.liveness();
+  }
+
+  @Public()
+  @Get('ready')
+  async ready(
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<ReadinessStatus> {
+    const readiness = await this.healthService.readiness();
+
+    if (readiness.status !== 'ok') {
+      res.status(HttpStatus.SERVICE_UNAVAILABLE);
+    }
+
+    return readiness;
   }
 }
