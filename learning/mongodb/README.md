@@ -37,10 +37,11 @@ Each exercise has three parts:
 
 ## Stages
 
-| Stage | Folder                                 | Status |
-| ----- | -------------------------------------- | ------ |
-| L1    | [`l1-fundamentals/`](l1-fundamentals/) | Done   |
-| L2–L6 | Added when each stage is approved      | —      |
+| Stage | Folder                                   | Status |
+| ----- | ---------------------------------------- | ------ |
+| L1    | [`l1-fundamentals/`](l1-fundamentals/)   | Done   |
+| L2    | [`l2-data-modeling/`](l2-data-modeling/) | Done   |
+| L3–L6 | Added when each stage is approved        | —      |
 
 ### L1 — MongoDB fundamentals
 
@@ -54,3 +55,15 @@ Each exercise has three parts:
 | `06-embedding-and-references.js`       | Embedding vs referencing, joins in the application       |
 | `07-pagination.js`                     | Offset vs range pagination, measured with `explain()`    |
 | [`NOTES.md`](l1-fundamentals/NOTES.md) | Summary, SQL/Prisma comparison, pitfalls, your notes     |
+
+### L2 — MongoDB data modeling
+
+| File                                       | Topic                                                                         |
+| ------------------------------------------ | ----------------------------------------------------------------------------- |
+| `01-organization-and-vehicles.js`          | Access patterns, embedded vs referenced fleet, one-to-one, hot vs cold fields |
+| `02-telemetry-readings.js`                 | One document per reading, latest-status summary, the 16 MB limit measured     |
+| `03-maintenance-and-driver-assignments.js` | Many-to-many over time, extended references and stale copies                  |
+| `04-bucket-pattern.js`                     | Bucketing readings per vehicle-hour, measured against flat documents          |
+| [`NOTES.md`](l2-data-modeling/NOTES.md)    | Decision rules, patterns, measurements, what the model does not protect       |
+
+Exercises use the `learning_l2` database: `docker compose exec mongo mongosh --quiet learning_l2 /learning/l2-data-modeling/01-organization-and-vehicles.js`. Solution 04 needs exercise 04 to have run first.

@@ -16,7 +16,7 @@ To avoid confusion with the other roadmaps, stages are always called **Learning 
 | Stage | Name                                 | Part                  | Status  | Commit(s) |
 | ----- | ------------------------------------ | --------------------- | ------- | --------- |
 | L1    | MongoDB fundamentals                 | A: MongoDB            | Done    | `fe09f1b` |
-| L2    | MongoDB data modeling                | A: MongoDB            | Planned | —         |
+| L2    | MongoDB data modeling                | A: MongoDB            | Done    | (pending) |
 | L3    | Indexing + query performance         | A: MongoDB            | Planned | —         |
 | L4    | MongoDB querying                     | A: MongoDB            | Planned | —         |
 | L5    | Aggregation pipeline                 | A: MongoDB            | Planned | —         |
@@ -233,15 +233,46 @@ Part A is about MongoDB itself. **No FleetOps code changes.** Exercises run agai
 
 ### Learning Stage 2 — MongoDB data modeling
 
-**Status:** Planned
+**Status:** Done (pending)
 
 **Goal:** learn how document modeling differs from relational modeling.
 
 **Topics:** embedding vs referencing; one-to-one, one-to-many, many-to-many; document boundaries; denormalization; read-oriented vs write-oriented modeling; access-pattern-driven design; avoiding both excessive normalization and unbounded documents (the 16 MB limit, ever-growing arrays).
 
-**Exercises:** model a FleetOps-like domain in documents: organization, vehicle, driver, telemetry reading, GPS position, maintenance event. For each, write down the access patterns first, then compare at least two models (e.g. readings embedded per vehicle-hour vs one document per reading) and explain the choice.
+**What was learned** (details in [`learning/mongodb/l2-data-modeling/NOTES.md`](../learning/mongodb/l2-data-modeling/NOTES.md))
 
-**Not yet:** any change to the FleetOps PostgreSQL schema. The point is to see how the same domain could be modeled differently, not to move it.
+- The access patterns decide the model. Each exercise lists them before any data is written.
+- Embed small, bounded data that is read with its parent (vehicle registration). Reference data that is large, grows, or is read and updated on its own (vehicles, maintenance events, telemetry).
+- Many-to-many over time with its own data (driver ↔ vehicle with dates) is a relationship collection, like `vehicle_assignments` in FleetOps.
+- Denormalized copies (extended references, a latest-status document) trade write work and consistency for read speed. Copy fields that never change, or whose old value is meaningful.
+- Telemetry, measured:
+  - Embedding a day of readings in a vehicle reaches the 16 MB limit in about 14 days.
+  - Bucketing per vehicle-hour stores the same data in 360× fewer documents and about 35% less space, but needs more complex writes and returns whole hours.
+- The 16 MB limit was never the first problem. Big shared documents cost reads, writes and contention long before that.
+- Some rules are not enforced by the model at all: one active assignment per vehicle, and changes that span two documents. They need indexes (L3), transactions (L14) or code.
+
+**Built**
+
+- Four `mongosh` exercises in `learning/mongodb/l2-data-modeling/`:
+  - organizations and vehicles;
+  - telemetry readings and a latest-status summary;
+  - assignments and maintenance;
+  - the bucket pattern.
+- Each exercise lists its access patterns and has worked examples, "your turn" tasks and runnable solutions.
+- A shared seed (`lib/fleet.js`) where every document carries `organizationId`.
+- `NOTES.md`: decision rules, the patterns used, the measurements, and what the model does not protect.
+
+**Decisions**
+
+1. For this domain, `vehicles`, `drivers`, `assignments`, `maintenanceEvents` and telemetry are separate collections. Only small, bounded one-to-one data is embedded.
+2. The telemetry shape stays open between one document per reading, hourly buckets and a time series collection. It is decided with indexes and measurements in L3. Hand-built buckets are not assumed.
+3. A maintenance event's copy of the vehicle plate is a snapshot (history), never synced.
+4. No change to the FleetOps PostgreSQL schema.
+
+**Deferred**
+
+- The partial unique index for "one active assignment" and time series collections (L3).
+- Upsert details (L4), `$unwind`/`$filter` over buckets (L5), multi-document transactions (L14), idempotent bucket writes for duplicate deliveries (L13).
 
 ### Learning Stage 3 — Indexing + query performance
 
