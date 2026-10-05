@@ -18,7 +18,7 @@ Rules for working with phases:
 | 3     | Authentication + tenant context  | Done    | `0195815` |
 | 4     | Vehicles API                     | Done    | `9e4a426` |
 | 5     | Users + roles                    | Done    | `c80e806` |
-| 6     | Drivers + vehicle assignments    | Done    | pending   |
+| 6     | Drivers + vehicle assignments    | Done    | `961d586` |
 | 7     | Maintenance + fuel records       | Planned | —         |
 | 8     | API docs, logging + error format | Planned | —         |
 | 9     | Docker, CI + deployment          | Planned | —         |
@@ -192,7 +192,7 @@ Rules for working with phases:
 
 ## Phase 6 — Drivers + vehicle assignments
 
-**Status:** Done (commit pending)
+**Status:** Done (`961d586`)
 
 **Goal:** record which driver uses which vehicle and when.
 
