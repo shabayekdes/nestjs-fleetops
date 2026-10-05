@@ -20,7 +20,7 @@ Rules for working with phases:
 | 5     | Users + roles                    | Done    | `c80e806` |
 | 6     | Drivers + vehicle assignments    | Done    | `961d586` |
 | 7     | Maintenance + fuel records       | Done    | `f12eeed` |
-| 8     | API docs, logging + error format | Done    | TBD       |
+| 8     | API docs, logging + error format | Done    | `2395d09` |
 | 9     | Docker, CI + deployment          | Planned | —         |
 
 ---
@@ -282,7 +282,7 @@ Rules for working with phases:
 
 ## Phase 8 — API docs, logging + error format
 
-**Status:** Done (commit TBD)
+**Status:** Done (`2395d09`)
 
 **Goal:** make the API easy to use and to debug.
 
