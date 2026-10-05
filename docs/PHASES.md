@@ -21,7 +21,7 @@ Rules for working with phases:
 | 6     | Drivers + vehicle assignments    | Done   | `961d586` |
 | 7     | Maintenance + fuel records       | Done   | `f12eeed` |
 | 8     | API docs, logging + error format | Done   | `2395d09` |
-| 9     | Docker, CI + deployment          | Done   | —         |
+| 9     | Docker, CI + deployment          | Done   | `a0217d0` |
 
 ---
 
@@ -322,7 +322,7 @@ Rules for working with phases:
 
 ## Phase 9 — Docker, CI + deployment
 
-**Status:** Done (commit pending)
+**Status:** Done (`a0217d0`)
 
 **Goal:** the API can be built, tested and deployed automatically.
 
