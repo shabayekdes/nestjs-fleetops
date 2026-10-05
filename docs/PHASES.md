@@ -2,6 +2,8 @@
 
 FleetOps is built in phases, partly as a way to learn NestJS. This file records what each phase delivered, the decisions it made, and what it deliberately left out. Use it as context before planning a new phase.
 
+This file covers the backend only. The web frontend is planned in [`frontend-roadmap.md`](frontend-roadmap.md) and starts only after Phase 9. Product versions after v1.0 are in [`product-roadmap.md`](product-roadmap.md).
+
 Rules for working with phases:
 
 - Build only the current phase. Do not implement anything listed under a later phase or under "Out of scope" without the user's approval.
