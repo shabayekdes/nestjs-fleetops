@@ -14,7 +14,7 @@ To avoid confusion with the backend roadmap, frontend phases are always called *
 
 | Frontend phase | Name                   | Status  | Commit(s) |
 | -------------- | ---------------------- | ------- | --------- |
-| FE1            | Application foundation | Done    | —         |
+| FE1            | Application foundation | Done    | `27b8860` |
 | FE2            | Authentication         | Planned | —         |
 | FE3            | Application shell      | Planned | —         |
 | FE4            | Vehicles               | Planned | —         |
@@ -96,7 +96,7 @@ For each choice: why it is needed, what it solves, why it fits, and when it is n
 
 ## Frontend Phase 1 — Application foundation
 
-**Status:** Done (commit pending)
+**Status:** Done (`27b8860`)
 
 **Goal:** a running Next.js application with the configuration, API client, layout and conventions that every later phase relies on.
 
