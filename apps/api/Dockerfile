@@ -1,4 +1,4 @@
-# Keep NODE_VERSION in sync with .nvmrc.
+# Keep NODE_VERSION in sync with the root .nvmrc (../../.nvmrc).
 ARG NODE_VERSION=24
 
 FROM node:${NODE_VERSION}-bookworm-slim AS base

@@ -28,6 +28,8 @@ Never modify production code just to make a test pass. If production behavior is
 
 ## Commands
 
+Run from `apps/api/`:
+
 ```bash
 npm test                 # unit
 npm run db:test:migrate  # after new migrations

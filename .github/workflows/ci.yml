@@ -13,7 +13,7 @@ permissions:
   contents: read
 
 jobs:
-  test:
+  api:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     services:
@@ -30,6 +30,9 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
+    defaults:
+      run:
+        working-directory: apps/api
     env:
       # Real env vars override .env.test for ConfigModule and prisma.config.ts.
       DATABASE_URL: postgresql://fleetops:fleetops@localhost:5432/fleetops_test?schema=public
@@ -39,6 +42,7 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
+          cache-dependency-path: apps/api/package-lock.json
       - run: npm ci
       - name: Create .env.test from the example
         run: cp .env.test.example .env.test
@@ -54,7 +58,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build migrate target
-        run: docker build --target migrate -t fleetops-migrate:ci .
+        run: docker build --target migrate -t fleetops-migrate:ci apps/api
       - name: Compose smoke test
         run: |
           docker compose up -d --build

@@ -2,15 +2,11 @@ node_modules
 dist
 coverage
 .git
-.github
-.claude
-docs
 test
 .env
 .env.*
 src/generated
 *.tsbuildinfo
 *.log
-docker-compose.yml
 Dockerfile
 .dockerignore

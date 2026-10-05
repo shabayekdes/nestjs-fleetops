@@ -1,6 +1,6 @@
 # FleetOps Web — Frontend Roadmap
 
-This file plans the FleetOps web frontend: a separate Next.js application that consumes the FleetOps NestJS REST API. It is a plan only. **Nothing in this file is built yet.**
+This file plans the FleetOps web frontend: a Next.js application (in this monorepo, `apps/web/`) that consumes the FleetOps NestJS REST API. It is a plan only. **Nothing in this file is built yet.**
 
 > **Frontend development MUST NOT start until Backend Phase 9 — Docker, CI + Deployment — has been completed and approved.**
 
@@ -38,7 +38,7 @@ To avoid confusion with the backend roadmap, frontend phases are always called *
 8. **No future product features** (billing, notifications, branches, trips, telematics, AI — see `product-roadmap.md`) are built during frontend development unless the user explicitly approves them.
 9. **Gaps in the API are fixed in the API.** If a screen needs data the API does not provide, that is a backend change, planned and approved separately. The frontend does not work around it by combining many calls or by guessing.
 
-Before each frontend phase starts, its scope is confirmed with the user and a plan is requested from `cto-esmail`, as for backend phases. The current agent team is backend- and QA-focused; whether frontend-specific agents are added is decided at FE1.
+Before each frontend phase starts, its scope is confirmed with the user and a plan is requested from `cto-esmail`, as for backend phases. Frontend work is done by `fe-dev-ahmed`, reporting to `cto-esmail`.
 
 ---
 
@@ -48,7 +48,7 @@ These are the decisions that shape every phase. They are recommendations to conf
 
 ### Separate application
 
-The frontend is its own Next.js application (working name `fleetops-web`), deployed separately from the API. **Assumption:** it lives in a separate repository, so the backend repository does not need restructuring into a monorepo. This is confirmed at FE1.
+The frontend is its own Next.js application (working name `fleetops-web`) and lives in this repository as a monorepo, in `apps/web/`, next to the API in `apps/api/`. It has an independent `package.json` (no npm workspaces) and is deployed separately from the API. **Decision:** monorepo, because it keeps one shared OpenAPI contract, allows atomic API and UI changes, and gives one compose stack.
 
 ### Server-side API access (backend-for-frontend)
 
@@ -119,7 +119,7 @@ For each choice: why it is needed, what it solves, why it fits, and when it is n
 
 **Decisions to make**
 
-- Separate repository or not; styling approach; unit test runner; generated vs hand-written API types.
+- Styling approach; unit test runner; generated vs hand-written API types.
 
 **Out of scope**
 

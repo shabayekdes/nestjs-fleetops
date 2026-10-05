@@ -354,6 +354,12 @@ Rules for working with phases:
 
 ---
 
+## Repository restructure
+
+API moved to `apps/api/` in preparation for the frontend (`apps/web/`); no behavior, dependency, schema or migration change. Paths in the phase notes above are relative to `apps/api/` (`.nvmrc`, `docker-compose.yml`, `docs/` and `.github/` stay at the repository root).
+
+---
+
 ## Template for future phases
 
 ```md

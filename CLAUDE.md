@@ -6,17 +6,29 @@ CTO
 ├── Backend Lead (be-lead-shreen)
 │   └── NestJS Developer (be-dev-abdel-aziz)
 │
+├── Frontend Developer (fe-dev-ahmed)
+│
 └── QA Lead (qa-lead-nasrallah)
     └── QA Developer (qa-dev-abdel-rahman)
 
-Agents live in `.claude/agents/`: `cto-esmail`, `be-lead-shreen`, `be-dev-abdel-aziz`, `qa-lead-nasrallah`, `qa-dev-abdel-rahman`.
+Agents live in `.claude/agents/`: `cto-esmail`, `be-lead-shreen`, `be-dev-abdel-aziz`, `qa-lead-nasrallah`, `qa-dev-abdel-rahman`, `fe-dev-ahmed`.
+
+---
+
+## Repository layout
+
+Monorepo. Each app has its own `package.json` and lockfile (no npm workspaces, root has no `package.json`).
+
+- `apps/api/`: NestJS API. **All API commands (`npm ...`, `npx prisma ...`) run from `apps/api/`.**
+- `apps/web/`: Next.js web app. Not created yet; its conventions will live in its own section/doc in FE1.
+- Shared at the root: `.github/`, `.claude/`, `docs/`, `docker-compose.yml` (run `docker compose` from the root), `docker/`, `.nvmrc`, `.prettierrc`, `.gitignore`.
 
 ### How orchestration works
 
 Subagents cannot launch other subagents. The **main conversation is the orchestrator**:
 
 1. Large or cross-cutting work → ask `cto-esmail` for a plan detailed enough to implement directly (files, decisions, required test cases).
-2. Send the plan to `be-dev-abdel-aziz` to implement, then to `qa-dev-abdel-rahman` to write the tests.
+2. Send the plan to `be-dev-abdel-aziz` to implement, then to `qa-dev-abdel-rahman` to write the tests. Frontend work goes to `fe-dev-ahmed`.
 3. When implementation is done, send the results back to `cto-esmail` for the final review.
 
 To save tokens, the leads are **not** part of the default flow. Use `be-lead-shreen` or `qa-lead-nasrallah` only when the CTO plan leaves real open questions, such as unverified library behavior, a risky schema change or a complex test strategy, and give them only that question.
@@ -33,7 +45,9 @@ The project is built in phases. `docs/PHASES.md` records what each phase built, 
 
 ---
 
-## Project Conventions (FleetOps API)
+## Project Conventions (FleetOps API, `apps/api/`)
+
+All paths in this section are relative to `apps/api/` unless they start with a root file name such as `docs/`.
 
 Stack: NestJS 12 · TypeScript strict · native ES modules · PostgreSQL · Prisma 7 · Jest · ESLint + Prettier.
 
@@ -72,7 +86,7 @@ Stack: NestJS 12 · TypeScript strict · native ES modules · PostgreSQL · Pris
 
 ### Definition of Done
 
-`npm run lint`, `npm test`, `npm run test:e2e` and `npm run build` all pass, and the README is updated when commands, endpoints or env vars change.
+`npm run lint`, `npm test`, `npm run test:e2e` and `npm run build` all pass, and `apps/api/README.md` is updated when commands, endpoints or env vars change.
 
 ---
 

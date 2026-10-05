@@ -14,8 +14,8 @@ Stack: NestJS 12 (ESM), TypeScript strict, PostgreSQL, Prisma 7, Jest. Redis, au
 ## Before planning
 
 1. Read `CLAUDE.md` for project conventions.
-2. Inspect existing modules, controllers and services under `src/`.
-3. Inspect `prisma/schema.prisma` and `prisma/migrations/`.
+2. Inspect existing modules, controllers and services under `apps/api/src/`.
+3. Inspect `apps/api/prisma/schema.prisma` and `apps/api/prisma/migrations/`.
 4. Identify reusable patterns and potential breaking changes.
 
 ## Rules
