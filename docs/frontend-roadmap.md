@@ -20,7 +20,7 @@ To avoid confusion with the backend roadmap, frontend phases are always called *
 | FE3            | Application shell      | Done    | `fcd16bb` |
 | FE4            | Vehicles               | Done    | `fa31a81` |
 | FE5            | Users + roles          | Done    | `499fa7d` |
-| FE6            | Drivers + assignments  | Done    | —         |
+| FE6            | Drivers + assignments  | Done    | `970993c` |
 | FE7            | Maintenance + fuel     | Planned | —         |
 | FE8            | Dashboard + reporting  | Planned | —         |
 | FE9            | Production readiness   | Planned | —         |
@@ -385,7 +385,7 @@ For each choice: why it is needed, what it solves, why it fits, and when it is n
 
 ## Frontend Phase 6 — Drivers + assignments
 
-**Status:** Done (commit —)
+**Status:** Done (`970993c`)
 
 **Goal:** manage drivers and see and change which driver uses which vehicle. Built on backend Phase 6. The exact screens follow the API that Phase 6 delivers.
 
