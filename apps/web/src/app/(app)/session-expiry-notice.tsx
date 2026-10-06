@@ -1,52 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { loginUrl } from '@/lib/auth/return-to';
+import { useSessionStatus } from '@/components/session-deadline';
 
-const CHECK_INTERVAL_MS = 15_000;
-const WARN_BEFORE_MS = 120_000;
-
-type NoticeState =
-  | { kind: 'none' }
-  | { kind: 'warning'; minutes: number }
-  | { kind: 'expired'; href: string };
-
-/**
- * Warns before the session ends and links to login once it has. Receives only
- * the remaining time, never the token.
- */
-export function SessionExpiryNotice({ remainingMs }: { remainingMs: number }) {
-  const [state, setState] = useState<NoticeState>({ kind: 'none' });
-
-  useEffect(() => {
-    const deadline = Date.now() + remainingMs;
-
-    function check() {
-      const left = deadline - Date.now();
-      if (left <= 0) {
-        setState({
-          kind: 'expired',
-          href: loginUrl({
-            reason: 'expired',
-            returnTo: window.location.pathname + window.location.search,
-          }),
-        });
-      } else if (left <= WARN_BEFORE_MS) {
-        setState({ kind: 'warning', minutes: Math.ceil(left / 60_000) });
-      } else {
-        setState({ kind: 'none' });
-      }
-    }
-
-    const initial = setTimeout(check, 0);
-    const interval = setInterval(check, CHECK_INTERVAL_MS);
-    document.addEventListener('visibilitychange', check);
-    return () => {
-      clearTimeout(initial);
-      clearInterval(interval);
-      document.removeEventListener('visibilitychange', check);
-    };
-  }, [remainingMs]);
+/** Warns before the session ends and links to login once it has. */
+export function SessionExpiryNotice() {
+  const state = useSessionStatus();
 
   if (state.kind === 'warning') {
     return (

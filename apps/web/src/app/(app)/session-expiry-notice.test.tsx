@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { act, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { SessionDeadlineProvider } from '@/components/session-deadline';
 import { SessionExpiryNotice } from './session-expiry-notice';
 
 beforeEach(() => {
@@ -17,15 +18,23 @@ function advance(ms: number) {
   });
 }
 
+function Notice({ remainingMs, k }: { remainingMs: number; k?: string }) {
+  return (
+    <SessionDeadlineProvider key={k} remainingMs={remainingMs}>
+      <SessionExpiryNotice />
+    </SessionDeadlineProvider>
+  );
+}
+
 describe('SessionExpiryNotice', () => {
   it('shows nothing with more than 2 minutes left', () => {
-    const { container } = render(<SessionExpiryNotice remainingMs={600_000} />);
+    const { container } = render(<Notice remainingMs={600_000} />);
     advance(1);
     expect(container).toBeEmptyDOMElement();
   });
 
   it('warns at 2 minutes or less', () => {
-    render(<SessionExpiryNotice remainingMs={600_000} />);
+    render(<Notice remainingMs={600_000} />);
     advance(600_000 - 100_000);
     expect(screen.getByRole('status')).toHaveTextContent(
       'Your session expires in about 2 minutes.',
@@ -33,13 +42,13 @@ describe('SessionExpiryNotice', () => {
   });
 
   it('warns immediately when already inside the window', () => {
-    render(<SessionExpiryNotice remainingMs={50_000} />);
+    render(<Notice remainingMs={50_000} />);
     advance(1);
     expect(screen.getByRole('status')).toHaveTextContent('about 1 minute.');
   });
 
   it('shows an alert with a login link at the deadline', () => {
-    render(<SessionExpiryNotice remainingMs={60_000} />);
+    render(<Notice remainingMs={60_000} />);
     advance(75_000);
     expect(screen.getByRole('alert')).toHaveTextContent(
       'Your session has expired.',
@@ -51,12 +60,10 @@ describe('SessionExpiryNotice', () => {
   });
 
   it('resets when remounted with a new key', () => {
-    const { rerender } = render(
-      <SessionExpiryNotice key="a" remainingMs={10_000} />,
-    );
+    const { rerender } = render(<Notice k="a" remainingMs={10_000} />);
     advance(20_000);
     expect(screen.getByRole('alert')).toBeInTheDocument();
-    rerender(<SessionExpiryNotice key="b" remainingMs={600_000} />);
+    rerender(<Notice k="b" remainingMs={600_000} />);
     advance(1);
     expect(screen.queryByRole('alert')).toBeNull();
     expect(screen.queryByRole('status')).toBeNull();

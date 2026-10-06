@@ -34,8 +34,16 @@ describe('visibleNavItems', () => {
 });
 
 describe('NAV_ITEMS', () => {
-  it('contains exactly Dashboard', () => {
-    expect(NAV_ITEMS.map((i) => i.label)).toEqual(['Dashboard']);
+  it('contains Dashboard and Vehicles', () => {
+    expect(NAV_ITEMS.map((i) => i.label)).toEqual(['Dashboard', 'Vehicles']);
+  });
+
+  it('shows Vehicles to every role', () => {
+    for (const role of ['ADMIN', 'MANAGER', 'DRIVER'] as const) {
+      expect(visibleNavItems(NAV_ITEMS, role).map((i) => i.label)).toContain(
+        'Vehicles',
+      );
+    }
   });
 });
 

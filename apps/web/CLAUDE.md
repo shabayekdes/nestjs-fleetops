@@ -28,7 +28,7 @@ Next.js 16 has APIs newer than most training data. Read `node_modules/next/dist/
 - Route groups: `(public)` (no session needed, e.g. `login`) and `(app)` (protected, its layout loads the current user). `session-expired` is a public Route Handler; `dev/` is public.
 - `src/proxy.ts` is the Next.js 16 proxy (formerly middleware). `e2e/` holds Playwright tests.
 - Files are kebab-case, components PascalCase. Tests sit next to the code (`*.test.ts(x)`).
-- Colocate components used by one route inside that route folder. The application shell is in `src/app/(app)/_shell/` (nav items, sidebar, mobile drawer, header, user menu).
+- Colocate components used by one route inside that route folder. Route-private code goes in `_components/` and `_lib/` folders next to the route (a leading underscore keeps them out of routing); `actions.ts` sits beside the pages that use it. The application shell is in `src/app/(app)/_shell/` (nav items, sidebar, mobile drawer, header, user menu).
 - `src/components/ui/` is copied shadcn/ui code that we own (add with `npx shadcn@4.21.3 add <name>`; never add the CLI as a dependency). Edit it only minimally, keep it lint-clean, and do not unit-test it directly.
 - Import with the `@/` alias for `src/`.
 - Relative imports have no `.js` extension (bundler resolution). This is deliberately the opposite of the API rule.
@@ -46,20 +46,22 @@ Next.js 16 has APIs newer than most training data. Read `node_modules/next/dist/
 - Types come from `@/lib/api/types` (generated from OpenAPI). Callers pass the response type: `apiRequest<HealthResponse>('/health')`.
 - Failures are `ApiError` (HTTP error: `status`, `message`, `fieldErrors`, `requestId`) or `ApiConnectionError` (`reason: 'timeout' | 'unreachable'`).
 
-| Result                       | UI                                                   |
-| ---------------------------- | ---------------------------------------------------- |
-| 400 with `fieldErrors`       | Show messages next to the matching fields            |
-| 401                          | Handled centrally by `sessionApiRequest`             |
-| 403                          | `NotAllowed` / `NOT_ALLOWED_MESSAGE`; do not log out |
-| 404                          | `notFound()`                                         |
-| 409                          | Form-level message using the API message             |
-| 5xx and `ApiConnectionError` | Generic "service unavailable"; never raw details     |
+| Result                       | UI                                                    |
+| ---------------------------- | ----------------------------------------------------- |
+| 400 with `fieldErrors`       | Show messages next to the matching fields             |
+| 401                          | Handled centrally by `sessionApiRequest`              |
+| 403                          | `NotAllowed` / `NOT_ALLOWED_MESSAGE`; do not log out  |
+| 404                          | `notFound()` (a 400 on GET by id is treated the same) |
+| 409                          | Form-level message using the API message              |
+| 5xx and `ApiConnectionError` | Generic "service unavailable"; never raw details      |
 
 Authenticated calls:
 
 - Use `sessionApiRequest` from `@/lib/auth/session-api`. In Server Components and layouts use the default `mode: 'render'`; in Server Actions and Route Handlers pass `mode: 'action'`.
 - Never call `apiRequest` with an `accessToken` directly, except the login action and the `/session-expired` route handler.
 - `sessionApiRequest` redirects (a thrown error) on a missing session or a 401. Code that wraps it in `try/catch` must catch only `ApiError`/`ApiConnectionError`, or call `unstable_rethrow(error)` first, so the redirect is not swallowed.
+- Check every id from a URL or an action argument with `isUuid` (`@/lib/ids`) before calling the API, and `encodeURIComponent` it in the path.
+- Server Actions map API failures with `apiErrorToFormState` (`@/lib/forms/api-error-to-form`): 400 to field errors, 403 to `NOT_ALLOWED_MESSAGE`, 404 to a message you pass, 409 and other 4xx to the API message, 5xx and connection errors to `SERVICE_UNAVAILABLE_MESSAGE`. It rethrows anything else, so redirect errors pass through.
 - 403: pages catching `ApiError` with status 403 render `<NotAllowed />` (`@/components/not-allowed`); Server Actions return `{ formError: NOT_ALLOWED_MESSAGE }`. Never delete the session on 403. Do not use `forbidden()`/`unauthorized()` (experimental).
 
 ## Authentication
@@ -85,7 +87,22 @@ API change, then `npm run openapi:export` (in `apps/api`), then `npm run api:typ
 
 ## 8. Styling
 
-Tailwind utility classes plus shadcn/ui on Radix (`src/components/ui/`). Shared building blocks in `src/components/`: `PageHeader`, `EmptyState`, `ErrorState`, `Notice` (inline, no toast library), `PageSkeleton`, `ConfirmDialog`, `NotAllowed`. Prefer theme tokens (`bg-background`, `text-muted-foreground`, `border`) over fixed colors. There is no dark mode: `globals.css` keeps the `dark` custom variant on `.dark` only, so `dark:` classes never apply. Only `ShellUser` (name, email, role, organization name) crosses into shell Client Components.
+Tailwind utility classes plus shadcn/ui on Radix (`src/components/ui/`). Shared building blocks in `src/components/`: `PageHeader`, `EmptyState`, `ErrorState`, `Notice` (inline, no toast library), `PageSkeleton`, `ConfirmDialog`, `NotAllowed`, `Pagination`, and in `components/form/` `FormField`, `FormError`, `SubmitButton`. `SessionDeadlineProvider` / `useSessionStatus` (`components/session-deadline.tsx`) share the session status with the expiry notice and forms. Prefer theme tokens (`bg-background`, `text-muted-foreground`, `border`) over fixed colors. There is no dark mode: `globals.css` keeps the `dark` custom variant on `.dark` only, so `dark:` classes never apply. Only `ShellUser` (name, email, role, organization name) crosses into shell Client Components.
+
+### Forms
+
+- A native `<form action={formAction}>` with `useActionState`. No form library.
+- Native constraints (`required`, `maxLength`, `type=number`) are for usability. Zod runs inside the Server Action, not in the client bundle; the API validates again and has the last word.
+- The action echoes the submitted values (`FormState.values`) and the form uses them as `defaultValue`, because React resets the form after an action.
+- Use `FormField` (label, hint, errors, `aria-invalid`, `aria-describedby`), `FormError` and `SubmitButton`. `SubmitButton` is disabled while pending and once the session has expired (`useSessionStatus`).
+- Edit forms send only the changed fields: the page binds the original values into the action, and `changedVehicleFields`-style diffing compares normalized values. No change means no API call.
+- Call `revalidatePath` and `redirect` outside `try/catch`. Success feedback is a redirect with an allowlisted `?notice=<key>` (`@/lib/flash`).
+
+### List pages
+
+- Filters, `page` and `limit` live in the URL. Parse search params leniently (invalid values are ignored, with a warning), never redirect to repair them, and build links with `buildHref` (`@/lib/search-params`).
+- Filters are a `next/form` GET form. Pagination is the shared `Pagination` component.
+- Distinguish three empty states: nothing exists yet, nothing matches the filters, and the requested page is past the end.
 
 ## 9. Accessibility
 
@@ -95,7 +112,7 @@ Labels on every input, semantic landmarks and headings, keyboard-usable controls
 
 - Vitest + React Testing Library. No real network: mock with `vi.spyOn(globalThis, 'fetch')`; set env with `vi.stubEnv`.
 - Component tests start with `// @vitest-environment jsdom`. `server-only` is mocked in `vitest.setup.ts`, which also stubs `ResizeObserver`, `scrollIntoView` and pointer-capture methods for jsdom (Radix needs them). With Radix, open menus with `fireEvent.keyDown(trigger, { key: 'Enter' })` and sheets or dialogs with `fireEvent.click`; `userEvent` pointer events are unreliable in jsdom.
-- Playwright e2e lives in `e2e/` (`npm run test:e2e`, Chromium, one worker). It starts the API (port 3100, `NODE_ENV=test`) and the web app (port 3101) itself and needs a migrated, seeded test database; see the README. `e2e/support/session.ts` imports only `lib/auth/session-crypto.ts` (which must stay free of `server-only`) to forge cookies. Vitest only includes `src/**`.
+- Playwright e2e lives in `e2e/` (`npm run test:e2e`, Chromium, one worker). It starts the API (port 3100, `NODE_ENV=test`) and the web app (port 3101) itself and needs a migrated, seeded test database; see the README. `e2e/support/session.ts` imports only `lib/auth/session-crypto.ts` (which must stay free of `server-only`) to forge cookies. Vitest only includes `src/**`. `e2e/support/api.ts` has API helpers for setup and cleanup. E2E tests that write data must use unique names (`E2E-<suffix>`), delete what they create through the API (related records first), sweep leftovers, and never modify seed data.
 
 ## 11. Definition of Done
 

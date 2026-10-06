@@ -4,6 +4,7 @@ import { SESSION_EXPIRY_SKEW_MS, getSession } from '@/lib/auth/session';
 import { AppHeader } from './_shell/app-header';
 import { SidebarNav } from './_shell/sidebar-nav';
 import { toShellUser } from './_shell/shell-user';
+import { SessionDeadlineProvider } from '@/components/session-deadline';
 import { SessionExpiryNotice } from './session-expiry-notice';
 
 function remainingMs(expiresAt: number | undefined): number {
@@ -30,18 +31,20 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         </div>
       </aside>
       <div className="min-w-0">
-        <AppHeader user={toShellUser(user)} />
-        <SessionExpiryNotice
+        <SessionDeadlineProvider
           key={session?.expiresAt}
           remainingMs={remainingMs(session?.expiresAt)}
-        />
-        <main
-          id="main-content"
-          tabIndex={-1}
-          className="p-4 outline-none lg:p-8"
         >
-          {children}
-        </main>
+          <AppHeader user={toShellUser(user)} />
+          <SessionExpiryNotice />
+          <main
+            id="main-content"
+            tabIndex={-1}
+            className="p-4 outline-none lg:p-8"
+          >
+            {children}
+          </main>
+        </SessionDeadlineProvider>
       </div>
     </div>
   );

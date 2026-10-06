@@ -18,7 +18,7 @@ To avoid confusion with the backend roadmap, frontend phases are always called *
 | FE1            | Application foundation | Done    | `27b8860` |
 | FE2            | Authentication         | Done    | `be2e028` |
 | FE3            | Application shell      | Done    | `fcd16bb` |
-| FE4            | Vehicles               | Planned | —         |
+| FE4            | Vehicles               | Done    | —         |
 | FE5            | Users + roles          | Planned | —         |
 | FE6            | Drivers + assignments  | Planned | —         |
 | FE7            | Maintenance + fuel     | Planned | —         |
@@ -83,9 +83,9 @@ For each choice: why it is needed, what it solves, why it fits, and when it is n
 | **Generated API types from OpenAPI** (e.g. `openapi-typescript`)               | Types for requests and responses produced from the API's OpenAPI document instead of being written by hand.     | Backend Phase 8 adds OpenAPI docs generated from the DTOs. Generated types stop the frontend and the API from drifting apart.                                                                                           | FE1. **Chosen: openapi-typescript 7.13 with a committed spec (`apps/api/openapi.json`) and committed generated types.**                                       |
 | **Styling: Tailwind CSS** (alternative: CSS Modules)                           | Consistent spacing, colour and responsive breakpoints without writing a CSS framework.                          | A dashboard needs many similar, responsive screens. Utility classes keep them consistent. CSS Modules (built into Next.js) is the zero-dependency alternative.                                                          | FE1. **Chosen: Tailwind CSS 4 (4.3.3).**                                                                                                                      |
 | **Accessible UI primitives** (e.g. Radix-based components such as shadcn/ui)   | Dialogs, dropdown menus, selects and toasts with correct keyboard and screen-reader behaviour.                  | These are hard to build accessibly by hand and appear from FE2 onward (user menu, delete confirmations, forms). Copy-in components avoid a heavy component-library dependency.                                          | **Chosen (FE3):** shadcn/ui (new-york) on `radix-ui` 1.7.0, with `class-variance-authority` 0.7.1, `cn` 0.4.0, `lucide-react` 1.52.0, `tw-animate-css` 1.4.0. |
-| **Forms: native forms + Server Actions first**; React Hook Form only if needed | Submitting, showing pending state and mapping API errors to fields.                                             | Most FleetOps forms are small CRUD forms. Server Actions keep the token on the server. A form library is added only if forms with many dependent fields (e.g. assignments, maintenance) become hard to manage.          | Server Actions at FE2. Decide on a form library at FE4–FE6 based on real need.                                                                                |
+| **Forms: native forms + Server Actions first**; React Hook Form only if needed | Submitting, showing pending state and mapping API errors to fields.                                             | Most FleetOps forms are small CRUD forms. Server Actions keep the token on the server. A form library is added only if forms with many dependent fields (e.g. assignments, maintenance) become hard to manage.          | **No form library (FE4):** native forms, Server Actions, `useActionState` and Zod in the action. Revisit only if a later form becomes hard to manage.         |
 | **Schema validation** (e.g. Zod)                                               | One place to describe form input and environment variables, with typed results.                                 | Covers env validation (FE1) and client-side form checks.                                                                                                                                                                | FE1 for env validation. **Chosen: Zod 4**; form checks follow from FE2.                                                                                       |
-| **Data tables** (plain table component first; TanStack Table only if needed)   | Displaying paginated lists.                                                                                     | Pagination, filtering and sorting are done by the API, so the table only renders rows. A table library is needed only if column features (resizing, column visibility, row selection) are required.                     | Plain component at FE4. Library deferred.                                                                                                                     |
+| **Data tables** (plain table component first; TanStack Table only if needed)   | Displaying paginated lists.                                                                                     | Pagination, filtering and sorting are done by the API, so the table only renders rows. A table library is needed only if column features (resizing, column visibility, row selection) are required.                     | **Plain shadcn `table` (FE4).** Library deferred.                                                                                                             |
 | **Client-side data cache** (e.g. TanStack Query)                               | Client-side caching, background refetching, optimistic updates.                                                 | Not needed while data is fetched on the server per request. It may be needed for highly interactive screens.                                                                                                            | Deferred. Adopt only with a concrete screen that needs it.                                                                                                    |
 | **Global client state library** (e.g. Zustand)                                 | Shared client-only state.                                                                                       | The current user comes from the server, and filters live in the URL. There is no known need.                                                                                                                            | Not planned.                                                                                                                                                  |
 | **Charts** (e.g. Recharts, or a similar lightweight library)                   | Time-series and comparison charts.                                                                              | Only the cost summaries (FE7) and the dashboard (FE8) need charts.                                                                                                                                                      | Deferred to FE7/FE8. Choose based on the actual charts needed.                                                                                                |
@@ -224,7 +224,7 @@ For each choice: why it is needed, what it solves, why it fits, and when it is n
 
 - Refresh tokens, "remember me", server-side logout/revocation (not in the backend). A copied cookie stays usable until the token expires (at most 15 minutes).
 - Sign-up, password reset, email verification (not in the backend); password change (FE5).
-- Disabling individual form submits when the session has expired (FE4, with the first authenticated form).
+- ~~Disabling individual form submits when the session has expired~~ Done in FE4 (`SubmitButton` and `SessionDeadlineProvider`).
 - Application shell, navigation and user menu (done in FE3).
 - `__Host-` cookie prefix, CSP and the full security review (FE9).
 - **Login rate limiting behind the web server (decide before production, FE9):** the API's per-IP login limit (30 per 60 s) is shared by all web users. Fix with deployment configuration (private API network + `TRUST_PROXY` + forwarded client IP) or a backend limit change, planned separately.
@@ -282,7 +282,7 @@ For each choice: why it is needed, what it solves, why it fits, and when it is n
 
 ## Frontend Phase 4 — Vehicles
 
-**Status:** Planned
+**Status:** Done (commit —)
 
 **Goal:** the first full CRUD screens, built on the backend Phase 4 vehicles API. This phase sets the pattern for every later resource.
 
@@ -304,6 +304,34 @@ For each choice: why it is needed, what it solves, why it fits, and when it is n
 
 - Partial-match search, sorting controls, cursor pagination (not in the API).
 - Driver assignment on the vehicle page (FE6).
+
+**Built**
+
+- Routes under `src/app/(app)/vehicles/`: list (`/vehicles`), detail (`/vehicles/[id]`), `new`, `[id]/edit` and a segment `not-found.tsx`. Route-private `_components/` (form, filters, table) and `_lib/` (list params, Zod schema and edit diff, API wrappers, `canManageVehicles`); Server Actions in `actions.ts` (`createVehicle`, `updateVehicle`, `deleteVehicle`).
+- Shared: `lib/search-params.ts`, `lib/ids.ts` (`isUuid`), `lib/forms/` (`FormState`, `apiErrorToFormState`), `lib/flash.ts`, `lib/format.ts`; components `FormField`, `FormError`, `SubmitButton`, `Pagination`, `SessionDeadlineProvider`; shadcn `input`, `label`, `table`. `SessionExpiryNotice` now reads the shared session status.
+- Nav item "Vehicles" for every role.
+- Tests: unit and component tests for all of the above; Playwright `e2e/vehicles.spec.ts` (create, edit, delete; 409 duplicate VIN; API 400 field error; delete blocked by a 409; driver and manager roles; 404s; filters and pagination in the URL; submit disabled after expiry) with API helpers in `e2e/support/api.ts`.
+- No new npm dependency.
+
+**Decisions**
+
+- Success feedback is an inline `Notice` driven by an allowlisted `?notice=<key>` param; no toast library.
+- `serviceStatus`, `nextServiceDueOn` and the `serviceStatus` filter are left out; FE7 adds them.
+- A 409 is shown at form level with the API's message; the message text is never matched.
+- API 400 messages are shown exactly as the API sends them.
+- `?limit` is honoured from the URL (1 to 100, default 20); there is no page-size selector.
+- A DRIVER opening `/vehicles/new` or `/vehicles/[id]/edit` sees "not allowed" straight away (the edit page fetches nothing first). A 403 from the API is still handled.
+- No form library and no table library. Zod runs only in the Server Actions; native constraints cover instant feedback.
+- Edit sends only changed fields, compared after normalization; no change means no API call. A cleared plate is sent as `null`; on create an empty plate is left out (the API rejects `""`).
+- List params are parsed leniently with a warning instead of a redirect or an error page.
+- A 400 on `GET /vehicles/:id` (malformed id) is treated as not found, and ids are checked with `isUuid` before any API call.
+- A 401 inside a Server Action redirects to login and loses unsaved input.
+
+**Deferred**
+
+- Service status and next-service date on vehicles (FE7), vehicle search beyond exact make/model/year, sorting controls.
+- A page-size selector, toasts.
+- Expiry detection uses the browser clock, so it is advisory; the API's 401 is the real guard.
 
 ---
 

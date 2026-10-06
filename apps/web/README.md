@@ -26,12 +26,16 @@ Start the API first (it listens on port 3000). The app refuses to start when the
 
 ## Routes
 
-| Route              | Access    | Purpose                                                                                             |
-| ------------------ | --------- | --------------------------------------------------------------------------------------------------- |
-| `/login`           | public    | Sign-in form (organization, email, password)                                                        |
-| `/`                | protected | Dashboard (empty state) inside the application shell; redirects to `/login` without a valid session |
-| `/session-expired` | public    | Route handler that resolves a render-time 401 (clears the cookie or returns to the page)            |
-| `/dev/api-health`  | public    | Development page, 404 in production (see below)                                                     |
+| Route                 | Access    | Purpose                                                                                                         |
+| --------------------- | --------- | --------------------------------------------------------------------------------------------------------------- |
+| `/login`              | public    | Sign-in form (organization, email, password)                                                                    |
+| `/`                   | protected | Dashboard (empty state) inside the application shell; redirects to `/login` without a valid session             |
+| `/vehicles`           | protected | Vehicle list: filters (`make`, `model`, `year`), pagination (`page`, `limit`) and flash notices, all in the URL |
+| `/vehicles/new`       | protected | Add vehicle (ADMIN, MANAGER; a DRIVER sees "not allowed")                                                       |
+| `/vehicles/[id]`      | protected | Vehicle detail; Edit and Delete for ADMIN and MANAGER                                                           |
+| `/vehicles/[id]/edit` | protected | Edit vehicle (ADMIN, MANAGER); sends only the changed fields                                                    |
+| `/session-expired`    | public    | Route handler that resolves a render-time 401 (clears the cookie or returns to the page)                        |
+| `/dev/api-health`     | public    | Development page, 404 in production (see below)                                                                 |
 
 Unknown paths are treated as protected: without a session they redirect to `/login?returnTo=...`.
 
@@ -43,7 +47,15 @@ The cookie is `Secure` in production builds. A production build served over plai
 
 ## Application shell
 
-Protected pages live in `src/app/(app)/` and share a layout with a sidebar (from `lg`, 1024px), a header (organization name and user menu) and a navigation drawer below `lg`. Navigation items are in `src/app/(app)/_shell/nav-items.ts`; hiding an item by role is for usability only, the API still enforces permissions. Shared building blocks (page header, empty state, error state, notice, page skeleton, confirm dialog) are in `src/components/`.
+Protected pages live in `src/app/(app)/` and share a layout with a sidebar (from `lg`, 1024px), a header (organization name and user menu) and a navigation drawer below `lg`. Navigation items are in `src/app/(app)/_shell/nav-items.ts`; hiding an item by role is for usability only, the API still enforces permissions. Shared building blocks (page header, empty state, error state, notice, page skeleton, confirm dialog, not allowed, pagination) are in `src/components/`; form pieces (`FormField`, `FormError`, `SubmitButton`) are in `src/components/form/`; `SessionDeadlineProvider` (`src/components/session-deadline.tsx`) shares the session status with the expiry notice and with forms.
+
+## Forms, lists and flash notices
+
+- Forms are native `<form>`s with Server Actions and `useActionState`; there is no form library. Native HTML constraints give instant feedback, Zod runs in the action, and the API has the last word. The action echoes the submitted values back (React resets the form) and maps API errors with `apiErrorToFormState` (`src/lib/forms/`): 400 to field errors, 403/404/409 to a form-level message, 5xx to "service unavailable".
+- `SubmitButton` is disabled while submitting and once the browser clock says the session has expired. This is advisory: the API's 401 is the real guard, and on a 401 inside an action the user is sent to login and unsaved input is lost.
+- List pages keep filters, pagination and the page size in the URL. Params are parsed leniently (`parseVehicleListParams`): an invalid one is ignored and a warning is shown. Filters are a `next/form` GET form. A list has three empty states: nothing exists, nothing matches the filters, and the page is past the end.
+- Success messages after a redirect use an allowlisted `?notice=<key>` param (`src/lib/flash.ts`); an unknown key shows nothing.
+- Every id from the URL or an action argument is checked with `isUuid` before it reaches an API path.
 
 ## UI components
 
@@ -96,7 +108,9 @@ npx playwright install chromium       # once
 npm run test:e2e
 ```
 
-Test users come from the API seed (organization `acme-logistics`, password `FleetOps-dev-123!`). The e2e suite uses a fixed test `SESSION_SECRET` (`e2e/support/env.ts`) so it can forge cookies for expiry cases.
+Test users come from the API seed (organization `acme-logistics`, password `FleetOps-dev-123!`; admin `alex@`, manager `morgan@`, driver `sam@`). The e2e suite uses a fixed test `SESSION_SECRET` (`e2e/support/env.ts`) so it can forge cookies for expiry cases.
+
+Data rules for e2e tests that write data (`e2e/support/api.ts` has the API helpers): create everything with a unique name (every vehicle's make is `E2E-<suffix>`), clean it up through the API in `afterEach` (related records first, then the vehicle), sweep leftovers by that make, and never modify or delete seed data.
 
 ## API types
 

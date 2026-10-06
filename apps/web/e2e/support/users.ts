@@ -8,6 +8,11 @@ export const ADMIN = {
   name: 'Alex Fleetwood',
   role: 'ADMIN',
 };
+export const MANAGER = {
+  email: 'morgan@acme-logistics.test',
+  name: 'Morgan Manager',
+  role: 'MANAGER',
+};
 export const DRIVER = {
   email: 'sam@acme-logistics.test',
   name: 'Sam Driver',

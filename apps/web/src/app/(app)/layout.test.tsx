@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { render, screen } from '@testing-library/react';
+import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 const getCurrentUser = vi.hoisted(() => vi.fn());
@@ -12,12 +13,16 @@ vi.mock('@/lib/auth/session', () => ({
 }));
 vi.mock('next/navigation', () => ({ usePathname: () => '/' }));
 vi.mock('@/lib/auth/actions', () => ({ logout: vi.fn() }));
-vi.mock('./session-expiry-notice', () => ({
-  SessionExpiryNotice: (props: { remainingMs: number }) => {
+vi.mock('@/components/session-deadline', () => ({
+  SessionDeadlineProvider: (props: {
+    remainingMs: number;
+    children: ReactNode;
+  }) => {
     notice(props.remainingMs);
-    return null;
+    return <>{props.children}</>;
   },
 }));
+vi.mock('./session-expiry-notice', () => ({ SessionExpiryNotice: () => null }));
 
 import AppLayout from './layout';
 
