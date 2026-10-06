@@ -1,12 +1,12 @@
 import {
-  buildHref,
-  singleParam,
-  type RawSearchParams,
-} from '@/lib/search-params';
+  DEFAULT_LIMIT,
+  parseInteger,
+  parsePageAndLimit,
+  readSingleParam,
+} from '@/lib/list-params';
+import { buildHref, type RawSearchParams } from '@/lib/search-params';
 
-export const DEFAULT_LIMIT = 20;
-const MAX_LIMIT = 100;
-const MAX_PAGE = 1_000_000;
+export { DEFAULT_LIMIT };
 const MAX_TEXT_LENGTH = 50;
 const MIN_YEAR = 1900;
 
@@ -29,17 +29,6 @@ export function maxVehicleYear(): number {
   return new Date().getUTCFullYear() + 1;
 }
 
-function parseInteger(
-  raw: string | undefined,
-  pattern: RegExp,
-  min: number,
-  max: number,
-): number | undefined {
-  if (raw === undefined || !pattern.test(raw)) return undefined;
-  const value = Number(raw);
-  return value >= min && value <= max ? value : undefined;
-}
-
 function parseText(raw: string | undefined): string | undefined | null {
   if (raw === undefined) return undefined;
   const value = raw.trim();
@@ -58,26 +47,12 @@ export function parseVehicleListParams(
   const ignored: string[] = [];
   const query: VehicleListQuery = { page: 1, limit: DEFAULT_LIMIT };
 
+  const { page, limit } = parsePageAndLimit(raw, ignored);
+  query.page = page;
+  query.limit = limit;
+
   function field(name: string): string | undefined {
-    const value = raw[name];
-    if (value === undefined) return undefined;
-    const single = singleParam(value);
-    if (single === undefined) ignored.push(name);
-    return single;
-  }
-
-  const page = field('page');
-  if (page !== undefined) {
-    const value = parseInteger(page, /^\d+$/, 1, MAX_PAGE);
-    if (value === undefined) ignored.push('page');
-    else query.page = value;
-  }
-
-  const limit = field('limit');
-  if (limit !== undefined) {
-    const value = parseInteger(limit, /^\d+$/, 1, MAX_LIMIT);
-    if (value === undefined) ignored.push('limit');
-    else query.limit = value;
+    return readSingleParam(raw, name, ignored);
   }
 
   for (const name of ['make', 'model'] as const) {

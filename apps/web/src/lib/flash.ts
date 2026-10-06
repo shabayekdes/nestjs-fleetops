@@ -5,6 +5,10 @@ export const FLASH_MESSAGES = {
   'vehicle-created': 'Vehicle created.',
   'vehicle-updated': 'Vehicle updated.',
   'vehicle-deleted': 'Vehicle deleted.',
+  'user-created': 'User created.',
+  'user-updated': 'User updated.',
+  'user-deleted': 'User deleted.',
+  'password-changed': 'Password changed.',
 } as const;
 
 export type FlashKey = keyof typeof FLASH_MESSAGES;

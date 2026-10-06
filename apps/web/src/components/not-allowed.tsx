@@ -1,14 +1,20 @@
 import Link from 'next/link';
+import { Notice } from '@/components/notice';
+import { RefreshOnMount } from '@/components/refresh-on-mount';
 import { NOT_ALLOWED_MESSAGE } from '@/lib/auth/messages';
 
-/** Shown when the API answers 403. Never logs the user out. */
+/**
+ * Shown when the API answers 403 (or the role cannot use the page). Never logs
+ * the user out. It refreshes the router so a stale navigation is replaced.
+ */
 export function NotAllowed() {
   return (
-    <div role="alert" className="rounded border border-red-200 bg-red-50 p-4">
-      <p className="font-medium text-red-800">{NOT_ALLOWED_MESSAGE}</p>
-      <Link href="/" className="mt-2 inline-block text-sm underline">
+    <div className="space-y-2">
+      <Notice variant="error">{NOT_ALLOWED_MESSAGE}</Notice>
+      <Link href="/" className="inline-block text-sm underline">
         Back to home
       </Link>
+      <RefreshOnMount />
     </div>
   );
 }

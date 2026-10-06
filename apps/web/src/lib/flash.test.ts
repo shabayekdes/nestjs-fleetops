@@ -5,6 +5,10 @@ describe('flashMessage', () => {
   it('returns the message for a known key', () => {
     expect(flashMessage('vehicle-created')).toBe('Vehicle created.');
     expect(flashMessage('vehicle-deleted')).toBe('Vehicle deleted.');
+    expect(flashMessage('user-created')).toBe('User created.');
+    expect(flashMessage('user-updated')).toBe('User updated.');
+    expect(flashMessage('user-deleted')).toBe('User deleted.');
+    expect(flashMessage('password-changed')).toBe('Password changed.');
   });
 
   it.each([

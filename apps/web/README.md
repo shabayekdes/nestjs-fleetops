@@ -26,16 +26,21 @@ Start the API first (it listens on port 3000). The app refuses to start when the
 
 ## Routes
 
-| Route                 | Access    | Purpose                                                                                                         |
-| --------------------- | --------- | --------------------------------------------------------------------------------------------------------------- |
-| `/login`              | public    | Sign-in form (organization, email, password)                                                                    |
-| `/`                   | protected | Dashboard (empty state) inside the application shell; redirects to `/login` without a valid session             |
-| `/vehicles`           | protected | Vehicle list: filters (`make`, `model`, `year`), pagination (`page`, `limit`) and flash notices, all in the URL |
-| `/vehicles/new`       | protected | Add vehicle (ADMIN, MANAGER; a DRIVER sees "not allowed")                                                       |
-| `/vehicles/[id]`      | protected | Vehicle detail; Edit and Delete for ADMIN and MANAGER                                                           |
-| `/vehicles/[id]/edit` | protected | Edit vehicle (ADMIN, MANAGER); sends only the changed fields                                                    |
-| `/session-expired`    | public    | Route handler that resolves a render-time 401 (clears the cookie or returns to the page)                        |
-| `/dev/api-health`     | public    | Development page, 404 in production (see below)                                                                 |
+| Route                 | Access    | Purpose                                                                                                           |
+| --------------------- | --------- | ----------------------------------------------------------------------------------------------------------------- |
+| `/login`              | public    | Sign-in form (organization, email, password)                                                                      |
+| `/`                   | protected | Dashboard (empty state) inside the application shell; redirects to `/login` without a valid session               |
+| `/vehicles`           | protected | Vehicle list: filters (`make`, `model`, `year`), pagination (`page`, `limit`) and flash notices, all in the URL   |
+| `/vehicles/new`       | protected | Add vehicle (ADMIN, MANAGER; a DRIVER sees "not allowed")                                                         |
+| `/vehicles/[id]`      | protected | Vehicle detail; Edit and Delete for ADMIN and MANAGER                                                             |
+| `/vehicles/[id]/edit` | protected | Edit vehicle (ADMIN, MANAGER); sends only the changed fields                                                      |
+| `/users`              | protected | User list (ADMIN only): `role` filter and pagination in the URL; a non-admin sees "not allowed" without any fetch |
+| `/users/new`          | protected | Add user (ADMIN only)                                                                                             |
+| `/users/[id]`         | protected | User detail; Edit and Delete (Delete is disabled on your own record)                                              |
+| `/users/[id]/edit`    | protected | Edit user (names, email, role); the role is locked on your own record; sends only the changed fields              |
+| `/account/password`   | protected | Change your own password (every role)                                                                             |
+| `/session-expired`    | public    | Route handler that resolves a render-time 401 (clears the cookie or returns to the page)                          |
+| `/dev/api-health`     | public    | Development page, 404 in production (see below)                                                                   |
 
 Unknown paths are treated as protected: without a session they redirect to `/login?returnTo=...`.
 
@@ -56,6 +61,10 @@ Protected pages live in `src/app/(app)/` and share a layout with a sidebar (from
 - List pages keep filters, pagination and the page size in the URL. Params are parsed leniently (`parseVehicleListParams`): an invalid one is ignored and a warning is shown. Filters are a `next/form` GET form. A list has three empty states: nothing exists, nothing matches the filters, and the page is past the end.
 - Success messages after a redirect use an allowlisted `?notice=<key>` param (`src/lib/flash.ts`); an unknown key shows nothing.
 - Every id from the URL or an action argument is checked with `isUuid` before it reaches an API path.
+- Shared list parsing (`page`, `limit`) is in `src/lib/list-params.ts`; each list adds its own filters (`vehicles/_lib/list-params.ts`, `users/_lib/list-params.ts`).
+- Password fields are never echoed back and never get a `defaultValue`; the action returns empty `values` for them.
+- Selects use `NativeSelect` (`src/components/ui/native-select.tsx`, a native `<select>`), not Radix Select.
+- A 403 means the user's role may have changed, but shared layouts are not re-rendered on client navigation. So `NotAllowed` calls `router.refresh()` once on mount (`RefreshOnMount`), and `apiErrorToFormState` calls `refresh()` from `next/cache` on a 403 in a Server Action. The navigation and user menu then load fresh data.
 
 ## UI components
 
@@ -110,7 +119,7 @@ npm run test:e2e
 
 Test users come from the API seed (organization `acme-logistics`, password `FleetOps-dev-123!`; admin `alex@`, manager `morgan@`, driver `sam@`). The e2e suite uses a fixed test `SESSION_SECRET` (`e2e/support/env.ts`) so it can forge cookies for expiry cases.
 
-Data rules for e2e tests that write data (`e2e/support/api.ts` has the API helpers): create everything with a unique name (every vehicle's make is `E2E-<suffix>`), clean it up through the API in `afterEach` (related records first, then the vehicle), sweep leftovers by that make, and never modify or delete seed data.
+Data rules for e2e tests that write data (`e2e/support/api.ts` has the API helpers): create everything with a unique name (every vehicle's make is `E2E-<suffix>`), clean it up through the API in `afterEach` (related records first, then the vehicle), sweep leftovers by that make, and never modify or delete seed data. Users an e2e test creates have the email `e2e-<suffix>-<n>@acme-logistics.test` and the names `E2E-<suffix>`; they are created and deleted through the API with the seed admin's token, and swept by that email prefix. Tests that act on their own record (role, delete, name) or change a password use a dedicated e2e user with its own password (`E2E_USER_PASSWORD`), never a seed user.
 
 ## API types
 

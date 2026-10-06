@@ -8,6 +8,9 @@ const getCurrentUser = vi.hoisted(() => vi.fn());
 const formProps = vi.hoisted(() => vi.fn());
 vi.mock('../../_lib/vehicles-api', () => ({ getVehicle }));
 vi.mock('@/lib/auth/current-user', () => ({ getCurrentUser }));
+vi.mock('@/components/refresh-on-mount', () => ({
+  RefreshOnMount: () => null,
+}));
 vi.mock('../../actions', () => ({ updateVehicle: vi.fn() }));
 vi.mock('../../_components/vehicle-form', () => ({
   VehicleForm: (props: unknown) => {

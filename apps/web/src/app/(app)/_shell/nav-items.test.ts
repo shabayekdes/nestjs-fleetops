@@ -34,8 +34,25 @@ describe('visibleNavItems', () => {
 });
 
 describe('NAV_ITEMS', () => {
-  it('contains Dashboard and Vehicles', () => {
-    expect(NAV_ITEMS.map((i) => i.label)).toEqual(['Dashboard', 'Vehicles']);
+  it('contains Dashboard, Vehicles and Users', () => {
+    expect(NAV_ITEMS.map((i) => i.label)).toEqual([
+      'Dashboard',
+      'Vehicles',
+      'Users',
+    ]);
+  });
+
+  it('shows Users to ADMIN only', () => {
+    const labels = (role: 'ADMIN' | 'MANAGER' | 'DRIVER') =>
+      visibleNavItems(NAV_ITEMS, role).map((i) => i.label);
+    expect(labels('ADMIN')).toContain('Users');
+    expect(labels('MANAGER')).not.toContain('Users');
+    expect(labels('DRIVER')).not.toContain('Users');
+  });
+
+  it('marks Users active on a user detail path', () => {
+    expect(isNavItemActive('/users/abc', '/users')).toBe(true);
+    expect(isNavItemActive('/users', '/users')).toBe(true);
   });
 
   it('shows Vehicles to every role', () => {

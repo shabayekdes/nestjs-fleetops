@@ -1,7 +1,15 @@
 // @vitest-environment jsdom
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const refresh = vi.hoisted(() => vi.fn());
+vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh }) }));
+
 import { NotAllowed } from './not-allowed';
+
+beforeEach(() => {
+  refresh.mockReset();
+});
 
 describe('NotAllowed', () => {
   it('shows the message in an alert with a link home', () => {
@@ -13,5 +21,12 @@ describe('NotAllowed', () => {
       'href',
       '/',
     );
+  });
+
+  it('refreshes the router once and not again on rerender', () => {
+    const { rerender } = render(<NotAllowed />);
+    expect(refresh).toHaveBeenCalledTimes(1);
+    rerender(<NotAllowed />);
+    expect(refresh).toHaveBeenCalledTimes(1);
   });
 });

@@ -40,11 +40,19 @@ test('the admin user menu shows details and returns focus on Escape', async ({
   await expect(menu).toContainText(ADMIN.email);
   await expect(menu).toContainText('Admin');
   await expect(menu).toContainText(ORGANIZATION_NAME);
-  await expect(page.getByText(/change password/i)).toHaveCount(0);
+  await expect(
+    page.getByRole('menuitem', { name: 'Change password' }),
+  ).toBeVisible();
 
   await page.keyboard.press('Escape');
   await expect(menu).toBeHidden();
   await expect(trigger).toBeFocused();
+});
+
+test('an admin sees the Users link', async ({ page }) => {
+  await login(page, ADMIN);
+  const nav = page.getByRole('navigation', { name: 'Main' });
+  await expect(nav.getByRole('link', { name: 'Users' })).toBeVisible();
 });
 
 test('a driver sees Dashboard and no Users link', async ({ page }) => {

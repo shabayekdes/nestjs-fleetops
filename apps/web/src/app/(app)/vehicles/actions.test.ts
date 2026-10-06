@@ -3,8 +3,9 @@ import { ApiConnectionError, ApiError } from '@/lib/api/errors';
 
 const sessionApiRequest = vi.hoisted(() => vi.fn());
 const revalidatePath = vi.hoisted(() => vi.fn());
+const refresh = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/auth/session-api', () => ({ sessionApiRequest }));
-vi.mock('next/cache', () => ({ revalidatePath }));
+vi.mock('next/cache', () => ({ revalidatePath, refresh }));
 vi.mock('next/navigation', () => ({
   redirect: (url: string) => {
     throw new Error(`REDIRECT:${url}`);

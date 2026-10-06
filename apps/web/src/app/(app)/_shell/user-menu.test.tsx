@@ -37,7 +37,14 @@ describe('UserMenu', () => {
     expect(menu).toHaveTextContent('alex@acme.test');
     expect(menu).toHaveTextContent('Admin');
     expect(menu).toHaveTextContent('Acme Logistics');
-    expect(screen.queryByText(/change password/i)).toBeNull();
+  });
+
+  it('links to the change password page', () => {
+    render(<UserMenu user={user} />);
+    open();
+    expect(
+      screen.getByRole('menuitem', { name: 'Change password' }),
+    ).toHaveAttribute('href', '/account/password');
   });
 
   it('signs out once when Sign out is selected', async () => {

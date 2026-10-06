@@ -63,6 +63,8 @@ Authenticated calls:
 - Check every id from a URL or an action argument with `isUuid` (`@/lib/ids`) before calling the API, and `encodeURIComponent` it in the path.
 - Server Actions map API failures with `apiErrorToFormState` (`@/lib/forms/api-error-to-form`): 400 to field errors, 403 to `NOT_ALLOWED_MESSAGE`, 404 to a message you pass, 409 and other 4xx to the API message, 5xx and connection errors to `SERVICE_UNAVAILABLE_MESSAGE`. It rethrows anything else, so redirect errors pass through.
 - 403: pages catching `ApiError` with status 403 render `<NotAllowed />` (`@/components/not-allowed`); Server Actions return `{ formError: NOT_ALLOWED_MESSAGE }`. Never delete the session on 403. Do not use `forbidden()`/`unauthorized()` (experimental).
+- A 403 can mean the user's role changed. Shared layouts are not re-rendered on client navigation, so the navigation would stay stale: `NotAllowed` renders `RefreshOnMount` (one `router.refresh()`), and `apiErrorToFormState` calls `refresh()` from `next/cache` on a 403 (so use it only in Server Actions).
+- A page that only one role can use (the Users pages) checks the role with `getCurrentUser()` and renders `NotAllowed` before any other fetch.
 
 ## Authentication
 
@@ -95,12 +97,14 @@ Tailwind utility classes plus shadcn/ui on Radix (`src/components/ui/`). Shared 
 - Native constraints (`required`, `maxLength`, `type=number`) are for usability. Zod runs inside the Server Action, not in the client bundle; the API validates again and has the last word.
 - The action echoes the submitted values (`FormState.values`) and the form uses them as `defaultValue`, because React resets the form after an action.
 - Use `FormField` (label, hint, errors, `aria-invalid`, `aria-describedby`), `FormError` and `SubmitButton`. `SubmitButton` is disabled while pending and once the session has expired (`useSessionStatus`).
+- Never echo password fields: keep them out of `FormState.values`, give password inputs no `defaultValue`, and set `autoComplete` (`new-password` or `current-password`).
+- Use `NativeSelect` (`@/components/ui/native-select`) for selects, not Radix Select.
 - Edit forms send only the changed fields: the page binds the original values into the action, and `changedVehicleFields`-style diffing compares normalized values. No change means no API call.
 - Call `revalidatePath` and `redirect` outside `try/catch`. Success feedback is a redirect with an allowlisted `?notice=<key>` (`@/lib/flash`).
 
 ### List pages
 
-- Filters, `page` and `limit` live in the URL. Parse search params leniently (invalid values are ignored, with a warning), never redirect to repair them, and build links with `buildHref` (`@/lib/search-params`).
+- Filters, `page` and `limit` live in the URL. Parse search params leniently with the shared `page`/`limit` helpers in `@/lib/list-params` (invalid values are ignored, with a warning), never redirect to repair them, and build links with `buildHref` (`@/lib/search-params`).
 - Filters are a `next/form` GET form. Pagination is the shared `Pagination` component.
 - Distinguish three empty states: nothing exists yet, nothing matches the filters, and the requested page is past the end.
 

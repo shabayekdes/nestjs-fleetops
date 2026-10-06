@@ -7,6 +7,9 @@ const getVehicle = vi.hoisted(() => vi.fn());
 const getCurrentUser = vi.hoisted(() => vi.fn());
 vi.mock('../_lib/vehicles-api', () => ({ getVehicle }));
 vi.mock('@/lib/auth/current-user', () => ({ getCurrentUser }));
+vi.mock('@/components/refresh-on-mount', () => ({
+  RefreshOnMount: () => null,
+}));
 vi.mock('./delete-vehicle-button', () => ({
   DeleteVehicleButton: () => <button>Delete</button>,
 }));

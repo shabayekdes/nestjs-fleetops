@@ -13,17 +13,17 @@ Related documents:
 
 To avoid confusion with the backend roadmap, frontend phases are always called **Frontend Phase N** (FE1–FE9). "Phase N" on its own always means a backend phase.
 
-| Frontend phase | Name                   | Status  | Commit(s) |
-| -------------- | ---------------------- | ------- | --------- |
-| FE1            | Application foundation | Done    | `27b8860` |
-| FE2            | Authentication         | Done    | `be2e028` |
-| FE3            | Application shell      | Done    | `fcd16bb` |
-| FE4            | Vehicles               | Done    | `fa31a81` |
-| FE5            | Users + roles          | Planned | —         |
-| FE6            | Drivers + assignments  | Planned | —         |
-| FE7            | Maintenance + fuel     | Planned | —         |
-| FE8            | Dashboard + reporting  | Planned | —         |
-| FE9            | Production readiness   | Planned | —         |
+| Frontend phase | Name                   | Status  | Commit(s)      |
+| -------------- | ---------------------- | ------- | -------------- |
+| FE1            | Application foundation | Done    | `27b8860`      |
+| FE2            | Authentication         | Done    | `be2e028`      |
+| FE3            | Application shell      | Done    | `fcd16bb`      |
+| FE4            | Vehicles               | Done    | `fa31a81`      |
+| FE5            | Users + roles          | Done    | commit pending |
+| FE6            | Drivers + assignments  | Planned | —              |
+| FE7            | Maintenance + fuel     | Planned | —              |
+| FE8            | Dashboard + reporting  | Planned | —              |
+| FE9            | Production readiness   | Planned | —              |
 
 ---
 
@@ -223,11 +223,11 @@ For each choice: why it is needed, what it solves, why it fits, and when it is n
 **Out of scope / deferred**
 
 - Refresh tokens, "remember me", server-side logout/revocation (not in the backend). A copied cookie stays usable until the token expires (at most 15 minutes).
-- Sign-up, password reset, email verification (not in the backend); password change (FE5).
+- Sign-up, password reset, email verification (not in the backend). ~~Password change~~ Done in FE5.
 - ~~Disabling individual form submits when the session has expired~~ Done in FE4 (`SubmitButton` and `SessionDeadlineProvider`).
 - Application shell, navigation and user menu (done in FE3).
 - `__Host-` cookie prefix, CSP and the full security review (FE9).
-- **Login rate limiting behind the web server (decide before production, FE9):** the API's per-IP login limit (30 per 60 s) is shared by all web users. Fix with deployment configuration (private API network + `TRUST_PROXY` + forwarded client IP) or a backend limit change, planned separately.
+- **Login rate limiting behind the web server (decide before production, FE9):** the API's per-IP login limit (30 per 60 s) is shared by all web users. `PATCH /auth/me/password` also has a per-IP throttle (30 per 60 s, plus 5 per 60 s per user in production), shared the same way. Fix with deployment configuration (private API network + `TRUST_PROXY` + forwarded client IP) or a backend limit change, planned separately.
 - The `web-e2e` CI job was verified locally only; confirm its first GitHub run.
 - Firefox/WebKit e2e and broader e2e coverage (FE9).
 
@@ -267,7 +267,7 @@ For each choice: why it is needed, what it solves, why it fits, and when it is n
 **Decisions**
 
 - shadcn/ui on Radix; copied components are owned code.
-- The "Change password" item is left out of the user menu until FE5 (the page does not exist yet).
+- The "Change password" item was left out of the user menu until FE5. Done in FE5.
 - Inline `Notice` instead of a toast library; revisit when a flow needs transient feedback.
 - "Collapsible" means a Sheet drawer below `lg` (1024px); no icon-collapse on desktop.
 - The nav shows only Dashboard for now. Planned items: FE4 Vehicles (all roles); FE5 Users (ADMIN only); FE6 Drivers and Assignments (ADMIN, MANAGER); FE7 nothing top-level (maintenance and fuel live under a vehicle). Role filtering is usability only.
@@ -276,7 +276,7 @@ For each choice: why it is needed, what it solves, why it fits, and when it is n
 
 **Deferred**
 
-- Toast library, password change link (FE5), nav items for later phases, dashboard content (FE8), dark mode, desktop icon-collapse sidebar.
+- Toast library, ~~password change link~~ (done in FE5), nav items for later phases, dashboard content (FE8), dark mode, desktop icon-collapse sidebar.
 
 ---
 
@@ -337,7 +337,7 @@ For each choice: why it is needed, what it solves, why it fits, and when it is n
 
 ## Frontend Phase 5 — Users + roles
 
-**Status:** Planned
+**Status:** Done (commit pending)
 
 **Goal:** admins manage their organization's users, and every user can change their own password. Built on backend Phase 5.
 
@@ -352,6 +352,33 @@ For each choice: why it is needed, what it solves, why it fits, and when it is n
 
 **Out of scope**
 
+- Admin password reset, invites by email, custom permissions (not in the backend).
+
+**Built**
+
+- Routes under `src/app/(app)/users/`: list, detail (`[id]`), `new`, `[id]/edit` and a segment `not-found.tsx`; `src/app/(app)/account/password/` (page, `changePassword` action, form, schema). Route-private `_components/` (form, filters, table), `_lib/` (list params, Zod schema and edit diff, API wrappers, `canManageUsers`) and `actions.ts` (`createUser`, `updateUser`, `deleteUser`).
+- Shared: `lib/list-params.ts` (page and limit parsing, moved out of vehicles with no behaviour change), `ROLES` and `isRole`, user API types, flash keys, `RefreshOnMount`, `NativeSelect` (shadcn `native-select`), `NotAllowed` rebuilt on `Notice`. Users nav item (ADMIN) and a "Change password" item in the user menu.
+- Tests: unit and component tests for all of the above; Playwright `e2e/users.spec.ts` (admin CRUD, duplicate email, API 400, own record, non-admin, demoted admin on the render path and the action path, 404s, own-name update in the shell, URL state), `e2e/password.spec.ts`, and updated `e2e/shell.spec.ts`. API helpers for users in `e2e/support/api.ts`.
+- No new npm dependency.
+
+**Decisions**
+
+- D1: the role is changed in the edit form (one native select, same edit diff).
+- D2: on your own record the role select and the Delete button are disabled, each with a hint. The API's 409 is still handled: the dialog's error display is unit tested, and the self-delete rule itself is tested at the API level in e2e (a `DELETE` with the user's own token returns 409), because React ignores clicks on a disabled button. `isSelf` is worked out on the server. A missing `role` in the form means unchanged.
+- D3: after a 403, `NotAllowed` refreshes the router once and `apiErrorToFormState` calls `refresh()` (Server Actions). Verified in e2e (demoted admin, both paths); the `forbidden` flag fallback was not needed.
+- D4: `NativeSelect`, not Radix Select.
+- D5: passwords are never echoed or given a default value.
+- D6: the password 400s without `details` (wrong current password, must differ) show at form level with the API text.
+- D7: Zod checks only trim, not empty and length for the email; the browser (`type=email`) and the API check the format.
+- The only browser-side password check is that the confirmation matches; "must differ from the current password" is the API's rule.
+- Creating a user: no role is preselected ("Choose a role", required).
+- A detail page `/users/[id]` exists, like vehicles; Delete lives there. After a password change the user is redirected to `/account/password` with "Password changed.".
+- Users pages check the role before any fetch. Mutations revalidate the root layout so the header shows a new name.
+
+**Deferred**
+
+- Changing a password does not revoke other sessions; they stay valid for up to 15 minutes (backend limitation).
+- Raw API wording is shown to users. The per-IP password throttle is shared by all web users in production (FE9).
 - Admin password reset, invites by email, custom permissions (not in the backend).
 
 ---

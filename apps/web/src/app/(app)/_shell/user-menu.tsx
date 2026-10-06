@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import {
@@ -51,6 +52,9 @@ export function UserMenu({ user }: { user: ShellUser }) {
           </p>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
+        <DropdownMenuItem asChild>
+          <Link href="/account/password">Change password</Link>
+        </DropdownMenuItem>
         <DropdownMenuItem
           disabled={pending}
           onSelect={(event) => {

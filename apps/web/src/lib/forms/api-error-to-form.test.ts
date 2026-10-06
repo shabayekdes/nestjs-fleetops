@@ -1,5 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiConnectionError, ApiError } from '@/lib/api/errors';
+const refresh = vi.hoisted(() => vi.fn());
+vi.mock('next/cache', () => ({ refresh }));
+
 import { apiErrorToFormState } from './api-error-to-form';
 
 const options = { fields: ['make', 'vin'] as const, notFoundMessage: 'Gone.' };
@@ -19,6 +22,10 @@ function apiError(
     body: undefined,
   });
 }
+
+beforeEach(() => {
+  refresh.mockReset();
+});
 
 describe('apiErrorToFormState', () => {
   it('maps a 400 to field errors for known fields only', () => {
@@ -42,10 +49,19 @@ describe('apiErrorToFormState', () => {
     ).toEqual({ formError: 'Validation failed' });
   });
 
-  it('maps 403 to the not-allowed message', () => {
+  it('maps 403 to the not-allowed message and refreshes the router', () => {
     expect(apiErrorToFormState(apiError(403), options)).toEqual({
       formError: 'You are not allowed to do this.',
     });
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not refresh for other errors', () => {
+    apiErrorToFormState(apiError(404), options);
+    apiErrorToFormState(apiError(409), options);
+    apiErrorToFormState(apiError(500), options);
+    apiErrorToFormState(new ApiConnectionError('timeout'), options);
+    expect(refresh).not.toHaveBeenCalled();
   });
 
   it('maps 404 to the supplied message', () => {

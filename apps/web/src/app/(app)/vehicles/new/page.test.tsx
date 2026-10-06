@@ -4,6 +4,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const getCurrentUser = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/auth/current-user', () => ({ getCurrentUser }));
+vi.mock('@/components/refresh-on-mount', () => ({
+  RefreshOnMount: () => null,
+}));
 vi.mock('../actions', () => ({ createVehicle: vi.fn() }));
 vi.mock('../_components/vehicle-form', () => ({
   VehicleForm: () => <form aria-label="vehicle form" />,

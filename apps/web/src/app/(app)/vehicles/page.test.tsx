@@ -8,6 +8,9 @@ const listVehicles = vi.hoisted(() => vi.fn());
 const getCurrentUser = vi.hoisted(() => vi.fn());
 vi.mock('./_lib/vehicles-api', () => ({ listVehicles }));
 vi.mock('@/lib/auth/current-user', () => ({ getCurrentUser }));
+vi.mock('@/components/refresh-on-mount', () => ({
+  RefreshOnMount: () => null,
+}));
 vi.mock('next/form', () => ({
   default: ({
     action,

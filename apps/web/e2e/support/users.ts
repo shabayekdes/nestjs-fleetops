@@ -18,3 +18,6 @@ export const DRIVER = {
   name: 'Sam Driver',
   role: 'DRIVER',
 };
+
+// Password of every user an e2e test creates (at least 16 characters).
+export const E2E_USER_PASSWORD = 'E2E-user-pass-123!';
