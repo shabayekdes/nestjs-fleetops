@@ -17,7 +17,7 @@ To avoid confusion with the backend roadmap, frontend phases are always called *
 | -------------- | ---------------------- | ------- | --------- |
 | FE1            | Application foundation | Done    | `27b8860` |
 | FE2            | Authentication         | Done    | `be2e028` |
-| FE3            | Application shell      | Done    | —         |
+| FE3            | Application shell      | Done    | `fcd16bb` |
 | FE4            | Vehicles               | Planned | —         |
 | FE5            | Users + roles          | Planned | —         |
 | FE6            | Drivers + assignments  | Planned | —         |
@@ -235,7 +235,7 @@ For each choice: why it is needed, what it solves, why it fits, and when it is n
 
 ## Frontend Phase 3 — Application shell
 
-**Status:** Done (commit: —)
+**Status:** Done (`fcd16bb`)
 
 **Goal:** an authenticated dashboard layout that every feature page lives in.
 
