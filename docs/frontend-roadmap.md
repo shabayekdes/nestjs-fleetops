@@ -18,7 +18,7 @@ To avoid confusion with the backend roadmap, frontend phases are always called *
 | FE1            | Application foundation | Done    | `27b8860` |
 | FE2            | Authentication         | Done    | `be2e028` |
 | FE3            | Application shell      | Done    | `fcd16bb` |
-| FE4            | Vehicles               | Done    | —         |
+| FE4            | Vehicles               | Done    | `fa31a81` |
 | FE5            | Users + roles          | Planned | —         |
 | FE6            | Drivers + assignments  | Planned | —         |
 | FE7            | Maintenance + fuel     | Planned | —         |
@@ -282,7 +282,7 @@ For each choice: why it is needed, what it solves, why it fits, and when it is n
 
 ## Frontend Phase 4 — Vehicles
 
-**Status:** Done (commit —)
+**Status:** Done (`fa31a81`)
 
 **Goal:** the first full CRUD screens, built on the backend Phase 4 vehicles API. This phase sets the pattern for every later resource.
 
