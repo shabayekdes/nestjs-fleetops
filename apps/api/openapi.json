@@ -2137,6 +2137,28 @@
           "expiresIn"
         ]
       },
+      "MeOrganizationDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Organization id (UUID)."
+          },
+          "name": {
+            "type": "string",
+            "description": "Organization display name."
+          },
+          "slug": {
+            "type": "string",
+            "description": "Organization slug, used at login."
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "slug"
+        ]
+      },
       "MeResponseDto": {
         "type": "object",
         "properties": {
@@ -2144,7 +2166,16 @@
             "type": "string"
           },
           "organizationId": {
-            "type": "string"
+            "type": "string",
+            "description": "Equals `organization.id`; kept for compatibility."
+          },
+          "organization": {
+            "description": "The caller's organization.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MeOrganizationDto"
+              }
+            ]
           },
           "firstName": {
             "type": "string"
@@ -2175,6 +2206,7 @@
         "required": [
           "id",
           "organizationId",
+          "organization",
           "firstName",
           "lastName",
           "email",

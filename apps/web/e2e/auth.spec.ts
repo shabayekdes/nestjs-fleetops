@@ -5,7 +5,7 @@ import {
   setRawSessionCookie,
   signIn,
 } from './support/session';
-import { ADMIN, DRIVER } from './support/users';
+import { ADMIN, DRIVER, ORGANIZATION_NAME } from './support/users';
 
 test('unauthenticated visit redirects to login, then returns after sign-in', async ({
   page,
@@ -16,9 +16,9 @@ test('unauthenticated visit redirects to login, then returns after sign-in', asy
   await signIn(page, ADMIN);
   await expect(page).toHaveURL('/?view=e2e');
   await expect(page.getByRole('banner')).toContainText(ADMIN.name);
-  await expect(page.getByRole('banner')).toContainText(ADMIN.role);
+  await expect(page.getByRole('banner')).toContainText(ORGANIZATION_NAME);
   await expect(
-    page.getByText(`Signed in as ${ADMIN.name} (${ADMIN.role})`),
+    page.getByRole('heading', { level: 1, name: 'Dashboard' }),
   ).toBeVisible();
 });
 
@@ -59,7 +59,8 @@ test('invalid credentials keep the form values and set no cookie', async ({
 test('a driver signs in and sees the DRIVER role', async ({ page }) => {
   await page.goto('/login');
   await signIn(page, DRIVER);
-  await expect(page.getByRole('banner')).toContainText(DRIVER.role);
+  await page.getByRole('button', { name: /Account menu/ }).click();
+  await expect(page.getByRole('menu')).toContainText('Driver');
 });
 
 test('sign out clears the session', async ({ page, context }) => {
@@ -67,7 +68,8 @@ test('sign out clears the session', async ({ page, context }) => {
   await signIn(page, ADMIN);
   await expect(page).toHaveURL('/');
 
-  await page.getByRole('button', { name: 'Sign out' }).click();
+  await page.getByRole('button', { name: /Account menu/ }).click();
+  await page.getByRole('menuitem', { name: 'Sign out' }).click();
   await expect(page).toHaveURL(/\/login\?reason=signed-out$/);
   await expect(page.getByRole('status')).toHaveText(
     'You have been signed out.',

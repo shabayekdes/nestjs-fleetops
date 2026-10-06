@@ -1,13 +1,22 @@
+import type { Metadata } from 'next';
+import { EmptyState } from '@/components/empty-state';
+import { PageHeader } from '@/components/page-header';
 import { getCurrentUser } from '@/lib/auth/current-user';
 
-export default async function HomePage() {
+export const metadata: Metadata = { title: 'Dashboard' };
+
+export default async function DashboardPage() {
   const user = await getCurrentUser();
   return (
-    <main className="mx-auto max-w-3xl p-8">
-      <h1 className="text-3xl font-semibold">FleetOps</h1>
-      <p className="mt-2 text-gray-600">
-        Signed in as {user.firstName} {user.lastName} ({user.role})
-      </p>
-    </main>
+    <>
+      <PageHeader
+        title="Dashboard"
+        description={`Welcome, ${user.firstName}.`}
+      />
+      <EmptyState
+        title="Your fleet overview will appear here"
+        description="Fleet statistics are added in a later release."
+      />
+    </>
   );
 }

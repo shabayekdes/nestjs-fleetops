@@ -283,10 +283,19 @@ describe('Auth (e2e)', () => {
           'firstName',
           'id',
           'lastName',
+          'organization',
           'organizationId',
           'role',
           'updatedAt',
         ].sort(),
+      );
+      expect(body.organization).toEqual({
+        id: orgAId,
+        name: `Auth A ${suffix}`,
+        slug: slugA,
+      });
+      expect(body.organizationId).toBe(
+        (body.organization as { id: string }).id,
       );
       expect(body).not.toHaveProperty('passwordHash');
       expect(body.id).toBe(userAId);
@@ -319,6 +328,11 @@ describe('Auth (e2e)', () => {
       const body = (await me(`Bearer ${token}`).expect(200)).body as Body;
       expect(body.id).toBe(userBId);
       expect(body.organizationId).toBe(orgBId);
+      expect(body.organization).toEqual({
+        id: orgBId,
+        name: `Auth B ${suffix}`,
+        slug: slugB,
+      });
     });
 
     it('accepts a lowercase scheme', async () => {

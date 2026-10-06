@@ -11,7 +11,14 @@ import { getCurrentUser } from './current-user';
 
 describe('getCurrentUser', () => {
   it('returns the /auth/me body', async () => {
-    const me = { id: '1', firstName: 'A', lastName: 'B', role: 'ADMIN' };
+    const me = {
+      id: '1',
+      organizationId: 'o1',
+      organization: { id: 'o1', name: 'Acme', slug: 'acme' },
+      firstName: 'A',
+      lastName: 'B',
+      role: 'ADMIN',
+    };
     request.mockResolvedValue(me);
     await expect(getCurrentUser()).resolves.toBe(me);
     expect(request).toHaveBeenCalledWith('/auth/me');

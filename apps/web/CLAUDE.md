@@ -10,7 +10,7 @@ Conventions for `apps/web/` (Next.js). The root `CLAUDE.md` covers the organizat
 
 ## 2. Stack and pinned versions
 
-Next.js 16.3.8 (App Router), React 19.2.8, TypeScript 5.9.3 (strict), Tailwind CSS 4.3.3, Zod 4.6.5, Vitest 5.0.3 + React Testing Library, Playwright 1.63.0 (e2e), ESLint 9.39.5 + Prettier 3.9.9, openapi-typescript 7.13.0. Node 24 (root `.nvmrc`). All versions are exact (`.npmrc` has `save-exact=true`).
+Next.js 16.3.8 (App Router), React 19.2.8, TypeScript 5.9.3 (strict), Tailwind CSS 4.3.3, Zod 4.6.5, Vitest 5.0.3 + React Testing Library, Playwright 1.63.0 (e2e), ESLint 9.39.5 + Prettier 3.9.9, openapi-typescript 7.13.0, radix-ui 1.7.0, class-variance-authority 0.7.1, cn 0.4.0, lucide-react 1.52.0, tw-animate-css 1.4.0 (shadcn/ui support). Node 24 (root `.nvmrc`). All versions are exact (`.npmrc` has `save-exact=true`).
 
 Deliberate holds:
 
@@ -28,7 +28,8 @@ Next.js 16 has APIs newer than most training data. Read `node_modules/next/dist/
 - Route groups: `(public)` (no session needed, e.g. `login`) and `(app)` (protected, its layout loads the current user). `session-expired` is a public Route Handler; `dev/` is public.
 - `src/proxy.ts` is the Next.js 16 proxy (formerly middleware). `e2e/` holds Playwright tests.
 - Files are kebab-case, components PascalCase. Tests sit next to the code (`*.test.ts(x)`).
-- Colocate components used by one route inside that route folder.
+- Colocate components used by one route inside that route folder. The application shell is in `src/app/(app)/_shell/` (nav items, sidebar, mobile drawer, header, user menu).
+- `src/components/ui/` is copied shadcn/ui code that we own (add with `npx shadcn@4.21.3 add <name>`; never add the CLI as a dependency). Edit it only minimally, keep it lint-clean, and do not unit-test it directly.
 - Import with the `@/` alias for `src/`.
 - Relative imports have no `.js` extension (bundler resolution). This is deliberately the opposite of the API rule.
 - No barrel files that mix server-only and client code.
@@ -84,7 +85,7 @@ API change, then `npm run openapi:export` (in `apps/api`), then `npm run api:typ
 
 ## 8. Styling
 
-Tailwind utility classes only. No UI kit yet; the decision moves to FE3 (the first dialog or menu).
+Tailwind utility classes plus shadcn/ui on Radix (`src/components/ui/`). Shared building blocks in `src/components/`: `PageHeader`, `EmptyState`, `ErrorState`, `Notice` (inline, no toast library), `PageSkeleton`, `ConfirmDialog`, `NotAllowed`. Prefer theme tokens (`bg-background`, `text-muted-foreground`, `border`) over fixed colors. There is no dark mode: `globals.css` keeps the `dark` custom variant on `.dark` only, so `dark:` classes never apply. Only `ShellUser` (name, email, role, organization name) crosses into shell Client Components.
 
 ## 9. Accessibility
 
@@ -93,7 +94,7 @@ Labels on every input, semantic landmarks and headings, keyboard-usable controls
 ## 10. Testing
 
 - Vitest + React Testing Library. No real network: mock with `vi.spyOn(globalThis, 'fetch')`; set env with `vi.stubEnv`.
-- Component tests start with `// @vitest-environment jsdom`. `server-only` is mocked in `vitest.setup.ts`.
+- Component tests start with `// @vitest-environment jsdom`. `server-only` is mocked in `vitest.setup.ts`, which also stubs `ResizeObserver`, `scrollIntoView` and pointer-capture methods for jsdom (Radix needs them). With Radix, open menus with `fireEvent.keyDown(trigger, { key: 'Enter' })` and sheets or dialogs with `fireEvent.click`; `userEvent` pointer events are unreliable in jsdom.
 - Playwright e2e lives in `e2e/` (`npm run test:e2e`, Chromium, one worker). It starts the API (port 3100, `NODE_ENV=test`) and the web app (port 3101) itself and needs a migrated, seeded test database; see the README. `e2e/support/session.ts` imports only `lib/auth/session-crypto.ts` (which must stay free of `server-only`) to forge cookies. Vitest only includes `src/**`.
 
 ## 11. Definition of Done

@@ -20,6 +20,7 @@ import type { MeResponseDto } from './dto/me-response.dto.js';
 const PROFILE_SELECT = {
   id: true,
   organizationId: true,
+  organization: { select: { id: true, name: true, slug: true } },
   firstName: true,
   lastName: true,
   email: true,

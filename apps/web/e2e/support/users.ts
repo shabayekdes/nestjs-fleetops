@@ -1,5 +1,6 @@
 // Values come from the API dev seed (apps/api/prisma/seed.ts).
 export const ORGANIZATION_SLUG = 'acme-logistics';
+export const ORGANIZATION_NAME = 'Acme Logistics';
 export const PASSWORD = 'FleetOps-dev-123!';
 
 export const ADMIN = {

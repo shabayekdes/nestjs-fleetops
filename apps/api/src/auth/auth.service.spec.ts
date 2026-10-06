@@ -162,6 +162,7 @@ describe('AuthService', () => {
     const profile = {
       id: 'user-1',
       organizationId: 'org-1',
+      organization: { id: 'org-1', name: 'Acme', slug: 'acme' },
       firstName: 'Alex',
       lastName: 'Doe',
       email: 'alex@acme.test',
@@ -186,6 +187,9 @@ describe('AuthService', () => {
       };
       expect(args.where).toEqual({ id: 'user-1', organizationId: 'org-1' });
       expect(args.select).not.toHaveProperty('passwordHash');
+      expect(args.select.organization).toEqual({
+        select: { id: true, name: true, slug: true },
+      });
       expect(Object.keys(args.select).sort()).toEqual(
         [
           'createdAt',
@@ -193,6 +197,7 @@ describe('AuthService', () => {
           'firstName',
           'id',
           'lastName',
+          'organization',
           'organizationId',
           'role',
           'updatedAt',

@@ -427,9 +427,20 @@ export interface components {
             tokenType: "Bearer";
             expiresIn: number;
         };
+        MeOrganizationDto: {
+            /** @description Organization id (UUID). */
+            id: string;
+            /** @description Organization display name. */
+            name: string;
+            /** @description Organization slug, used at login. */
+            slug: string;
+        };
         MeResponseDto: {
             id: string;
+            /** @description Equals `organization.id`; kept for compatibility. */
             organizationId: string;
+            /** @description The caller's organization. */
+            organization: components["schemas"]["MeOrganizationDto"];
             firstName: string;
             lastName: string;
             email: string;

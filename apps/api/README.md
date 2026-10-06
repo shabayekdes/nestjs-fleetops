@@ -210,7 +210,7 @@ All routes are served under the `/api` prefix with URI versioning (default versi
 | GET    | `/api/v1/health/live`                                 | Liveness: always 200, touches no dependency                                   |
 | GET    | `/api/v1/health/ready`                                | Readiness: database up and migrations applied (200 / 503)                     |
 | POST   | `/api/v1/auth/login`                                  | Public. Exchange credentials for an access token                              |
-| GET    | `/api/v1/auth/me`                                     | Bearer token. Current user profile (with role)                                |
+| GET    | `/api/v1/auth/me`                                     | Bearer token. Current user profile (with role and organization)               |
 | PATCH  | `/api/v1/auth/me/password`                            | Bearer token, any role. Change own password (204)                             |
 | GET    | `/api/v1/users`                                       | Bearer token, ADMIN. List users (paginated, role filter)                      |
 | POST   | `/api/v1/users`                                       | Bearer token, ADMIN. Create a user                                            |
@@ -280,7 +280,10 @@ curl -X POST http://localhost:3000/api/v1/auth/login \
 # {"accessToken":"<token>","tokenType":"Bearer","expiresIn":900}
 
 curl http://localhost:3000/api/v1/auth/me -H 'Authorization: Bearer <token>'
+# {"id":"<uuid>","organizationId":"<uuid>","organization":{"id":"<uuid>","name":"Acme Logistics","slug":"acme-logistics"},"firstName":"Alex","lastName":"Doe","email":"alex@acme-logistics.test","role":"ADMIN","createdAt":"...","updatedAt":"..."}
 ```
+
+`/auth/me` returns the caller's `organization` (`id`, `name`, `slug`); `organizationId` equals `organization.id` and is kept for compatibility.
 
 Invalid credentials return `401` with `{"message":"Invalid credentials","error":"Unauthorized","statusCode":401}`. A missing, malformed, expired or invalid token returns `401`.
 

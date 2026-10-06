@@ -7,3 +7,4 @@ export type LoginRequest = Schemas['LoginDto'];
 export type LoginResponse = Schemas['LoginResponseDto'];
 export type CurrentUser = Schemas['MeResponseDto'];
 export type Role = CurrentUser['role'];
+export type CurrentOrganization = Schemas['MeOrganizationDto'];

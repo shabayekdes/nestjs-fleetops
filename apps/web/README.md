@@ -26,12 +26,12 @@ Start the API first (it listens on port 3000). The app refuses to start when the
 
 ## Routes
 
-| Route              | Access    | Purpose                                                                                  |
-| ------------------ | --------- | ---------------------------------------------------------------------------------------- |
-| `/login`           | public    | Sign-in form (organization, email, password)                                             |
-| `/`                | protected | Home page; redirects to `/login` without a valid session                                 |
-| `/session-expired` | public    | Route handler that resolves a render-time 401 (clears the cookie or returns to the page) |
-| `/dev/api-health`  | public    | Development page, 404 in production (see below)                                          |
+| Route              | Access    | Purpose                                                                                             |
+| ------------------ | --------- | --------------------------------------------------------------------------------------------------- |
+| `/login`           | public    | Sign-in form (organization, email, password)                                                        |
+| `/`                | protected | Dashboard (empty state) inside the application shell; redirects to `/login` without a valid session |
+| `/session-expired` | public    | Route handler that resolves a render-time 401 (clears the cookie or returns to the page)            |
+| `/dev/api-health`  | public    | Development page, 404 in production (see below)                                                     |
 
 Unknown paths are treated as protected: without a session they redirect to `/login?returnTo=...`.
 
@@ -40,6 +40,22 @@ Unknown paths are treated as protected: without a session they redirect to `/log
 The API issues a bearer access token that lives 15 minutes (no refresh token). The web server stores it encrypted (AES-256-GCM) in the `httpOnly`, `SameSite=Lax` cookie `fleetops_session`; browser JavaScript never sees it. When it expires the user signs in again; the app warns two minutes before.
 
 The cookie is `Secure` in production builds. A production build served over plain `http` on a non-localhost host drops the cookie, so sign-in appears to do nothing; use https (browsers allow `Secure` cookies on `http://localhost`). A `__Host-` cookie prefix is reviewed in FE9.
+
+## Application shell
+
+Protected pages live in `src/app/(app)/` and share a layout with a sidebar (from `lg`, 1024px), a header (organization name and user menu) and a navigation drawer below `lg`. Navigation items are in `src/app/(app)/_shell/nav-items.ts`; hiding an item by role is for usability only, the API still enforces permissions. Shared building blocks (page header, empty state, error state, notice, page skeleton, confirm dialog) are in `src/components/`.
+
+## UI components
+
+UI primitives are [shadcn/ui](https://ui.shadcn.com) (new-york style, Radix) copied into `src/components/ui/`; we own that code. `components.json` configures the CLI. Add a component with:
+
+```bash
+npx shadcn@4.21.3 add <name>
+```
+
+Do not add the CLI as a dependency. After each `add`: remove the `shadcn` devDependency and the `@import "shadcn/tailwind.css"` line if the CLI adds them, pin any `^` version it writes in `package.json`, change `from "cn"` imports to `@/lib/utils`, run `npm run format`, and make sure `npm run lint` passes. Dark mode is not supported (the `dark:` classes in copied files are inert).
+
+New dependencies (exact versions): `radix-ui` 1.7.0, `class-variance-authority` 0.7.1, `cn` 0.4.0, `lucide-react` 1.52.0; dev: `tw-animate-css` 1.4.0.
 
 ## Development page
 
