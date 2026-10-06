@@ -19,7 +19,7 @@ To avoid confusion with the backend roadmap, frontend phases are always called *
 | FE2            | Authentication         | Done    | `be2e028`      |
 | FE3            | Application shell      | Done    | `fcd16bb`      |
 | FE4            | Vehicles               | Done    | `fa31a81`      |
-| FE5            | Users + roles          | Done    | commit pending |
+| FE5            | Users + roles          | Done    | `499fa7d`      |
 | FE6            | Drivers + assignments  | Planned | —              |
 | FE7            | Maintenance + fuel     | Planned | —              |
 | FE8            | Dashboard + reporting  | Planned | —              |
@@ -337,7 +337,7 @@ For each choice: why it is needed, what it solves, why it fits, and when it is n
 
 ## Frontend Phase 5 — Users + roles
 
-**Status:** Done (commit pending)
+**Status:** Done (`499fa7d`)
 
 **Goal:** admins manage their organization's users, and every user can change their own password. Built on backend Phase 5.
 
