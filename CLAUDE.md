@@ -88,7 +88,7 @@ Stack: NestJS 12 · TypeScript strict · native ES modules · PostgreSQL · Pris
 
 ### Definition of Done
 
-`npm run lint`, `npm test`, `npm run test:e2e` and `npm run build` all pass, and `apps/api/README.md` is updated when commands, endpoints or env vars change.
+`npm run lint`, `npm run typecheck`, `npm test`, `npm run test:e2e` and `npm run build` all pass, and `apps/api/README.md` is updated when commands, endpoints or env vars change.
 
 ---
 

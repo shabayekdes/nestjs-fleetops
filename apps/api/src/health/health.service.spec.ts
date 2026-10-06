@@ -34,8 +34,10 @@ describe('HealthService', () => {
 
   beforeEach(async () => {
     queryRaw.mockReset();
-    warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
-    errorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation();
+    warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => {});
+    errorSpy = jest
+      .spyOn(Logger.prototype, 'error')
+      .mockImplementation(() => {});
     dir = await mkdtemp(join(tmpdir(), 'fleetops-migrations-'));
     service = await build(dir);
   });

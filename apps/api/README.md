@@ -212,6 +212,7 @@ Integration tests create uniquely-named organizations and delete only those rows
 ```bash
 npm run lint        # check
 npm run lint:fix    # auto-fix
+npm run typecheck   # tsc --noEmit over src, test and prisma
 npm run format      # Prettier
 ```
 

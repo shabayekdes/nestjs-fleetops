@@ -18,9 +18,10 @@ function setup(
     body: { password: 'hunter2' },
     ...extra,
   };
+  const resHeaders: Record<string, string> = {};
   const res = Object.assign(new EventEmitter(), {
     statusCode: 200,
-    headers: {},
+    headers: resHeaders,
     setHeader(name: string, value: string) {
       this.headers[name] = value;
     },
@@ -37,7 +38,7 @@ function setup(
 describe('requestContextMiddleware', () => {
   let logSpy: jest.SpiedFunction<Logger['log']>;
   beforeEach(() => {
-    logSpy = jest.spyOn(Logger.prototype, 'log').mockImplementation();
+    logSpy = jest.spyOn(Logger.prototype, 'log').mockImplementation(() => {});
   });
   afterEach(() => logSpy.mockRestore());
 

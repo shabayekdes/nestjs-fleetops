@@ -53,7 +53,9 @@ describe('AllExceptionsFilter', () => {
   let errorSpy: jest.SpiedFunction<Logger['error']>;
 
   beforeEach(() => {
-    errorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation();
+    errorSpy = jest
+      .spyOn(Logger.prototype, 'error')
+      .mockImplementation(() => {});
   });
   afterEach(() => {
     errorSpy.mockRestore();

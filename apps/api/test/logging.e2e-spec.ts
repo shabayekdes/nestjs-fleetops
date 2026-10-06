@@ -62,7 +62,7 @@ describe('Request logging (e2e)', () => {
   });
 
   beforeEach(() => {
-    logSpy = jest.spyOn(Logger.prototype, 'log').mockImplementation();
+    logSpy = jest.spyOn(Logger.prototype, 'log').mockImplementation(() => {});
   });
   afterEach(() => logSpy.mockRestore());
 

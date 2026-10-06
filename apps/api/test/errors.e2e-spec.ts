@@ -180,7 +180,9 @@ describe('Error format (e2e)', () => {
   });
 
   it('unexpected errors return 500 without leaking the message', async () => {
-    const errorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation();
+    const errorSpy = jest
+      .spyOn(Logger.prototype, 'error')
+      .mockImplementation(() => {});
     const res = await request(server()).get('/api/v1/test-errors/plain');
     expect(res.status).toBe(500);
     expect(errorSpy).toHaveBeenCalledTimes(1);
