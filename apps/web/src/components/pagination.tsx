@@ -33,7 +33,7 @@ function PageLink({
 
 /**
  * Previous/Next links plus the visible range. `params` are the other search
- * params to keep (filters, a non-default limit); `page` is added here.
+ * params to keep (filters, a non-default limit); the page param is added here.
  */
 export function Pagination({
   page,
@@ -41,19 +41,25 @@ export function Pagination({
   total,
   pathname,
   params,
+  pageParam = 'page',
 }: {
   page: number;
   limit: number;
   total: number;
   pathname: string;
   params: Params;
+  /** The search param that holds the page; a second list on one page needs its own. */
+  pageParam?: string;
 }) {
   if (total === 0) return null;
   const pageCount = Math.max(1, Math.ceil(total / limit));
   const from = Math.min((page - 1) * limit + 1, total);
   const to = Math.min(page * limit, total);
   const hrefFor = (target: number) =>
-    buildHref(pathname, { ...params, page: target === 1 ? undefined : target });
+    buildHref(pathname, {
+      ...params,
+      [pageParam]: target === 1 ? undefined : target,
+    });
 
   return (
     <nav

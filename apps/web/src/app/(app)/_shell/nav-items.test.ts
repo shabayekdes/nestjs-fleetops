@@ -34,12 +34,24 @@ describe('visibleNavItems', () => {
 });
 
 describe('NAV_ITEMS', () => {
-  it('contains Dashboard, Vehicles and Users', () => {
+  it('contains the items in order', () => {
     expect(NAV_ITEMS.map((i) => i.label)).toEqual([
       'Dashboard',
       'Vehicles',
+      'Drivers',
+      'Assignments',
       'Users',
     ]);
+  });
+
+  it('shows Drivers and Assignments to ADMIN and MANAGER only', () => {
+    const labels = (role: 'ADMIN' | 'MANAGER' | 'DRIVER') =>
+      visibleNavItems(NAV_ITEMS, role).map((i) => i.label);
+    for (const role of ['ADMIN', 'MANAGER'] as const) {
+      expect(labels(role)).toContain('Drivers');
+      expect(labels(role)).toContain('Assignments');
+    }
+    expect(labels('DRIVER')).toEqual(['Dashboard', 'Vehicles']);
   });
 
   it('shows Users to ADMIN only', () => {

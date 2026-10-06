@@ -1,12 +1,18 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { AssignmentSection } from '@/components/assignments/assignment-section';
 import { NotAllowed } from '@/components/not-allowed';
 import { Notice } from '@/components/notice';
 import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
 import { ApiError } from '@/lib/api/errors';
 import type { Vehicle } from '@/lib/api/types';
+import { assignDriverToVehicle } from '@/lib/assignments/actions';
+import { loadAssignmentSection } from '@/lib/assignments/assignments-api';
+import { driverOptions } from '@/lib/assignments/options';
+import { parseAssignmentsPage } from '@/lib/assignments/page-param';
+import { canManageAssignments } from '@/lib/assignments/permissions';
 import { getCurrentUser } from '@/lib/auth/current-user';
 import { flashMessage } from '@/lib/flash';
 import { formatDateTime } from '@/lib/format';
@@ -39,6 +45,14 @@ export default async function VehicleDetailPage({
   }
 
   const canManage = canManageVehicles(user.role);
+  // Drivers cannot use the assignment endpoints: no call and no section.
+  const section = canManageAssignments(user.role)
+    ? await loadAssignmentSection(
+        { vehicleId: id },
+        parseAssignmentsPage(raw),
+        { withOptions: true },
+      )
+    : null;
   const flash = flashMessage(singleParam(raw.notice));
   const rows: [string, string][] = [
     ['Make', vehicle.make],
@@ -85,6 +99,25 @@ export default async function VehicleDetailPage({
           </div>
         ))}
       </dl>
+      {section ? (
+        <AssignmentSection
+          perspective="vehicle"
+          data={section}
+          pathname={`/vehicles/${vehicle.id}`}
+          assignAction={assignDriverToVehicle.bind(null, vehicle.id)}
+          options={
+            section.kind === 'ok' && section.driverOptions
+              ? driverOptions(section.driverOptions.data)
+              : undefined
+          }
+          truncated={section.kind === 'ok' && section.driverOptions?.truncated}
+          emptyHint={{
+            text: 'No drivers yet.',
+            href: '/drivers/new',
+            linkLabel: 'Add a driver',
+          }}
+        />
+      ) : null}
       <p className="mt-8">
         <Link href="/vehicles" className="text-sm underline">
           Back to vehicles

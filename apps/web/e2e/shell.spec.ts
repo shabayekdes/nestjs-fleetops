@@ -3,7 +3,7 @@ import type { Page } from '@playwright/test';
 import { SESSION_COOKIE, decryptSession } from '../src/lib/auth/session-crypto';
 import { E2E_SESSION_SECRET, WEB_URL } from './support/env';
 import { forgeSession, signIn } from './support/session';
-import { ADMIN, DRIVER, ORGANIZATION_NAME } from './support/users';
+import { ADMIN, DRIVER, MANAGER, ORGANIZATION_NAME } from './support/users';
 
 async function login(page: Page, user: { email: string }) {
   await page.goto('/login');
@@ -55,11 +55,25 @@ test('an admin sees the Users link', async ({ page }) => {
   await expect(nav.getByRole('link', { name: 'Users' })).toBeVisible();
 });
 
+test('admin and manager see Drivers and Assignments in the nav', async ({
+  page,
+}) => {
+  for (const user of [ADMIN, MANAGER]) {
+    await page.context().clearCookies();
+    await login(page, user);
+    const nav = page.getByRole('navigation', { name: 'Main' });
+    await expect(nav.getByRole('link', { name: 'Drivers' })).toBeVisible();
+    await expect(nav.getByRole('link', { name: 'Assignments' })).toBeVisible();
+  }
+});
+
 test('a driver sees Dashboard and no Users link', async ({ page }) => {
   await login(page, DRIVER);
   const nav = page.getByRole('navigation', { name: 'Main' });
   await expect(nav.getByRole('link', { name: 'Dashboard' })).toBeVisible();
   await expect(nav.getByRole('link', { name: 'Users' })).toHaveCount(0);
+  await expect(nav.getByRole('link', { name: 'Drivers' })).toHaveCount(0);
+  await expect(nav.getByRole('link', { name: 'Assignments' })).toHaveCount(0);
 });
 
 for (const [name, size] of [

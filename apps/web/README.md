@@ -26,21 +26,26 @@ Start the API first (it listens on port 3000). The app refuses to start when the
 
 ## Routes
 
-| Route                 | Access    | Purpose                                                                                                           |
-| --------------------- | --------- | ----------------------------------------------------------------------------------------------------------------- |
-| `/login`              | public    | Sign-in form (organization, email, password)                                                                      |
-| `/`                   | protected | Dashboard (empty state) inside the application shell; redirects to `/login` without a valid session               |
-| `/vehicles`           | protected | Vehicle list: filters (`make`, `model`, `year`), pagination (`page`, `limit`) and flash notices, all in the URL   |
-| `/vehicles/new`       | protected | Add vehicle (ADMIN, MANAGER; a DRIVER sees "not allowed")                                                         |
-| `/vehicles/[id]`      | protected | Vehicle detail; Edit and Delete for ADMIN and MANAGER                                                             |
-| `/vehicles/[id]/edit` | protected | Edit vehicle (ADMIN, MANAGER); sends only the changed fields                                                      |
-| `/users`              | protected | User list (ADMIN only): `role` filter and pagination in the URL; a non-admin sees "not allowed" without any fetch |
-| `/users/new`          | protected | Add user (ADMIN only)                                                                                             |
-| `/users/[id]`         | protected | User detail; Edit and Delete (Delete is disabled on your own record)                                              |
-| `/users/[id]/edit`    | protected | Edit user (names, email, role); the role is locked on your own record; sends only the changed fields              |
-| `/account/password`   | protected | Change your own password (every role)                                                                             |
-| `/session-expired`    | public    | Route handler that resolves a render-time 401 (clears the cookie or returns to the page)                          |
-| `/dev/api-health`     | public    | Development page, 404 in production (see below)                                                                   |
+| Route                 | Access    | Purpose                                                                                                                   |
+| --------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `/login`              | public    | Sign-in form (organization, email, password)                                                                              |
+| `/`                   | protected | Dashboard (empty state) inside the application shell; redirects to `/login` without a valid session                       |
+| `/vehicles`           | protected | Vehicle list: filters (`make`, `model`, `year`), pagination (`page`, `limit`) and flash notices, all in the URL           |
+| `/vehicles/new`       | protected | Add vehicle (ADMIN, MANAGER; a DRIVER sees "not allowed")                                                                 |
+| `/vehicles/[id]`      | protected | Vehicle detail; Edit and Delete for ADMIN and MANAGER; ADMIN and MANAGER also see the Assignment section                  |
+| `/vehicles/[id]/edit` | protected | Edit vehicle (ADMIN, MANAGER); sends only the changed fields                                                              |
+| `/drivers`            | protected | Driver list (ADMIN, MANAGER): pagination in the URL, license expiry badges; a DRIVER sees "not allowed" without any fetch |
+| `/drivers/new`        | protected | Add driver (ADMIN, MANAGER); only an ADMIN can link a login account                                                       |
+| `/drivers/[id]`       | protected | Driver detail; Edit, Delete and the Assignment section (assign a vehicle, end it, past assignments)                       |
+| `/drivers/[id]/edit`  | protected | Edit driver; sends only the changed fields                                                                                |
+| `/assignments`        | protected | Read-only assignment list (ADMIN, MANAGER): `active` filter (All, Current, Ended) and pagination in the URL               |
+| `/users`              | protected | User list (ADMIN only): `role` filter and pagination in the URL; a non-admin sees "not allowed" without any fetch         |
+| `/users/new`          | protected | Add user (ADMIN only)                                                                                                     |
+| `/users/[id]`         | protected | User detail; Edit and Delete (Delete is disabled on your own record)                                                      |
+| `/users/[id]/edit`    | protected | Edit user (names, email, role); the role is locked on your own record; sends only the changed fields                      |
+| `/account/password`   | protected | Change your own password (every role)                                                                                     |
+| `/session-expired`    | public    | Route handler that resolves a render-time 401 (clears the cookie or returns to the page)                                  |
+| `/dev/api-health`     | public    | Development page, 404 in production (see below)                                                                           |
 
 Unknown paths are treated as protected: without a session they redirect to `/login?returnTo=...`.
 
@@ -120,6 +125,8 @@ npm run test:e2e
 Test users come from the API seed (organization `acme-logistics`, password `FleetOps-dev-123!`; admin `alex@`, manager `morgan@`, driver `sam@`). The e2e suite uses a fixed test `SESSION_SECRET` (`e2e/support/env.ts`) so it can forge cookies for expiry cases.
 
 Data rules for e2e tests that write data (`e2e/support/api.ts` has the API helpers): create everything with a unique name (every vehicle's make is `E2E-<suffix>`), clean it up through the API in `afterEach` (related records first, then the vehicle), sweep leftovers by that make, and never modify or delete seed data. Users an e2e test creates have the email `e2e-<suffix>-<n>@acme-logistics.test` and the names `E2E-<suffix>`; they are created and deleted through the API with the seed admin's token, and swept by that email prefix. Tests that act on their own record (role, delete, name) or change a password use a dedicated e2e user with its own password (`E2E_USER_PASSWORD`), never a seed user.
+
+Drivers and assignments: driver `firstName` is `E2E-<suffix>`, `licenseNumber` is `E2E-<SUFFIX>-<n>`, and the vehicle make is `E2E-<suffix>`. The API cannot delete assignments, so a driver or vehicle that was ever assigned cannot be deleted through it. Each test ends its active E2E assignments, deletes its users and sweeps what it can (`cleanupE2eFixtures`); the Playwright `globalTeardown` (`e2e/support/global-teardown.ts`) then runs the API's test-only `npm --prefix ../api run db:test:e2e-cleanup`, which removes the remaining `E2E-*` drivers, vehicles and assignments and `e2e-*` users. It forces `NODE_ENV=test`, refuses a database whose name does not contain `test`, and never touches seed rows. It needs the API dependencies installed (`apps/api`, `npm ci`) and `apps/api/.env.test` or a `DATABASE_URL` in the environment (CI sets it).
 
 ## API types
 

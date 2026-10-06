@@ -110,6 +110,7 @@ The init script runs only when the data volume is empty. With an existing volume
 | `prisma/schema.prisma`  | Data model (source of truth)                                      |
 | `prisma/migrations/`    | Generated SQL migrations — committed, never edited after applied  |
 | `prisma/seed.ts`        | Idempotent development seed                                       |
+| `prisma/e2e-cleanup.ts` | Test-only cleanup of data left by the web Playwright tests        |
 | `prisma.config.ts`      | Prisma CLI config (schema/migrations paths, datasource URL, seed) |
 | `src/generated/prisma/` | Generated client — git-ignored, rebuilt by `prisma generate`      |
 
@@ -129,7 +130,22 @@ npm run db:reset             # drop all data, re-apply migrations, re-seed (asks
 npm run db:studio            # npx prisma studio        — browse data in the browser
 
 npm run db:test:migrate      # apply migrations to the database in .env.test
+npm run db:test:e2e-cleanup  # TEST ONLY: delete E2E rows left by the web Playwright tests
 ```
+
+### E2E cleanup (test-only)
+
+`npm run db:test:e2e-cleanup` runs `prisma/e2e-cleanup.ts` with `NODE_ENV=test`, so it only ever reads `.env.test`. It exists because the API cannot delete assignments and all FKs are `Restrict`, so E2E drivers and vehicles that were ever assigned cannot be removed through the API. It is not an endpoint and never runs automatically in the API.
+
+It refuses to run (non-zero exit) unless `NODE_ENV=test`, `DATABASE_URL` is set and the database name contains `test`. It only touches the `acme-logistics` organization (exit 0 with a message if it is missing) and deletes, in one transaction, and logs the count per table:
+
+1. `vehicle_assignments` whose driver `licenseNumber` or vehicle `make` starts with `E2E-`
+2. `maintenance_records` and `fuel_logs` of vehicles whose `make` starts with `E2E-`
+3. `drivers` whose `licenseNumber` starts with `E2E-`
+4. `vehicles` whose `make` starts with `E2E-`
+5. `users` whose email starts with `e2e-` (drivers still linked to them are unlinked first)
+
+Seed data (`DL-*` licenses, Ford/Mercedes-Benz/Volvo, `*@acme-logistics.test`) never matches these prefixes. The web Playwright `globalTeardown` runs it with `npm --prefix ../api run db:test:e2e-cleanup`.
 
 `prisma migrate dev` is for development only — it may prompt to reset the database on drift. Deployed environments use `prisma migrate deploy`.
 

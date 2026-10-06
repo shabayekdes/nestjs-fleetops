@@ -10,6 +10,14 @@ vi.mock('@/lib/auth/current-user', () => ({ getCurrentUser }));
 vi.mock('@/components/refresh-on-mount', () => ({
   RefreshOnMount: () => null,
 }));
+const loadAssignmentSection = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/assignments/assignments-api', () => ({
+  loadAssignmentSection,
+}));
+vi.mock('@/lib/assignments/actions', () => ({
+  assignDriverToVehicle: vi.fn(),
+  endAssignment: vi.fn(),
+}));
 vi.mock('./delete-vehicle-button', () => ({
   DeleteVehicleButton: () => <button>Delete</button>,
 }));
@@ -59,6 +67,13 @@ async function renderPage(id: string = ID, notice?: string) {
 beforeEach(() => {
   getCurrentUser.mockResolvedValue({ role: 'ADMIN' });
   getVehicle.mockResolvedValue(vehicle);
+  loadAssignmentSection.mockReset();
+  loadAssignmentSection.mockResolvedValue({
+    kind: 'ok',
+    current: null,
+    past: { data: [], meta: { page: 1, limit: 10, total: 0 } },
+    driverOptions: { data: [], truncated: false },
+  });
 });
 
 describe('VehicleDetailPage', () => {
@@ -122,5 +137,50 @@ describe('VehicleDetailPage', () => {
     await renderPage();
     expect(screen.queryByRole('link', { name: 'Edit' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Delete' })).toBeNull();
+  });
+
+  it('makes no assignment call and shows no section to a driver', async () => {
+    getCurrentUser.mockResolvedValue({ role: 'DRIVER' });
+    await renderPage();
+    expect(loadAssignmentSection).not.toHaveBeenCalled();
+    expect(screen.queryByRole('heading', { name: 'Assignment' })).toBeNull();
+  });
+
+  it('shows the assignment section to a manager', async () => {
+    getCurrentUser.mockResolvedValue({ role: 'MANAGER' });
+    await renderPage();
+    expect(loadAssignmentSection).toHaveBeenCalledWith({ vehicleId: ID }, 1, {
+      withOptions: true,
+    });
+    expect(
+      screen.getByRole('heading', { name: 'Assignment' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('No driver assigned.')).toBeInTheDocument();
+  });
+
+  it('reads the history page leniently', async () => {
+    const searchParams = Promise.resolve({ assignmentsPage: 'abc' });
+    render(
+      await VehicleDetailPage({
+        params: Promise.resolve({ id: ID }),
+        searchParams,
+      }),
+    );
+    expect(loadAssignmentSection).toHaveBeenCalledWith(
+      { vehicleId: ID },
+      1,
+      expect.anything(),
+    );
+  });
+
+  it('shows an inline NotAllowed in the section while the details render', async () => {
+    loadAssignmentSection.mockResolvedValue({ kind: 'forbidden' });
+    await renderPage();
+    expect(
+      screen.getByRole('heading', { name: 'Ford Transit' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'You are not allowed to do this.',
+    );
   });
 });

@@ -305,3 +305,248 @@ export async function loginStatusViaApi(
   });
   return response.status();
 }
+
+// ---- Drivers and assignments -------------------------------------------
+// Everything an e2e test creates is named so the sweep (and the test-only
+// `db:test:e2e-cleanup` script, see README) can find it: driver firstName
+// `E2E-<suffix>`, licenseNumber `E2E-<SUFFIX>-<n>`, vehicle make `E2E-<suffix>`,
+// user email `e2e-<suffix>-<n>@acme-logistics.test`.
+
+export type ApiDriver = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  licenseNumber: string;
+  licenseExpiresOn: string;
+  userId: string | null;
+};
+
+export type ApiAssignment = {
+  id: string;
+  startedAt: string;
+  endedAt: string | null;
+  vehicle: { id: string; make: string };
+  driver: { id: string; licenseNumber: string };
+};
+
+/** A calendar date ("YYYY-MM-DD", UTC) `days` from today. */
+export function isoDateFromToday(days: number): string {
+  const now = new Date();
+  return new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + days),
+  )
+    .toISOString()
+    .slice(0, 10);
+}
+
+export async function createDriverViaApi(
+  request: APIRequestContext,
+  token: string,
+  data: {
+    firstName: string;
+    lastName?: string;
+    licenseNumber: string;
+    licenseExpiresOn?: string;
+    userId?: string;
+  },
+): Promise<ApiDriver> {
+  const response = await request.post(`${API}/drivers`, {
+    headers: auth(token),
+    data: {
+      ...data,
+      lastName: data.lastName ?? 'Fixture',
+      licenseExpiresOn: data.licenseExpiresOn ?? isoDateFromToday(365),
+    },
+  });
+  await expectOk(response, 'create driver');
+  return (await response.json()) as ApiDriver;
+}
+
+/** Returns the status and body, so tests can assert a 404 or a kept link. */
+export async function getDriverViaApi(
+  request: APIRequestContext,
+  token: string,
+  id: string,
+): Promise<{ status: number; body: ApiDriver | null }> {
+  const response = await request.get(`${API}/drivers/${id}`, {
+    headers: auth(token),
+  });
+  return {
+    status: response.status(),
+    body: response.ok() ? ((await response.json()) as ApiDriver) : null,
+  };
+}
+
+/** Deletes a driver; a missing driver (404) is fine. */
+export async function deleteDriverViaApi(
+  request: APIRequestContext,
+  token: string,
+  id: string,
+): Promise<void> {
+  const response = await request.delete(`${API}/drivers/${id}`, {
+    headers: auth(token),
+  });
+  if (response.status() !== 404) await expectOk(response, 'delete driver');
+}
+
+export async function createAssignmentViaApi(
+  request: APIRequestContext,
+  token: string,
+  data: { vehicleId: string; driverId: string },
+): Promise<ApiAssignment> {
+  const response = await request.post(`${API}/assignments`, {
+    headers: auth(token),
+    data,
+  });
+  await expectOk(response, 'create assignment');
+  return (await response.json()) as ApiAssignment;
+}
+
+/** Ends an assignment; one that is already ended or gone is fine. */
+export async function endAssignmentViaApi(
+  request: APIRequestContext,
+  token: string,
+  id: string,
+): Promise<void> {
+  const response = await request.post(`${API}/assignments/${id}/end`, {
+    headers: auth(token),
+  });
+  if (![404, 409].includes(response.status())) {
+    await expectOk(response, 'end assignment');
+  }
+}
+
+export async function listAssignmentsViaApi(
+  request: APIRequestContext,
+  token: string,
+  query: { active?: boolean; vehicleId?: string; driverId?: string } = {},
+): Promise<ApiAssignment[]> {
+  const response = await request.get(`${API}/assignments`, {
+    headers: auth(token),
+    params: { limit: 100, ...query },
+  });
+  await expectOk(response, 'list assignments');
+  return ((await response.json()) as { data: ApiAssignment[] }).data;
+}
+
+/**
+ * Safety net: pages through all drivers and deletes those whose license number
+ * starts with `prefix` (`E2E-<SUFFIX>`). A driver that has assignments cannot
+ * be deleted (409); that is tolerated, the test-only cleanup script removes it.
+ */
+export async function sweepDriversByLicensePrefix(
+  request: APIRequestContext,
+  token: string,
+  prefix: string,
+): Promise<void> {
+  const ids: string[] = [];
+  for (let page = 1; ; page += 1) {
+    const response = await request.get(`${API}/drivers`, {
+      headers: auth(token),
+      params: { page, limit: 100 },
+    });
+    await expectOk(response, 'list drivers');
+    const body = (await response.json()) as {
+      data: ApiDriver[];
+      meta: { total: number; limit: number };
+    };
+    for (const driver of body.data) {
+      if (driver.licenseNumber.startsWith(prefix)) ids.push(driver.id);
+    }
+    if (page * body.meta.limit >= body.meta.total) break;
+  }
+  for (const id of ids) {
+    const response = await request.delete(`${API}/drivers/${id}`, {
+      headers: auth(token),
+    });
+    if (![404, 409].includes(response.status())) {
+      await expectOk(response, 'sweep driver');
+    }
+  }
+}
+
+/** Like `sweepVehiclesByMake`, but tolerates a vehicle with assignments (409). */
+export async function sweepAssignableVehiclesByMake(
+  request: APIRequestContext,
+  token: string,
+  make: string,
+): Promise<void> {
+  const response = await request.get(`${API}/vehicles`, {
+    headers: auth(token),
+    params: { make, limit: 100 },
+  });
+  await expectOk(response, 'list vehicles');
+  const body = (await response.json()) as { data: ApiVehicle[] };
+  for (const vehicle of body.data) {
+    if (vehicle.make.toLowerCase() !== make.toLowerCase()) continue;
+    const deleted = await request.delete(`${API}/vehicles/${vehicle.id}`, {
+      headers: auth(token),
+    });
+    if (![404, 409].includes(deleted.status())) {
+      await expectOk(deleted, 'sweep vehicle');
+    }
+  }
+}
+
+/**
+ * Cleans up everything one test created, in the order the API allows: end the
+ * active E2E assignments, delete the E2E users, then sweep drivers and
+ * vehicles. Rows blocked by assignment history stay until the global teardown
+ * runs `db:test:e2e-cleanup`.
+ */
+export async function cleanupE2eFixtures(
+  request: APIRequestContext,
+  token: string,
+  suffix: string,
+): Promise<void> {
+  const licensePrefix = `E2E-${suffix}`;
+  const make = `E2E-${suffix}`;
+  try {
+    for (const assignment of await listAssignmentsViaApi(request, token, {
+      active: true,
+    })) {
+      if (
+        assignment.driver.licenseNumber.startsWith(licensePrefix) ||
+        assignment.vehicle.make === make
+      ) {
+        await endAssignmentViaApi(request, token, assignment.id);
+      }
+    }
+  } finally {
+    try {
+      await sweepUsersByEmailPrefix(
+        request,
+        token,
+        `e2e-${suffix.toLowerCase()}-`,
+      );
+    } finally {
+      try {
+        await sweepDriversByLicensePrefix(request, token, licensePrefix);
+      } finally {
+        await sweepAssignableVehiclesByMake(request, token, make);
+      }
+    }
+  }
+}
+
+/** Finds a driver by its exact license number (seed drivers included). */
+export async function findDriverByLicenseViaApi(
+  request: APIRequestContext,
+  token: string,
+  licenseNumber: string,
+): Promise<ApiDriver | undefined> {
+  for (let page = 1; ; page += 1) {
+    const response = await request.get(`${API}/drivers`, {
+      headers: auth(token),
+      params: { page, limit: 100 },
+    });
+    await expectOk(response, 'list drivers');
+    const body = (await response.json()) as {
+      data: ApiDriver[];
+      meta: { total: number; limit: number };
+    };
+    const found = body.data.find((d) => d.licenseNumber === licenseNumber);
+    if (found) return found;
+    if (page * body.meta.limit >= body.meta.total) return undefined;
+  }
+}

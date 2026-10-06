@@ -28,7 +28,8 @@
     "db:seed": "prisma db seed",
     "db:reset": "prisma migrate reset && prisma db seed",
     "db:studio": "prisma studio",
-    "db:test:migrate": "NODE_ENV=test prisma migrate deploy"
+    "db:test:migrate": "NODE_ENV=test prisma migrate deploy",
+    "db:test:e2e-cleanup": "NODE_ENV=test tsx prisma/e2e-cleanup.ts"
   },
   "dependencies": {
     "@nestjs/common": "^12.0.1",

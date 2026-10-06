@@ -8,6 +8,11 @@ export const FLASH_MESSAGES = {
   'user-created': 'User created.',
   'user-updated': 'User updated.',
   'user-deleted': 'User deleted.',
+  'driver-created': 'Driver created.',
+  'driver-updated': 'Driver updated.',
+  'driver-deleted': 'Driver deleted.',
+  'assignment-created': 'Driver assigned.',
+  'assignment-ended': 'Assignment ended.',
   'password-changed': 'Password changed.',
 } as const;
 

@@ -8,6 +8,8 @@ const WEB_PORT = new URL(WEB_URL).port;
 export default defineConfig({
   testDir: 'e2e',
   workers: 1,
+  // Deletes the e2e drivers and vehicles that assignments keep from the API.
+  globalTeardown: './e2e/support/global-teardown.ts',
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [['github'], ['html']] : 'list',
   use: {

@@ -72,3 +72,22 @@ describe('Pagination', () => {
     );
   });
 });
+
+describe('Pagination with a custom page param', () => {
+  it('uses the param and keeps the other params', () => {
+    render(
+      <Pagination
+        page={1}
+        limit={10}
+        total={25}
+        pathname="/vehicles/abc"
+        params={{ notice: 'x' }}
+        pageParam="assignmentsPage"
+      />,
+    );
+    expect(screen.getByRole('link', { name: 'Next' })).toHaveAttribute(
+      'href',
+      '/vehicles/abc?notice=x&assignmentsPage=2',
+    );
+  });
+});

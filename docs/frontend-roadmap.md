@@ -13,17 +13,17 @@ Related documents:
 
 To avoid confusion with the backend roadmap, frontend phases are always called **Frontend Phase N** (FE1–FE9). "Phase N" on its own always means a backend phase.
 
-| Frontend phase | Name                   | Status  | Commit(s)      |
-| -------------- | ---------------------- | ------- | -------------- |
-| FE1            | Application foundation | Done    | `27b8860`      |
-| FE2            | Authentication         | Done    | `be2e028`      |
-| FE3            | Application shell      | Done    | `fcd16bb`      |
-| FE4            | Vehicles               | Done    | `fa31a81`      |
-| FE5            | Users + roles          | Done    | `499fa7d`      |
-| FE6            | Drivers + assignments  | Planned | —              |
-| FE7            | Maintenance + fuel     | Planned | —              |
-| FE8            | Dashboard + reporting  | Planned | —              |
-| FE9            | Production readiness   | Planned | —              |
+| Frontend phase | Name                   | Status  | Commit(s) |
+| -------------- | ---------------------- | ------- | --------- |
+| FE1            | Application foundation | Done    | `27b8860` |
+| FE2            | Authentication         | Done    | `be2e028` |
+| FE3            | Application shell      | Done    | `fcd16bb` |
+| FE4            | Vehicles               | Done    | `fa31a81` |
+| FE5            | Users + roles          | Done    | `499fa7d` |
+| FE6            | Drivers + assignments  | Done    | —         |
+| FE7            | Maintenance + fuel     | Planned | —         |
+| FE8            | Dashboard + reporting  | Planned | —         |
+| FE9            | Production readiness   | Planned | —         |
 
 ---
 
@@ -385,7 +385,7 @@ For each choice: why it is needed, what it solves, why it fits, and when it is n
 
 ## Frontend Phase 6 — Drivers + assignments
 
-**Status:** Planned
+**Status:** Done (commit —)
 
 **Goal:** manage drivers and see and change which driver uses which vehicle. Built on backend Phase 6. The exact screens follow the API that Phase 6 delivers.
 
@@ -400,6 +400,39 @@ For each choice: why it is needed, what it solves, why it fits, and when it is n
 **Out of scope**
 
 - Trips, GPS or telemetry (product roadmap v2.0+).
+
+**Built**
+
+- Routes under `src/app/(app)/drivers/`: list, detail (`[id]`), `new`, `[id]/edit`, a segment `not-found.tsx`; `src/app/(app)/assignments/`: a read-only list with an All, Current or Ended filter. Route-private `_components/`, `_lib/` (list params, Zod schema and edit diff, API wrappers, `canManageDrivers`, the login-account picker) and `actions.ts` (`createDriver`, `updateDriver`, `deleteDriver`).
+- Shared: `components/assignments/` (`AssignmentSection`, `AssignForm`, `EndAssignmentButton`, `AssignmentHistoryTable`), `LicenseStatusBadge`, shadcn `badge`, `lib/license-status.ts`, `formatDateOnly`, `lib/assignments/` (`actions.ts`, `assignments-api.ts`, labels, permissions), `Pagination` `pageParam`, flash keys, and the Drivers and Assignments nav items (ADMIN, MANAGER). The vehicle detail page gained the Assignment section (ADMIN, MANAGER only; a DRIVER makes no assignment call).
+- Tests: unit and component tests for all of the above; Playwright `e2e/drivers.spec.ts`, `e2e/assignments.spec.ts` and an updated `e2e/shell.spec.ts`; a Playwright `globalTeardown` that runs the API's test-only `npm run db:test:e2e-cleanup`.
+- No new npm dependency.
+
+**Decisions**
+
+- Q1: the API cannot delete assignments, so e2e drivers and vehicles that were ever assigned cannot be removed through the API. A test-only script (`apps/api/prisma/e2e-cleanup.ts`, `npm run db:test:e2e-cleanup`) removes rows named `E2E-*` (and users `e2e-*`); the Playwright `globalTeardown` runs it. Tests also clean up through the API first.
+- Q2: a top-level, read-only `/assignments` page with a status filter. Assign and end stay on the vehicle and driver pages.
+- Q3: "Expires soon" means 30 days, inclusive, in UTC. The frontend computes it for display only; the API's 422 is the authority and the assign button is never disabled because of it.
+- Q4: only an ADMIN can link a login account (a MANAGER cannot list users, so the field is not shown and `userId` is never sent).
+- Q5: the account picker lists users of all roles, newest first, at most 100.
+- Q6: vehicle and driver pickers are capped at 100 with no search, plus a hint when truncated.
+- Pickers do not mark busy vehicles or drivers; the API's 409 covers it. An expired license is labelled in the driver picker, never blocked.
+- Detail pages use a separate `assignmentsPage` search param for the past assignments (10 per page).
+- Mutations that change assignments revalidate the root layout (both detail pages and `/assignments` change).
+
+**Deferred**
+
+- Search and filters for drivers, vehicles in pickers, and "available" filters (API gaps).
+- A driver cannot see their own assignment (API gap; FE8 or later).
+
+**Backend gaps recorded**
+
+1. No way to delete assignments (handled by the test cleanup script).
+2. No driver search or filters, and no "available" filters.
+3. No license status from the API; "Expires soon" lives in the frontend. Move it to the API when FE8 needs it.
+4. The driver response has no user summary.
+5. A MANAGER cannot list users.
+6. A DRIVER cannot see their own assignment.
 
 ---
 
@@ -479,7 +512,7 @@ Every frontend phase depends on the backend phases below. All backend phases mus
 | FE3 Shell                 | Phase 5 roles; `/auth/me` profile.                                                                                                                                  | ~~Organization name is not exposed.~~ **Resolved (FE3):** `/auth/me` now returns `organization: { id, name, slug }`.                                                                                                                                                            |
 | FE4 Vehicles              | Phase 4 vehicles CRUD, pagination, filters, 404/409 behaviour; Phase 5 write roles (ADMIN, MANAGER).                                                                | None.                                                                                                                                                                                                                                                                           |
 | FE5 Users + roles         | Phase 5 users CRUD, role filter, `PATCH /auth/me/password`, self-delete/self-demotion `409`.                                                                        | None.                                                                                                                                                                                                                                                                           |
-| FE6 Drivers + assignments | Phase 6 drivers, assignments, current and past assignments, assignment rules.                                                                                       | Depends on the final Phase 6 API.                                                                                                                                                                                                                                               |
+| FE6 Drivers + assignments | Phase 6 drivers, assignments, current and past assignments, assignment rules.                                                                                       | Gaps: no assignment delete (test cleanup script), no driver search or filters, no license status from the API, no user summary on a driver, a MANAGER cannot list users, a DRIVER cannot see their own assignment.                                                              |
 | FE7 Maintenance + fuel    | Phase 7 maintenance and fuel CRUD, per-vehicle cost summary, service-due flag.                                                                                      | Depends on the final Phase 7 API.                                                                                                                                                                                                                                               |
 | FE8 Dashboard             | Phases 4–7 data.                                                                                                                                                    | **No fleet-wide aggregate endpoints.** A dashboard/statistics endpoint (or a few) must be designed in the backend.                                                                                                                                                              |
 | FE9 Production            | Phase 8 error format, request IDs (shown in error messages to help support); Phase 9 Docker, CI and deployment.                                                     | The API must accept requests from the deployed frontend's server (network/host configuration, no CORS needed).                                                                                                                                                                  |

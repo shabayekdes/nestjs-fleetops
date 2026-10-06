@@ -1,4 +1,11 @@
-import { LayoutDashboard, Truck, Users, type LucideIcon } from 'lucide-react';
+import {
+  ArrowLeftRight,
+  IdCard,
+  LayoutDashboard,
+  Truck,
+  Users,
+  type LucideIcon,
+} from 'lucide-react';
 import type { Role } from '@/lib/api/types';
 
 export type NavItem = {
@@ -12,6 +19,18 @@ export type NavItem = {
 export const NAV_ITEMS: readonly NavItem[] = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/vehicles', label: 'Vehicles', icon: Truck },
+  {
+    href: '/drivers',
+    label: 'Drivers',
+    icon: IdCard,
+    roles: ['ADMIN', 'MANAGER'],
+  },
+  {
+    href: '/assignments',
+    label: 'Assignments',
+    icon: ArrowLeftRight,
+    roles: ['ADMIN', 'MANAGER'],
+  },
   { href: '/users', label: 'Users', icon: Users, roles: ['ADMIN'] },
 ];
 
