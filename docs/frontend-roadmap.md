@@ -21,7 +21,7 @@ To avoid confusion with the backend roadmap, frontend phases are always called *
 | FE4            | Vehicles               | Done    | `fa31a81` |
 | FE5            | Users + roles          | Done    | `499fa7d` |
 | FE6            | Drivers + assignments  | Done    | `970993c` |
-| FE7            | Maintenance + fuel     | Done    | —         |
+| FE7            | Maintenance + fuel     | Done    | `e2f2bfa` |
 | FE8            | Dashboard + reporting  | Planned | —         |
 | FE9            | Production readiness   | Planned | —         |
 
@@ -438,7 +438,7 @@ For each choice: why it is needed, what it solves, why it fits, and when it is n
 
 ## Frontend Phase 7 — Maintenance + fuel
 
-**Status:** Done
+**Status:** Done (`e2f2bfa`)
 
 **Goal:** record and review running costs per vehicle. Built on backend Phase 7.
 
