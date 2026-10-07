@@ -27,6 +27,12 @@ export function VehicleFilters({
 }) {
   return (
     <Form
+      key={JSON.stringify([
+        query.make,
+        query.model,
+        query.year,
+        query.serviceStatus,
+      ])}
       action="/vehicles"
       className="mb-6 flex flex-wrap items-start gap-4"
       aria-label="Filter vehicles"

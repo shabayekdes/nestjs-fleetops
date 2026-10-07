@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { EmptyState } from '@/components/empty-state';
+import { ErrorState } from '@/components/error-state';
 import { NotAllowed } from '@/components/not-allowed';
 import { Notice } from '@/components/notice';
 import { PageHeader } from '@/components/page-header';
@@ -11,6 +12,7 @@ import type { DriverList } from '@/lib/api/types';
 import { getCurrentUser } from '@/lib/auth/current-user';
 import { flashMessage } from '@/lib/flash';
 import { singleParam } from '@/lib/search-params';
+import { DriverFilters } from './_components/driver-filters';
 import { DriversTable } from './_components/drivers-table';
 import { listDrivers } from './_lib/drivers-api';
 import {
@@ -37,7 +39,7 @@ export default async function DriversPage({
     );
   }
 
-  const { query, ignored } = parseDriverListParams(raw);
+  const { query, ignored, hasFilters } = parseDriverListParams(raw);
   const flash = flashMessage(singleParam(raw.notice));
 
   const addButton = (
@@ -59,18 +61,48 @@ export default async function DriversPage({
         </>
       );
     }
+    if (error instanceof ApiError && error.status === 400) {
+      return (
+        <>
+          {header}
+          <ErrorState
+            title="These filters could not be applied"
+            message="Clear the filters and try again."
+            reference={error.requestId ?? undefined}
+            action={
+              <Button variant="outline" asChild>
+                <Link href="/drivers">Clear filters</Link>
+              </Button>
+            }
+          />
+        </>
+      );
+    }
     throw error;
   }
 
   const { data, meta } = result;
 
+  const clearHref = driverListHref({ limit: query.limit });
+
   let body;
-  if (meta.total === 0) {
+  if (meta.total === 0 && !hasFilters) {
     body = (
       <EmptyState
         title="No drivers yet"
         description="Add the first driver to start assigning vehicles."
         action={addButton}
+      />
+    );
+  } else if (meta.total === 0) {
+    body = (
+      <EmptyState
+        title="No drivers match these filters"
+        action={
+          <Button variant="outline" asChild>
+            <Link href={clearHref}>Clear filters</Link>
+          </Button>
+        }
       />
     );
   } else if (data.length === 0) {
@@ -113,7 +145,10 @@ export default async function DriversPage({
           </Notice>
         ) : null}
       </div>
-      <div className="mt-4">{body}</div>
+      <div className="mt-4">
+        <DriverFilters query={query} />
+        {body}
+      </div>
     </>
   );
 }

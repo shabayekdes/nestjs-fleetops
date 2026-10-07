@@ -57,4 +57,26 @@ describe('MaintenanceFilters', () => {
     );
     expect(screen.getByLabelText('Type')).toHaveValue('');
   });
+
+  it('resets the select and date fields when the query changes', () => {
+    const { rerender } = render(
+      <MaintenanceFilters
+        vehicleId="v1"
+        query={{
+          page: 1,
+          limit: 10,
+          type: 'OIL_CHANGE',
+          from: '2026-01-01',
+          to: '2026-02-01',
+        }}
+      />,
+    );
+    expect(screen.getByLabelText('Type')).toHaveValue('OIL_CHANGE');
+    rerender(
+      <MaintenanceFilters vehicleId="v1" query={{ page: 1, limit: 10 }} />,
+    );
+    expect(screen.getByLabelText('Type')).toHaveValue('');
+    expect(screen.getByLabelText('From')).toHaveValue('');
+    expect(screen.getByLabelText('To')).toHaveValue('');
+  });
 });

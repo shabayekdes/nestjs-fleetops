@@ -17,6 +17,7 @@ import { userListHref, type UserListQuery } from '../_lib/list-params';
 export function UserFilters({ query }: { query: UserListQuery }) {
   return (
     <Form
+      key={JSON.stringify([query.role ?? ''])}
       action="/users"
       className="mb-6 flex flex-wrap items-start gap-4"
       aria-label="Filter users"

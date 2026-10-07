@@ -13,3 +13,8 @@ export function getCostSummary(
     { query },
   );
 }
+
+/** The fleet-wide summary (ADMIN and MANAGER). Same shape and rules. */
+export function getFleetCostSummary(query: CostQuery): Promise<CostSummary> {
+  return sessionApiRequest<CostSummary>('/cost-summary', { query });
+}

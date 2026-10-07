@@ -22,7 +22,7 @@ To avoid confusion with the backend roadmap, frontend phases are always called *
 | FE5            | Users + roles          | Done    | `499fa7d` |
 | FE6            | Drivers + assignments  | Done    | `970993c` |
 | FE7            | Maintenance + fuel     | Done    | `e2f2bfa` |
-| FE8            | Dashboard + reporting  | Planned | —         |
+| FE8            | Dashboard + reporting  | Done    | —         |
 | FE9            | Production readiness   | Planned | —         |
 
 ---
@@ -88,7 +88,7 @@ For each choice: why it is needed, what it solves, why it fits, and when it is n
 | **Data tables** (plain table component first; TanStack Table only if needed)   | Displaying paginated lists.                                                                                     | Pagination, filtering and sorting are done by the API, so the table only renders rows. A table library is needed only if column features (resizing, column visibility, row selection) are required.                     | **Plain shadcn `table` (FE4).** Library deferred.                                                                                                             |
 | **Client-side data cache** (e.g. TanStack Query)                               | Client-side caching, background refetching, optimistic updates.                                                 | Not needed while data is fetched on the server per request. It may be needed for highly interactive screens.                                                                                                            | Deferred. Adopt only with a concrete screen that needs it.                                                                                                    |
 | **Global client state library** (e.g. Zustand)                                 | Shared client-only state.                                                                                       | The current user comes from the server, and filters live in the URL. There is no known need.                                                                                                                            | Not planned.                                                                                                                                                  |
-| **Charts** (e.g. Recharts, or a similar lightweight library)                   | Time-series and comparison charts.                                                                              | Only the cost summaries (FE7) and the dashboard (FE8) need charts.                                                                                                                                                      | FE7 uses a table only; deferred to FE8. Choose based on the actual charts needed.                                                                             |
+| **Charts** (e.g. Recharts, or a similar lightweight library)                   | Time-series and comparison charts.                                                                              | Only the cost summaries (FE7) and the dashboard (FE8) need charts.                                                                                                                                                      | No library (FE8): a server-rendered SVG chart. Recharts 3.10.1 was considered and rejected.                                                                   |
 | **Unit/component tests** (e.g. Vitest or Jest + React Testing Library)         | Testing components, form behaviour and API error mapping without a browser.                                     | Matches the backend's unit-test discipline. Choose the runner that works best with the chosen Next.js version, preferring Jest if it works without friction (same runner as the backend).                               | Required, FE1. **Chosen: Vitest 5 + React Testing Library** (the user chose it over Jest).                                                                    |
 | **End-to-end tests** (e.g. Playwright)                                         | Testing real flows (login, CRUD, role behaviour) in a browser against a running API.                            | The most important frontend risks (session expiry, 401/403 handling, tenant isolation in the UI) only show up end to end.                                                                                               | **Chosen: Playwright 1.63.0 (Chromium)**, set up in FE2 with a CI job. Expanded at FE9.                                                                       |
 | **Authentication library** (e.g. Auth.js)                                      | —                                                                                                               | **Not planned.** The API already authenticates users and issues tokens. A small custom session (an encrypted cookie holding the access token) is simpler than adapting an auth library to an external bearer-token API. | Not needed.                                                                                                                                                   |
@@ -428,11 +428,11 @@ For each choice: why it is needed, what it solves, why it fits, and when it is n
 **Backend gaps recorded**
 
 1. No way to delete assignments (handled by the test cleanup script).
-2. No driver search or filters, and no "available" filters.
-3. No license status from the API; "Expires soon" lives in the frontend. Move it to the API when FE8 needs it.
+2. No driver search or filters, and no "available" filters. (License status filter added in FE8.)
+3. ~~No license status from the API~~ Resolved in FE8: the API returns `licenseStatus`.
 4. The driver response has no user summary.
 5. A MANAGER cannot list users.
-6. A DRIVER cannot see their own assignment.
+6. ~~A DRIVER cannot see their own assignment.~~ Resolved in FE8: `GET /dashboard/me`.
 
 ---
 
@@ -479,7 +479,7 @@ For each choice: why it is needed, what it solves, why it fits, and when it is n
 
 **Deferred**
 
-- A cost chart (FE8), currency display, sort controls on record lists, a combined "overdue or due soon" filter, price per liter, driver self-service fuel entry.
+- ~~A cost chart~~ (done in FE8), currency display, sort controls on record lists, a combined "overdue or due soon" filter, price per liter, driver self-service fuel entry.
 - A 401 inside a Server Action still loses unsaved form input (as in earlier phases).
 
 **Backend gaps recorded**
@@ -493,7 +493,7 @@ For each choice: why it is needed, what it solves, why it fits, and when it is n
 
 ## Frontend Phase 8 — Dashboard + reporting
 
-**Status:** Planned
+**Status:** Done
 
 **Goal:** a fleet overview that answers the questions fleet managers ask most often.
 
@@ -508,6 +508,44 @@ For each choice: why it is needed, what it solves, why it fits, and when it is n
 **Out of scope**
 
 - Exportable reports, custom report builders and advanced analytics (product roadmap v1.3).
+
+**Built**
+
+- Dashboard `/` by role: ADMIN and MANAGER see the fleet overview (vehicles, drivers, active assignments, service and license counts linking to filtered lists, "as of" date) and fleet costs (this month and last month, a 12-month chart, a "Show data table" table, a link to `/costs`). A DRIVER sees their own overview: their vehicle and license, or a "not linked" or "no vehicle" state. Each section streams in its own `Suspense` boundary and fails on its own (`section-error`, `section-skeleton`, `stat-card`, `_lib/dashboard-api.ts`).
+- Fleet cost report `/costs` (ADMIN, MANAGER) with a month range, chart and table, and a "Costs" nav item.
+- `MonthlyCostChart`: a server-rendered SVG stacked bar chart (maintenance and fuel) with `role="img"`, a title, a description, per-month tooltips and a legend. Its geometry is in `lib/costs/chart-scale.ts`. The vehicle costs page now shows it too.
+- Shared cost pieces moved to `components/costs/` (`CostSummaryTable`, `CostRangeForm` with a `path` prop) and `lib/costs/` (params, API wrappers including `getFleetCostSummary`).
+- License status comes from the API: `LicenseStatusBadge` takes `status`, `lib/license-status.ts` holds labels only, and `/drivers` has a `licenseStatus` filter with its empty and error states.
+- All seven GET filter forms are keyed on their query values, so "Clear filters" also resets the fields (a bug found by QA in FE8; present since FE4).
+- Tests: unit and component tests for all of the above; Playwright `e2e/dashboard.spec.ts`, `e2e/costs.spec.ts`, and updates to the drivers, cost-summary and shell specs.
+- No new npm dependency.
+
+**Backend changes made for FE8** (see "Backend addendum — FE8 dashboard endpoints" in [`PHASES.md`](PHASES.md))
+
+- `GET /dashboard/fleet` (ADMIN, MANAGER), `GET /dashboard/me` (any role, own data only), `GET /cost-summary` (fleet-wide, ADMIN, MANAGER).
+- A computed `licenseStatus` on drivers and a `licenseStatus` filter on `GET /drivers`. The 30-day rule moved from the web app to the API.
+- No migration and no new dependency.
+
+**Decisions**
+
+- Q1: the backend change was approved before frontend work started (Rule 9).
+- Q2: a DRIVER can read their own driver record and current assignment through `/dashboard/me` only.
+- Q3: license status moved into the API; the frontend never recomputes it, like `serviceStatus`.
+- Q4: no chart library. A hand-written SVG Server Component adds no client JavaScript; Recharts 3.10.1 was considered and rejected for one chart type. Every chart has a table equivalent.
+- Q5: a fleet cost report at `/costs` with a nav item for ADMIN and MANAGER.
+- Q6: the per-vehicle costs page gets the chart too.
+- Q7: this month and last month are shown side by side with no percentage, so the web app does no decimal arithmetic.
+- Q8–Q10: currency, a multi-value `serviceStatus` filter and "highest-cost vehicles" stay deferred.
+- Q11: ADMIN and MANAGER see the same dashboard.
+- Q12: the backend change is recorded as an addendum in `PHASES.md`.
+- `Number()` is used only for chart geometry; every amount shown is the API's string. The y-axis ticks are rounded compact labels.
+- The chart scrolls horizontally on narrow screens (minimum width 34rem). Chart colours are 6.1:1 and 4.2:1 against the card.
+- No new `revalidatePath`: the dashboard is dynamic and is rendered fresh on every request.
+
+**Deferred**
+
+- Organization currency, a multi-value `serviceStatus` filter, a month-over-month percentage, top-cost vehicles, CSV export.
+- Indexes on `(organizationId, performedOn)` and `(organizationId, fueledOn)` for the fleet cost query.
 
 ---
 
@@ -549,7 +587,7 @@ Every frontend phase depends on the backend phases below. All backend phases mus
 | FE5 Users + roles         | Phase 5 users CRUD, role filter, `PATCH /auth/me/password`, self-delete/self-demotion `409`.                                                                        | None.                                                                                                                                                                                                                                                                           |
 | FE6 Drivers + assignments | Phase 6 drivers, assignments, current and past assignments, assignment rules.                                                                                       | Gaps: no assignment delete (test cleanup script), no driver search or filters, no license status from the API, no user summary on a driver, a MANAGER cannot list users, a DRIVER cannot see their own assignment.                                                              |
 | FE7 Maintenance + fuel    | Phase 7 maintenance and fuel CRUD, per-vehicle cost summary, service-due flag.                                                                                      | None blocking. Gaps: no organization currency, single-value `serviceStatus` filter, no sort on record lists.                                                                                                                                                                    |
-| FE8 Dashboard             | Phases 4–7 data.                                                                                                                                                    | **No fleet-wide aggregate endpoints.** A dashboard/statistics endpoint (or a few) must be designed in the backend.                                                                                                                                                              |
+| FE8 Dashboard             | Phases 4–7 data.                                                                                                                                                    | ~~No fleet-wide aggregate endpoints.~~ **Resolved (FE8 addendum):** `/dashboard/fleet`, `/dashboard/me`, `/cost-summary`, driver `licenseStatus`.                                                                                                                               |
 | FE9 Production            | Phase 8 error format, request IDs (shown in error messages to help support); Phase 9 Docker, CI and deployment.                                                     | The API must accept requests from the deployed frontend's server (network/host configuration, no CORS needed).                                                                                                                                                                  |
 
 ---

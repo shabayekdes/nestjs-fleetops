@@ -15,6 +15,7 @@ import {
   uniqueSuffix,
 } from './support/api';
 import { signIn } from './support/session';
+import { expectUrl } from './support/url';
 import { ADMIN, DRIVER, MANAGER } from './support/users';
 
 const EMAIL_DOMAIN = 'acme-logistics.test';
@@ -336,6 +337,73 @@ test('the list marks expired and soon-to-expire licenses', async ({
   await expect(rowOf(soon.licenseNumber)).toContainText('Expires soon');
   await expect(rowOf(expired.licenseNumber)).toContainText('Expired');
   await expect(rowOf(valid.licenseNumber)).not.toContainText('Expire');
+});
+
+test('the license filter lives in the URL and keeps only matching drivers', async ({
+  page,
+  request,
+}) => {
+  const expired = await newDriver(request, {
+    licenseExpiresOn: isoDateFromToday(-5),
+  });
+  const soon = await newDriver(request, {
+    licenseExpiresOn: isoDateFromToday(10),
+  });
+  const valid = await newDriver(request, {
+    licenseExpiresOn: isoDateFromToday(200),
+  });
+  await login(page, ADMIN);
+  await page.goto('/drivers?limit=100');
+
+  const table = page.getByRole('table');
+  const rowOf = (license: string) =>
+    table.getByRole('row').filter({ hasText: license });
+  await expect(rowOf(valid.licenseNumber)).toBeVisible();
+
+  await page.getByLabel('License', { exact: true }).selectOption('EXPIRED');
+  await page.getByRole('button', { name: 'Apply filters' }).click();
+  await expectUrl(page, '/drivers', {
+    licenseStatus: 'EXPIRED',
+    limit: '100',
+  });
+  await expect(page.getByLabel('License', { exact: true })).toHaveValue(
+    'EXPIRED',
+  );
+  await expect(rowOf(expired.licenseNumber)).toBeVisible();
+  await expect(rowOf(soon.licenseNumber)).toHaveCount(0);
+  await expect(rowOf(valid.licenseNumber)).toHaveCount(0);
+
+  // A reload keeps the filter.
+  await page.reload();
+  await expect(page.getByLabel('License', { exact: true })).toHaveValue(
+    'EXPIRED',
+  );
+  await expect(rowOf(expired.licenseNumber)).toBeVisible();
+
+  await page.goto('/drivers?licenseStatus=EXPIRING_SOON&limit=100');
+  await expect(rowOf(soon.licenseNumber)).toContainText('Expires soon');
+  await expect(rowOf(expired.licenseNumber)).toHaveCount(0);
+
+  await page.getByRole('link', { name: 'Clear filters' }).click();
+  await expectUrl(page, '/drivers', { limit: '100' });
+  await expect(rowOf(valid.licenseNumber)).toBeVisible();
+});
+
+test('Clear filters also resets the select', async ({ page, request }) => {
+  await newDriver(request);
+  await login(page, ADMIN);
+  await page.goto('/drivers?licenseStatus=EXPIRING_SOON');
+  await expect(page.getByLabel('License', { exact: true })).toHaveValue(
+    'EXPIRING_SOON',
+  );
+  await page
+    .getByRole('form', { name: 'Filter drivers' })
+    .getByRole('link', { name: 'Clear filters' })
+    .click();
+  await expectUrl(page, '/drivers');
+  await expect(page.getByLabel('License', { exact: true })).toHaveValue('', {
+    timeout: 3000,
+  });
 });
 
 test('a driver with assignment history cannot be deleted', async ({

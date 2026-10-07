@@ -17,7 +17,6 @@ import { getCurrentUser } from '@/lib/auth/current-user';
 import { flashMessage } from '@/lib/flash';
 import { formatDateOnly, formatDateTime } from '@/lib/format';
 import { isUuid } from '@/lib/ids';
-import { licenseStatus } from '@/lib/license-status';
 import { singleParam } from '@/lib/search-params';
 import { getDriver } from '../_lib/drivers-api';
 import { canManageDrivers } from '../_lib/permissions';
@@ -70,7 +69,7 @@ export default async function DriverDetailPage({
 
   const name = `${driver.firstName} ${driver.lastName}`;
   const flash = flashMessage(singleParam(raw.notice));
-  const expired = licenseStatus(driver.licenseExpiresOn) === 'expired';
+  const expired = driver.licenseStatus === 'EXPIRED';
 
   return (
     <>
@@ -102,7 +101,7 @@ export default async function DriverDetailPage({
           <span className="mr-2">
             {formatDateOnly(driver.licenseExpiresOn)}
           </span>
-          <LicenseStatusBadge expiresOn={driver.licenseExpiresOn} />
+          <LicenseStatusBadge status={driver.licenseStatus} />
         </dd>
         <dt className="text-muted-foreground">Login account</dt>
         <dd>

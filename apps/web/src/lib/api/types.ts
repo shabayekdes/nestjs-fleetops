@@ -38,3 +38,6 @@ export type CreateFuelLogRequest = Schemas['CreateFuelLogDto'];
 export type UpdateFuelLogRequest = Schemas['UpdateFuelLogDto'];
 export type CostSummary = Schemas['CostSummaryResponseDto'];
 export type CostSummaryMonth = Schemas['CostSummaryMonthDto'];
+export type FleetDashboard = Schemas['FleetDashboardResponseDto'];
+export type MyDashboard = Schemas['MyDashboardResponseDto'];
+export type LicenseStatus = Driver['licenseStatus'];

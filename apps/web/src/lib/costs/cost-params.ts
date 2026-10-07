@@ -24,7 +24,3 @@ export function parseCostParams(raw: RawSearchParams): {
   }
   return { query, ignored };
 }
-
-export function costsPath(vehicleId: string): string {
-  return `/vehicles/${vehicleId}/costs`;
-}

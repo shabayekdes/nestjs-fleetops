@@ -23,6 +23,7 @@ export function FuelFilters({
 }) {
   return (
     <Form
+      key={JSON.stringify([query.from, query.to])}
       action={fuelPath(vehicleId)}
       className="mb-6 flex flex-wrap items-start gap-4"
       aria-label="Filter fuel logs"

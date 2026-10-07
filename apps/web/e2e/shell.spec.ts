@@ -64,6 +64,7 @@ test('admin and manager see Drivers and Assignments in the nav', async ({
     const nav = page.getByRole('navigation', { name: 'Main' });
     await expect(nav.getByRole('link', { name: 'Drivers' })).toBeVisible();
     await expect(nav.getByRole('link', { name: 'Assignments' })).toBeVisible();
+    await expect(nav.getByRole('link', { name: 'Costs' })).toBeVisible();
   }
 });
 
@@ -74,6 +75,7 @@ test('a driver sees Dashboard and no Users link', async ({ page }) => {
   await expect(nav.getByRole('link', { name: 'Users' })).toHaveCount(0);
   await expect(nav.getByRole('link', { name: 'Drivers' })).toHaveCount(0);
   await expect(nav.getByRole('link', { name: 'Assignments' })).toHaveCount(0);
+  await expect(nav.getByRole('link', { name: 'Costs' })).toHaveCount(0);
 });
 
 for (const [name, size] of [

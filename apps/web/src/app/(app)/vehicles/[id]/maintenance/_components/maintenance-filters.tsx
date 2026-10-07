@@ -31,6 +31,7 @@ export function MaintenanceFilters({
 }) {
   return (
     <Form
+      key={JSON.stringify([query.type, query.from, query.to])}
       action={maintenancePath(vehicleId)}
       className="mb-6 flex flex-wrap items-start gap-4"
       aria-label="Filter maintenance records"

@@ -340,6 +340,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/cost-summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["FleetCostSummaryController_getFleetSummary_v1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dashboard/fleet": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["DashboardController_getFleet_v1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dashboard/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["DashboardController_getMe_v1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -533,6 +581,11 @@ export interface components {
             licensePlate?: string | null;
         };
         DriverResponseDto: {
+            /**
+             * @description Derived from `licenseExpiresOn` (UTC): EXPIRING_SOON means within 30 days.
+             * @enum {string}
+             */
+            licenseStatus: "VALID" | "EXPIRING_SOON" | "EXPIRED";
             id: string;
             firstName: string;
             lastName: string;
@@ -717,6 +770,64 @@ export interface components {
             to: string;
             months: components["schemas"]["CostSummaryMonthDto"][];
             totals: components["schemas"]["CostSummaryTotalsDto"];
+        };
+        FleetServiceStatusCountsDto: {
+            OK: number;
+            DUE_SOON: number;
+            OVERDUE: number;
+            UNKNOWN: number;
+        };
+        FleetVehiclesDto: {
+            total: number;
+            serviceStatus: components["schemas"]["FleetServiceStatusCountsDto"];
+        };
+        FleetLicenseStatusCountsDto: {
+            VALID: number;
+            EXPIRING_SOON: number;
+            EXPIRED: number;
+        };
+        FleetDriversDto: {
+            total: number;
+            licenseStatus: components["schemas"]["FleetLicenseStatusCountsDto"];
+        };
+        FleetAssignmentsDto: {
+            /** @description Assignments that have not ended. */
+            active: number;
+        };
+        FleetDashboardResponseDto: {
+            /** @description "YYYY-MM-DD": the UTC day used for the license windows. */
+            asOf: string;
+            vehicles: components["schemas"]["FleetVehiclesDto"];
+            drivers: components["schemas"]["FleetDriversDto"];
+            assignments: components["schemas"]["FleetAssignmentsDto"];
+        };
+        DashboardDriverDto: {
+            /** @enum {string} */
+            licenseStatus: "VALID" | "EXPIRING_SOON" | "EXPIRED";
+            id: string;
+            firstName: string;
+            lastName: string;
+            licenseNumber: string;
+            /** @description "YYYY-MM-DD" */
+            licenseExpiresOn: string;
+        };
+        DashboardVehicleDto: {
+            id: string;
+            make: string;
+            model: string;
+            licensePlate: string | null;
+        };
+        DashboardAssignmentDto: {
+            id: string;
+            /** Format: date-time */
+            startedAt: string;
+            vehicle: components["schemas"]["DashboardVehicleDto"];
+        };
+        MyDashboardResponseDto: {
+            /** @description The driver profile linked to the caller, or null. */
+            driver: components["schemas"]["DashboardDriverDto"] | null;
+            /** @description The caller's active assignment, or null. */
+            currentAssignment: components["schemas"]["DashboardAssignmentDto"] | null;
         };
     };
     responses: never;
@@ -1265,6 +1376,7 @@ export interface operations {
             query?: {
                 page?: number;
                 limit?: number;
+                licenseStatus?: "VALID" | "EXPIRING_SOON" | "EXPIRED";
             };
             header?: never;
             path?: never;
@@ -1897,6 +2009,95 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CostSummaryResponseDto"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    FleetCostSummaryController_getFleetSummary_v1: {
+        parameters: {
+            query?: {
+                /** @description First month, inclusive. Default: 11 months before `to`. */
+                from?: string;
+                /** @description Last month, inclusive. Default: the current UTC month. */
+                to?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CostSummaryResponseDto"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    DashboardController_getFleet_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FleetDashboardResponseDto"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    DashboardController_getMe_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyDashboardResponseDto"];
                 };
             };
             /** @description Error */

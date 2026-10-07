@@ -69,6 +69,7 @@ test('the summary shows both months and the totals', async ({
   await expect(page.getByLabel('From')).toHaveValue(prevMonth);
   await expect(page.getByLabel('To')).toHaveValue(thisMonth);
 
+  await expect(page.getByRole('img', { name: 'Monthly costs' })).toBeVisible();
   const rows = page.locator('tbody tr');
   await expect(rows).toHaveCount(2);
   await expect(rows.nth(0).getByRole('cell')).toHaveText([

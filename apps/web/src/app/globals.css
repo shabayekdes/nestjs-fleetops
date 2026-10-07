@@ -24,6 +24,9 @@
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
+  /* Chart series; each is at least 3:1 against the white background. */
+  --chart-1: oklch(0.5 0.17 255);
+  --chart-2: oklch(0.6 0.15 55);
 }
 
 @theme inline {
@@ -49,6 +52,8 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
 }
 
 @layer base {

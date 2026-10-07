@@ -1,6 +1,9 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { CostRangeForm } from '@/components/costs/cost-range-form';
+import { CostSummaryTable } from '@/components/costs/cost-summary-table';
+import { MonthlyCostChart } from '@/components/costs/monthly-cost-chart';
 import { EmptyState } from '@/components/empty-state';
 import { ErrorState } from '@/components/error-state';
 import { NotAllowed } from '@/components/not-allowed';
@@ -10,15 +13,13 @@ import { Button } from '@/components/ui/button';
 import { ApiError } from '@/lib/api/errors';
 import type { CostSummary } from '@/lib/api/types';
 import { getCurrentUser } from '@/lib/auth/current-user';
+import { parseCostParams } from '@/lib/costs/cost-params';
+import { getCostSummary } from '@/lib/costs/cost-summary-api';
 import { formatMonth } from '@/lib/format';
 import { isUuid } from '@/lib/ids';
 import { VehicleSectionNav } from '../../_components/vehicle-section-nav';
 import { loadVehicle } from '../../_lib/load-vehicle';
 import { canManageVehicleRecords } from '../../_lib/permissions';
-import { CostRangeForm } from './_components/cost-range-form';
-import { CostSummaryTable } from './_components/cost-summary-table';
-import { costsPath, parseCostParams } from './_lib/cost-params';
-import { getCostSummary } from './_lib/cost-summary-api';
 
 export const metadata: Metadata = { title: 'Costs' };
 
@@ -53,6 +54,7 @@ export default async function CostsPage({
   const { vehicle } = loaded;
   const name = `${vehicle.make} ${vehicle.model}`;
   const { query, ignored } = parseCostParams(raw);
+  const path = `/vehicles/${id}/costs`;
 
   let summary: CostSummary;
   try {
@@ -79,7 +81,7 @@ export default async function CostsPage({
               reference={error.requestId ?? undefined}
               action={
                 <Button variant="outline" asChild>
-                  <Link href={costsPath(id)}>Reset</Link>
+                  <Link href={path}>Reset</Link>
                 </Button>
               }
             />
@@ -108,7 +110,7 @@ export default async function CostsPage({
           </Notice>
         </div>
       ) : null}
-      <CostRangeForm vehicleId={id} from={summary.from} to={summary.to} />
+      <CostRangeForm path={path} from={summary.from} to={summary.to} />
       {isEmpty ? (
         <EmptyState
           title="No costs recorded in this period"
@@ -127,7 +129,10 @@ export default async function CostsPage({
           }
         />
       ) : (
-        <CostSummaryTable summary={summary} />
+        <>
+          <MonthlyCostChart summary={summary} />
+          <CostSummaryTable summary={summary} />
+        </>
       )}
     </>
   );

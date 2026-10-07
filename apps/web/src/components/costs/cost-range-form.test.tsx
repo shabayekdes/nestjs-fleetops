@@ -22,7 +22,9 @@ import { CostRangeForm } from './cost-range-form';
 
 describe('CostRangeForm', () => {
   it('has two month inputs with the range, a pattern and a placeholder', () => {
-    render(<CostRangeForm vehicleId="v1" from="2025-03" to="2026-02" />);
+    render(
+      <CostRangeForm path="/vehicles/v1/costs" from="2025-03" to="2026-02" />,
+    );
     expect(screen.getByRole('form', { name: 'Cost range' })).toHaveAttribute(
       'action',
       '/vehicles/v1/costs',
@@ -43,11 +45,35 @@ describe('CostRangeForm', () => {
     );
   });
 
+  it('submits to whatever path it is given', () => {
+    render(<CostRangeForm path="/costs" from="2025-03" to="2026-02" />);
+    expect(screen.getByRole('form', { name: 'Cost range' })).toHaveAttribute(
+      'action',
+      '/costs',
+    );
+    expect(screen.getByRole('link', { name: 'Reset' })).toHaveAttribute(
+      'href',
+      '/costs',
+    );
+  });
+
   it('resets to the plain path', () => {
-    render(<CostRangeForm vehicleId="v1" from="2025-03" to="2026-02" />);
+    render(
+      <CostRangeForm path="/vehicles/v1/costs" from="2025-03" to="2026-02" />,
+    );
     expect(screen.getByRole('link', { name: 'Reset' })).toHaveAttribute(
       'href',
       '/vehicles/v1/costs',
     );
+  });
+
+  it('resets the month fields when the range changes', () => {
+    const { rerender } = render(
+      <CostRangeForm path="/costs" from="2025-03" to="2026-02" />,
+    );
+    expect(screen.getByLabelText('From')).toHaveValue('2025-03');
+    rerender(<CostRangeForm path="/costs" from="" to="" />);
+    expect(screen.getByLabelText('From')).toHaveValue('');
+    expect(screen.getByLabelText('To')).toHaveValue('');
   });
 });

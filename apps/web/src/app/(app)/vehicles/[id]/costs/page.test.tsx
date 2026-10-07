@@ -7,7 +7,7 @@ import { ApiError } from '@/lib/api/errors';
 const getCostSummary = vi.hoisted(() => vi.fn());
 const loadVehicle = vi.hoisted(() => vi.fn());
 const getCurrentUser = vi.hoisted(() => vi.fn());
-vi.mock('./_lib/cost-summary-api', () => ({ getCostSummary }));
+vi.mock('@/lib/costs/cost-summary-api', () => ({ getCostSummary }));
 vi.mock('../../_lib/load-vehicle', () => ({ loadVehicle }));
 vi.mock('@/lib/auth/current-user', () => ({ getCurrentUser }));
 vi.mock('@/components/refresh-on-mount', () => ({
@@ -186,6 +186,9 @@ describe('CostsPage', () => {
     expect(screen.getByLabelText('From')).toHaveValue('2025-03');
     expect(screen.getByLabelText('To')).toHaveValue('2026-02');
     expect(screen.getByRole('table')).toBeInTheDocument();
+    expect(
+      screen.getByRole('img', { name: /Monthly costs/ }),
+    ).toBeInTheDocument();
     expect(screen.getAllByText('150.00').length).toBeGreaterThan(0);
   });
 
@@ -196,6 +199,7 @@ describe('CostsPage', () => {
       screen.getByRole('heading', { name: 'No costs recorded in this period' }),
     ).toBeInTheDocument();
     expect(screen.queryByRole('table')).toBeNull();
+    expect(screen.queryByRole('img')).toBeNull();
     expect(
       screen.getByRole('link', { name: 'Add maintenance record' }),
     ).toHaveAttribute('href', `/vehicles/${ID}/maintenance/new`);

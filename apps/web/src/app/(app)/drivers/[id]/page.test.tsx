@@ -36,6 +36,7 @@ const driver = {
   lastName: 'Lovelace',
   licenseNumber: 'AB-123',
   licenseExpiresOn: '2099-05-20',
+  licenseStatus: 'VALID',
   userId: 'user-1' as string | null,
   createdAt: '2026-06-15T10:05:00.000Z',
   updatedAt: '2026-06-16T11:30:00.000Z',
@@ -128,7 +129,11 @@ describe('DriverDetailPage', () => {
   });
 
   it('shows the Expired badge and passes the warning to the form', async () => {
-    getDriver.mockResolvedValue({ ...driver, licenseExpiresOn: '2020-01-02' });
+    getDriver.mockResolvedValue({
+      ...driver,
+      licenseExpiresOn: '2020-01-02',
+      licenseStatus: 'EXPIRED',
+    });
     await renderPage();
     expect(screen.getAllByText('Expired').length).toBeGreaterThan(0);
     expect(
@@ -137,6 +142,17 @@ describe('DriverDetailPage', () => {
       ),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Assign' })).toBeEnabled();
+  });
+
+  it('uses the API status for the badge and warning, not the date', async () => {
+    getDriver.mockResolvedValue({
+      ...driver,
+      licenseExpiresOn: '2020-01-02',
+      licenseStatus: 'VALID',
+    });
+    await renderPage();
+    expect(screen.queryByText('Expired')).toBeNull();
+    expect(screen.queryByText(/New assignments will be refused/)).toBeNull();
   });
 
   it('shows no warning for a valid license', async () => {

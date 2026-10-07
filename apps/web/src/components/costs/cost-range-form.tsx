@@ -3,23 +3,25 @@ import Link from 'next/link';
 import { FormField } from '@/components/form/form-field';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { costsPath } from '../_lib/cost-params';
 
 const MONTH_PATTERN = String.raw`\d{4}-(0[1-9]|1[0-2])`;
 
-/** GET form with two month inputs. Reset goes back to the API's default range. */
+/**
+ * GET form with two month inputs that submits to `path`. Reset goes back to
+ * `path` without params, i.e. the API's default range.
+ */
 export function CostRangeForm({
-  vehicleId,
+  path,
   from,
   to,
 }: {
-  vehicleId: string;
+  path: string;
   from: string;
   to: string;
 }) {
-  const path = costsPath(vehicleId);
   return (
     <Form
+      key={JSON.stringify([from, to])}
       action={path}
       className="mb-6 flex flex-wrap items-start gap-4"
       aria-label="Cost range"

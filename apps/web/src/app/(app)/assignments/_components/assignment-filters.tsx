@@ -19,6 +19,7 @@ import {
 export function AssignmentFilters({ query }: { query: AssignmentsPageQuery }) {
   return (
     <Form
+      key={JSON.stringify([query.active ?? ''])}
       action="/assignments"
       className="mb-6 flex flex-wrap items-start gap-4"
       aria-label="Filter assignments"

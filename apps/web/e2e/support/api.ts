@@ -680,3 +680,79 @@ export async function findDriverByLicenseViaApi(
     if (page * body.meta.limit >= body.meta.total) return undefined;
   }
 }
+
+export type ApiFleetDashboard = {
+  asOf: string;
+  vehicles: {
+    total: number;
+    serviceStatus: {
+      OK: number;
+      DUE_SOON: number;
+      OVERDUE: number;
+      UNKNOWN: number;
+    };
+  };
+  drivers: {
+    total: number;
+    licenseStatus: { VALID: number; EXPIRING_SOON: number; EXPIRED: number };
+  };
+  assignments: { active: number };
+};
+
+/** The fleet statistics, so a test can compare the page with the API. */
+export async function fleetDashboardViaApi(
+  request: APIRequestContext,
+  token: string,
+): Promise<ApiFleetDashboard> {
+  const response = await request.get(`${API}/dashboard/fleet`, {
+    headers: auth(token),
+  });
+  await expectOk(response, 'fleet dashboard');
+  return (await response.json()) as ApiFleetDashboard;
+}
+
+export type ApiCostSummary = {
+  from: string;
+  to: string;
+  months: {
+    month: string;
+    maintenanceCost: string;
+    fuelCost: string;
+    fuelLiters: string;
+    totalCost: string;
+  }[];
+};
+
+/** GET /cost-summary (fleet-wide); the API's default range is 12 months. */
+export async function fleetCostSummaryViaApi(
+  request: APIRequestContext,
+  token: string,
+): Promise<ApiCostSummary> {
+  const response = await request.get(`${API}/cost-summary`, {
+    headers: auth(token),
+  });
+  await expectOk(response, 'fleet cost summary');
+  return (await response.json()) as ApiCostSummary;
+}
+
+export type ApiMyDashboard = {
+  driver: {
+    licenseNumber: string;
+    licenseStatus: 'VALID' | 'EXPIRING_SOON' | 'EXPIRED';
+  } | null;
+  currentAssignment: {
+    vehicle: { make: string; model: string; licensePlate: string | null };
+  } | null;
+};
+
+/** GET /dashboard/me, for the signed-in driver. */
+export async function myDashboardViaApi(
+  request: APIRequestContext,
+  token: string,
+): Promise<ApiMyDashboard> {
+  const response = await request.get(`${API}/dashboard/me`, {
+    headers: auth(token),
+  });
+  await expectOk(response, 'my dashboard');
+  return (await response.json()) as ApiMyDashboard;
+}

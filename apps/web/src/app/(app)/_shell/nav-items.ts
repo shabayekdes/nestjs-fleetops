@@ -1,5 +1,6 @@
 import {
   ArrowLeftRight,
+  ChartColumn,
   IdCard,
   LayoutDashboard,
   Truck,
@@ -29,6 +30,12 @@ export const NAV_ITEMS: readonly NavItem[] = [
     href: '/assignments',
     label: 'Assignments',
     icon: ArrowLeftRight,
+    roles: ['ADMIN', 'MANAGER'],
+  },
+  {
+    href: '/costs',
+    label: 'Costs',
+    icon: ChartColumn,
     roles: ['ADMIN', 'MANAGER'],
   },
   { href: '/users', label: 'Users', icon: Users, roles: ['ADMIN'] },

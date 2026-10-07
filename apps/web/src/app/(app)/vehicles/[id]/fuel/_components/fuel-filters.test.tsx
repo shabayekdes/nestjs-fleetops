@@ -39,4 +39,17 @@ describe('FuelFilters', () => {
       '/vehicles/v1/fuel?limit=5',
     );
   });
+
+  it('resets the date fields when the query changes', () => {
+    const { rerender } = render(
+      <FuelFilters
+        vehicleId="v1"
+        query={{ page: 1, limit: 10, from: '2026-01-01', to: '2026-02-01' }}
+      />,
+    );
+    expect(screen.getByLabelText('To')).toHaveValue('2026-02-01');
+    rerender(<FuelFilters vehicleId="v1" query={{ page: 1, limit: 10 }} />);
+    expect(screen.getByLabelText('From')).toHaveValue('');
+    expect(screen.getByLabelText('To')).toHaveValue('');
+  });
 });

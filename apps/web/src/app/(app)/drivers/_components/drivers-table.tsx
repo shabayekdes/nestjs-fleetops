@@ -40,7 +40,7 @@ export function DriversTable({ drivers }: { drivers: Driver[] }) {
               <span className="mr-2">
                 {formatDateOnly(driver.licenseExpiresOn)}
               </span>
-              <LicenseStatusBadge expiresOn={driver.licenseExpiresOn} />
+              <LicenseStatusBadge status={driver.licenseStatus} />
             </TableCell>
             <TableCell>{driver.userId ? 'Linked' : '—'}</TableCell>
           </TableRow>

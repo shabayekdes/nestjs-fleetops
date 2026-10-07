@@ -40,6 +40,7 @@ describe('NAV_ITEMS', () => {
       'Vehicles',
       'Drivers',
       'Assignments',
+      'Costs',
       'Users',
     ]);
   });
@@ -52,6 +53,15 @@ describe('NAV_ITEMS', () => {
       expect(labels(role)).toContain('Assignments');
     }
     expect(labels('DRIVER')).toEqual(['Dashboard', 'Vehicles']);
+  });
+
+  it('shows Costs to ADMIN and MANAGER only, linking to /costs', () => {
+    const items = (role: 'ADMIN' | 'MANAGER' | 'DRIVER') =>
+      visibleNavItems(NAV_ITEMS, role);
+    for (const role of ['ADMIN', 'MANAGER'] as const) {
+      expect(items(role).find((i) => i.label === 'Costs')?.href).toBe('/costs');
+    }
+    expect(items('DRIVER').map((i) => i.label)).not.toContain('Costs');
   });
 
   it('shows Users to ADMIN only', () => {

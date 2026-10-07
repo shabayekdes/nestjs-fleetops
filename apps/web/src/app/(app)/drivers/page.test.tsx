@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '@/lib/api/errors';
 
@@ -17,6 +17,7 @@ function driver(
   n: number,
   expires = '2099-01-01',
   userId: string | null = null,
+  licenseStatus: 'VALID' | 'EXPIRING_SOON' | 'EXPIRED' = 'VALID',
 ) {
   return {
     id: `id-${n}`,
@@ -24,10 +25,15 @@ function driver(
     lastName: 'Driver',
     licenseNumber: `LIC-${n}`,
     licenseExpiresOn: expires,
+    licenseStatus,
     userId,
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
   };
+}
+
+function table() {
+  return screen.getByRole('table');
 }
 
 function apiError(status: number) {
@@ -57,7 +63,7 @@ beforeEach(() => {
   getCurrentUser.mockResolvedValue({ role: 'ADMIN' });
   listDrivers.mockReset();
   listDrivers.mockResolvedValue({
-    data: [driver(1), driver(2, '2000-01-01', 'u2')],
+    data: [driver(1), driver(2, '2000-01-01', 'u2', 'EXPIRED')],
     meta: { page: 1, limit: 20, total: 2 },
   });
 });
@@ -71,7 +77,7 @@ describe('DriversPage', () => {
     );
     expect(screen.getByText('Jan 1, 2099')).toBeInTheDocument();
     expect(screen.getByText('Jan 1, 2000')).toBeInTheDocument();
-    expect(screen.getByText('Expired')).toBeInTheDocument();
+    expect(within(table()).getByText('Expired')).toBeInTheDocument();
     expect(screen.getByText('Linked')).toBeInTheDocument();
     expect(screen.getByText('—')).toBeInTheDocument();
     expect(screen.getByText('Showing 1–2 of 2')).toBeInTheDocument();
@@ -116,6 +122,72 @@ describe('DriversPage', () => {
     expect(
       screen.getByRole('link', { name: 'Go to the last page' }),
     ).toHaveAttribute('href', '/drivers?page=3');
+  });
+
+  it('shows the badge from the API status, not from the date', async () => {
+    listDrivers.mockResolvedValue({
+      data: [
+        driver(1, '2000-01-01', null, 'VALID'),
+        driver(2, '2099-01-01', null, 'EXPIRING_SOON'),
+      ],
+      meta: { page: 1, limit: 20, total: 2 },
+    });
+    await renderPage();
+    expect(within(table()).queryByText('Expired')).toBeNull();
+    expect(within(table()).getByText('Expires soon')).toBeInTheDocument();
+  });
+
+  it('has a license filter that reflects and passes the licenseStatus', async () => {
+    await renderPage({ licenseStatus: 'EXPIRED' });
+    expect(listDrivers).toHaveBeenCalledWith({
+      page: 1,
+      limit: 20,
+      licenseStatus: 'EXPIRED',
+    });
+    expect(
+      screen.getByRole('form', { name: 'Filter drivers' }),
+    ).toHaveAttribute('action', '/drivers');
+    expect(screen.getByLabelText('License')).toHaveValue('EXPIRED');
+    expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual([
+      'Any',
+      'Expired',
+      'Expires soon',
+      'Valid',
+    ]);
+  });
+
+  it('shows "no drivers match" with a clear link when a filter finds nothing', async () => {
+    listDrivers.mockResolvedValue({
+      data: [],
+      meta: { page: 1, limit: 20, total: 0 },
+    });
+    await renderPage({ licenseStatus: 'EXPIRED' });
+    expect(
+      screen.getByText('No drivers match these filters'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('No drivers yet')).toBeNull();
+    expect(
+      screen.getAllByRole('link', { name: 'Clear filters' })[0],
+    ).toHaveAttribute('href', '/drivers');
+  });
+
+  it('keeps the filter on the last-page link', async () => {
+    listDrivers.mockResolvedValue({
+      data: [],
+      meta: { page: 9, limit: 20, total: 45 },
+    });
+    await renderPage({ page: '9', licenseStatus: 'VALID' });
+    expect(
+      screen.getByRole('link', { name: 'Go to the last page' }),
+    ).toHaveAttribute('href', '/drivers?licenseStatus=VALID&page=3');
+  });
+
+  it('shows a reset ErrorState on a 400', async () => {
+    listDrivers.mockRejectedValueOnce(apiError(400));
+    await renderPage({ licenseStatus: 'EXPIRED' });
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'These filters could not be applied',
+    );
   });
 
   it('shows NotAllowed on a 403 and rethrows other errors', async () => {
