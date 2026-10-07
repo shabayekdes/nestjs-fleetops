@@ -46,6 +46,28 @@ export class CostSummaryService {
     vehicleId: string,
     query: CostSummaryQueryDto,
   ): Promise<CostSummaryResponseDto> {
+    const { from, to } = this.resolveRange(query);
+    const vehicle = await this.prisma.vehicle.findFirst({
+      where: { id: vehicleId, organizationId },
+      select: { id: true },
+    });
+    if (!vehicle) throw new NotFoundException('Vehicle not found');
+    return this.aggregate(organizationId, from, to, vehicleId);
+  }
+
+  /** Same summary across every vehicle of the organization. */
+  async getFleetSummary(
+    organizationId: string,
+    query: CostSummaryQueryDto,
+  ): Promise<CostSummaryResponseDto> {
+    const { from, to } = this.resolveRange(query);
+    return this.aggregate(organizationId, from, to);
+  }
+
+  private resolveRange(query: CostSummaryQueryDto): {
+    from: string;
+    to: string;
+  } {
     const to = query.to ?? currentMonth();
     const from = query.from ?? addMonths(to, -(DEFAULT_MONTHS - 1));
     if (from > to) throw new BadRequestException('from must not be after to');
@@ -54,26 +76,32 @@ export class CostSummaryService {
         `The range must not exceed ${MAX_MONTHS} months`,
       );
     }
+    return { from, to };
+  }
 
-    const vehicle = await this.prisma.vehicle.findFirst({
-      where: { id: vehicleId, organizationId },
-      select: { id: true },
-    });
-    if (!vehicle) throw new NotFoundException('Vehicle not found');
-
+  private async aggregate(
+    organizationId: string,
+    from: string,
+    to: string,
+    vehicleId?: string,
+  ): Promise<CostSummaryResponseDto> {
     const range = {
       gte: parseDateOnly(`${from}-01`),
       lt: parseDateOnly(`${addMonths(to, 1)}-01`),
     };
+    const scope = {
+      organizationId,
+      ...(vehicleId !== undefined && { vehicleId }),
+    };
     const [maintenance, fuel] = await this.prisma.$transaction([
       this.prisma.maintenanceRecord.groupBy({
         by: ['performedOn'],
-        where: { organizationId, vehicleId, performedOn: range },
+        where: { ...scope, performedOn: range },
         _sum: { cost: true },
       }),
       this.prisma.fuelLog.groupBy({
         by: ['fueledOn'],
-        where: { organizationId, vehicleId, fueledOn: range },
+        where: { ...scope, fueledOn: range },
         _sum: { totalCost: true, liters: true },
       }),
     ]);

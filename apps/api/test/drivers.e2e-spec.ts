@@ -10,7 +10,7 @@ import { PrismaService } from '../src/database/prisma.service.js';
 import { errorBody } from './utils/error-body.js';
 
 type Body = Record<string, unknown>;
-type Actor = 'admin' | 'manager' | 'driver' | 'adminB';
+type Actor = 'admin' | 'manager' | 'driver' | 'adminB' | 'adminE';
 type Method = 'get' | 'post' | 'patch' | 'delete';
 
 const BASE = '/api/v1/drivers';
@@ -21,6 +21,7 @@ const RESPONSE_KEYS = [
   'lastName',
   'licenseExpiresOn',
   'licenseNumber',
+  'licenseStatus',
   'updatedAt',
   'userId',
 ];
@@ -40,6 +41,7 @@ describe('Drivers (e2e)', () => {
   const orgIds: string[] = [];
   let orgAId: string;
   let orgBId: string;
+  let orgEId: string;
   let seq = 0;
 
   const tokens = {} as Record<Actor, string>;
@@ -124,12 +126,18 @@ describe('Drivers (e2e)', () => {
     });
     orgAId = orgA.id;
     orgBId = orgB.id;
-    orgIds.push(orgAId, orgBId);
+    const slugE = `drv-e-${suffix}`;
+    const orgE = await prisma.organization.create({
+      data: { name: `Drv E ${suffix}`, slug: slugE },
+    });
+    orgEId = orgE.id;
+    orgIds.push(orgAId, orgBId, orgEId);
 
     await setupActor('admin', orgAId, slugA, 'ADMIN');
     await setupActor('manager', orgAId, slugA, 'MANAGER');
     await setupActor('driver', orgAId, slugA, 'DRIVER');
     await setupActor('adminB', orgBId, slugB, 'ADMIN');
+    await setupActor('adminE', orgEId, slugE, 'ADMIN');
 
     const tmp = await createVia('admin');
     missingId = tmp.id as string;
@@ -334,6 +342,132 @@ describe('Drivers (e2e)', () => {
         await api('get', `?${qs}`).expect(400);
       },
     );
+  });
+
+  describe('licenseStatus', () => {
+    const MS_DAY = 86_400_000;
+    let today: Date;
+    const dateAt = (days: number): string =>
+      new Date(today.getTime() + days * MS_DAY).toISOString().slice(0, 10);
+    const ids = {} as Record<string, string>;
+    const OFFSETS = { m1: -1, d0: 0, p30: 30, p31: 31 } as const;
+    const EXPECTED = {
+      m1: 'EXPIRED',
+      d0: 'EXPIRING_SOON',
+      p30: 'EXPIRING_SOON',
+      p31: 'VALID',
+    } as const;
+
+    const list = async (qs: string, actor: Actor = 'adminE') =>
+      (await api('get', qs, actor).expect(200)).body as {
+        data: Body[];
+        meta: { page: number; limit: number; total: number };
+      };
+
+    beforeAll(async () => {
+      // Avoid a UTC midnight rollover between computing dates and asserting.
+      const untilMidnight = MS_DAY - (Date.now() % MS_DAY);
+      if (untilMidnight < 60_000) {
+        await new Promise((r) => setTimeout(r, untilMidnight + 1_000));
+      }
+      const n = new Date();
+      today = new Date(
+        Date.UTC(n.getUTCFullYear(), n.getUTCMonth(), n.getUTCDate()),
+      );
+      for (const [key, offset] of Object.entries(OFFSETS)) {
+        const d = await createVia('adminE', {
+          licenseExpiresOn: dateAt(offset),
+        });
+        ids[key] = d.id as string;
+      }
+      // Same boundary data in org A and B: must never show up for org E.
+      await createVia('admin', { licenseExpiresOn: dateAt(-1) });
+      await createVia('adminB', { licenseExpiresOn: dateAt(0) });
+    });
+
+    it.each(Object.keys(OFFSETS))(
+      'returns the status for the %s boundary in the response',
+      async (key) => {
+        const res = await api('get', `/${ids[key]}`, 'adminE').expect(200);
+        expect((res.body as Body).licenseStatus).toBe(
+          EXPECTED[key as keyof typeof EXPECTED],
+        );
+        expect((res.body as Body).licenseExpiresOn).toBe(
+          dateAt(OFFSETS[key as keyof typeof OFFSETS]),
+        );
+      },
+    );
+
+    it('includes licenseStatus on list items', async () => {
+      const body = await list('?limit=100');
+      expect(body.meta.total).toBe(4);
+      const byId = new Map(body.data.map((d) => [d.id, d.licenseStatus]));
+      for (const key of Object.keys(OFFSETS)) {
+        expect(byId.get(ids[key])).toBe(EXPECTED[key as keyof typeof EXPECTED]);
+      }
+    });
+
+    it('includes licenseStatus on create and update responses', async () => {
+      const created = await createVia('adminE', {
+        licenseExpiresOn: dateAt(-1),
+      });
+      expect(created.licenseStatus).toBe('EXPIRED');
+      const res = await api('patch', `/${created.id as string}`, 'adminE')
+        .send({ licenseExpiresOn: dateAt(31) })
+        .expect(200);
+      expect((res.body as Body).licenseStatus).toBe('VALID');
+      await api('delete', `/${created.id as string}`, 'adminE').expect(204);
+    });
+
+    it.each([
+      ['EXPIRED', ['m1']],
+      ['EXPIRING_SOON', ['d0', 'p30']],
+      ['VALID', ['p31']],
+    ] as const)(
+      'filters by licenseStatus=%s with matching data and meta.total',
+      async (status, keys) => {
+        const body = await list(`?licenseStatus=${status}`);
+        expect(body.meta.total).toBe(keys.length);
+        expect(body.data.map((d) => d.id).sort()).toEqual(
+          keys.map((k) => ids[k]).sort(),
+        );
+        expect(body.data.every((d) => d.licenseStatus === status)).toBe(true);
+      },
+    );
+
+    it('paginates a filtered list with a stable total', async () => {
+      const body = await list('?licenseStatus=EXPIRING_SOON&limit=1&page=2');
+      expect(body.meta).toEqual({ page: 2, limit: 1, total: 2 });
+      expect(body.data).toHaveLength(1);
+    });
+
+    it('is tenant-scoped when filtering', async () => {
+      const a = await list('?licenseStatus=EXPIRED&limit=100', 'admin');
+      expect(a.data.map((d) => d.id)).not.toContain(ids.m1);
+      expect(a.data.every((d) => d.licenseStatus === 'EXPIRED')).toBe(true);
+      const b = await list('?licenseStatus=EXPIRING_SOON&limit=100', 'adminB');
+      expect(b.data.map((d) => d.id)).not.toContain(ids.d0);
+      expect(b.data.map((d) => d.id)).not.toContain(ids.p30);
+    });
+
+    it('returns an empty page when nothing matches the filter', async () => {
+      await api('delete', `/${ids.p31}`, 'adminE').expect(204);
+      const body = await list('?licenseStatus=VALID');
+      expect(body).toMatchObject({ data: [], meta: { total: 0 } });
+    });
+
+    it.each(['valid', 'EXPIRED ', 'SOON', '', 'null'])(
+      'returns 400 for invalid licenseStatus %j',
+      async (bad) => {
+        await api('get', `?licenseStatus=${encodeURIComponent(bad)}`).expect(
+          400,
+        );
+      },
+    );
+
+    it('returns 403 for DRIVER filtering', async () => {
+      await api('get', '?licenseStatus=VALID', 'driver').expect(403);
+    });
   });
 
   describe('GET /drivers/:id', () => {

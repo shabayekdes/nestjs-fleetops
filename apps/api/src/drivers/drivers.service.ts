@@ -7,6 +7,10 @@ import { parseDateOnly, toDateOnly } from '../common/date-only.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { uniqueConstraintHints } from '../database/prisma-errors.js';
 import { Prisma } from '../generated/prisma/client.js';
+import {
+  computeLicenseStatus,
+  licenseExpiresOnFilter,
+} from './driver-license.js';
 import type { CreateDriverDto } from './dto/create-driver.dto.js';
 import type {
   DriverListResponseDto,
@@ -28,12 +32,16 @@ const DRIVER_SELECT = {
 
 type DriverRow = Prisma.DriverGetPayload<{ select: typeof DRIVER_SELECT }>;
 
-const toDriverResponse = (row: DriverRow): DriverResponseDto => ({
+const toDriverResponse = (
+  row: DriverRow,
+  now: Date = new Date(),
+): DriverResponseDto => ({
   id: row.id,
   firstName: row.firstName,
   lastName: row.lastName,
   licenseNumber: row.licenseNumber,
   licenseExpiresOn: toDateOnly(row.licenseExpiresOn),
+  licenseStatus: computeLicenseStatus(row.licenseExpiresOn, now),
   userId: row.userId,
   createdAt: row.createdAt,
   updatedAt: row.updatedAt,
@@ -66,8 +74,14 @@ export class DriversService {
     organizationId: string,
     query: ListDriversQueryDto,
   ): Promise<DriverListResponseDto> {
-    const { page, limit } = query;
-    const where: Prisma.DriverWhereInput = { organizationId };
+    const { page, limit, licenseStatus } = query;
+    const now = new Date();
+    const where: Prisma.DriverWhereInput = {
+      organizationId,
+      ...(licenseStatus !== undefined && {
+        licenseExpiresOn: licenseExpiresOnFilter(licenseStatus, now),
+      }),
+    };
     const [rows, total] = await this.prisma.$transaction([
       this.prisma.driver.findMany({
         where,
@@ -78,7 +92,10 @@ export class DriversService {
       }),
       this.prisma.driver.count({ where }),
     ]);
-    return { data: rows.map(toDriverResponse), meta: { page, limit, total } };
+    return {
+      data: rows.map((row) => toDriverResponse(row, now)),
+      meta: { page, limit, total },
+    };
   }
 
   async findOne(

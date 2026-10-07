@@ -143,6 +143,43 @@ describe('DriversService', () => {
       expect(res.data[0].licenseExpiresOn).toBe('2027-01-01');
     });
 
+    it('includes licenseStatus in every response', async () => {
+      findMany.mockResolvedValue([
+        row({ licenseExpiresOn: new Date('2000-01-01T00:00:00.000Z') }),
+        row({ licenseExpiresOn: new Date('2999-01-01T00:00:00.000Z') }),
+      ]);
+      const res = await service.findAll(ORG, query());
+      expect(res.data.map((d) => d.licenseStatus)).toEqual([
+        'EXPIRED',
+        'VALID',
+      ]);
+    });
+
+    it('adds the license range to the where, keeping organizationId', async () => {
+      jest.useFakeTimers({ now: new Date('2026-06-15T10:00:00.000Z') });
+      try {
+        await service.findAll(ORG, query({ licenseStatus: 'EXPIRING_SOON' }));
+      } finally {
+        jest.useRealTimers();
+      }
+      const where = {
+        organizationId: ORG,
+        licenseExpiresOn: {
+          gte: new Date('2026-06-15T00:00:00.000Z'),
+          lte: new Date('2026-07-15T00:00:00.000Z'),
+        },
+      };
+      expect(findMany.mock.calls[0][0]).toMatchObject({ where });
+      expect(count.mock.calls[0][0]).toEqual({ where });
+    });
+
+    it('has no licenseExpiresOn key without the filter', async () => {
+      await service.findAll(ORG, query());
+      const args = findMany.mock.calls[0][0] as { where: object };
+      expect(args.where).toEqual({ organizationId: ORG });
+      expect(args.where).not.toHaveProperty('licenseExpiresOn');
+    });
+
     it('selects no organizationId', async () => {
       await service.findAll(ORG, query());
       const args = findMany.mock.calls[0][0] as {
@@ -154,7 +191,7 @@ describe('DriversService', () => {
   });
 
   describe('findOne', () => {
-    it('returns exactly 8 keys with a date-only expiry', async () => {
+    it('returns exactly 9 keys with a date-only expiry', async () => {
       findFirst.mockResolvedValue(row({ organizationId: ORG }));
       const res = await service.findOne(ORG, ID);
       expect(findFirst.mock.calls[0][0]).toMatchObject({
@@ -167,6 +204,7 @@ describe('DriversService', () => {
         'lastName',
         'licenseExpiresOn',
         'licenseNumber',
+        'licenseStatus',
         'updatedAt',
         'userId',
       ]);

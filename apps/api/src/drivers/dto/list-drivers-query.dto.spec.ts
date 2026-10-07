@@ -42,4 +42,20 @@ describe('ListDriversQueryDto', () => {
   it('rejects unknown filters', async () => {
     expect((await run({ role: 'ADMIN' })).fields).toContain('role');
   });
+
+  it.each(['VALID', 'EXPIRING_SOON', 'EXPIRED'])(
+    'accepts licenseStatus %s',
+    async (licenseStatus) => {
+      const { dto, errors } = await run({ licenseStatus });
+      expect(errors).toHaveLength(0);
+      expect(dto.licenseStatus).toBe(licenseStatus);
+    },
+  );
+
+  it.each(['valid', 'expired', 'SOON', ''])(
+    'rejects licenseStatus %j',
+    async (licenseStatus) => {
+      expect((await run({ licenseStatus })).fields).toContain('licenseStatus');
+    },
+  );
 });

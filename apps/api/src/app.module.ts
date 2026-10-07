@@ -6,6 +6,7 @@ import { AssignmentsModule } from './assignments/assignments.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { validateEnv } from './config/env.validation.js';
 import { CostSummaryModule } from './cost-summary/cost-summary.module.js';
+import { DashboardModule } from './dashboard/dashboard.module.js';
 import { DriversModule } from './drivers/drivers.module.js';
 import { FuelLogsModule } from './fuel-logs/fuel-logs.module.js';
 import { HealthModule } from './health/health.module.js';
@@ -31,6 +32,7 @@ import { VehiclesModule } from './vehicles/vehicles.module.js';
     MaintenanceModule,
     FuelLogsModule,
     CostSummaryModule,
+    DashboardModule,
   ],
   controllers: [AppController],
 })

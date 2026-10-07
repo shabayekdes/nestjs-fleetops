@@ -1,3 +1,6 @@
+import { ApiProperty } from '@nestjs/swagger';
+import { LicenseStatus } from '../driver-license.js';
+
 export class DriverResponseDto {
   id: string;
   firstName: string;
@@ -5,6 +8,9 @@ export class DriverResponseDto {
   licenseNumber: string;
   /** "YYYY-MM-DD" */
   licenseExpiresOn: string;
+  /** Derived from `licenseExpiresOn` (UTC): EXPIRING_SOON means within 30 days. */
+  @ApiProperty({ enum: Object.values(LicenseStatus) })
+  licenseStatus: LicenseStatus;
   userId: string | null;
   createdAt: Date;
   updatedAt: Date;

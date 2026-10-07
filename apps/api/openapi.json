@@ -804,6 +804,19 @@
               "default": 20,
               "type": "number"
             }
+          },
+          {
+            "name": "licenseStatus",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "VALID",
+                "EXPIRING_SOON",
+                "EXPIRED"
+              ]
+            }
           }
         ],
         "responses": {
@@ -1903,6 +1916,133 @@
           "cost-summary"
         ]
       }
+    },
+    "/api/v1/cost-summary": {
+      "get": {
+        "operationId": "FleetCostSummaryController_getFleetSummary_v1",
+        "parameters": [
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "First month, inclusive. Default: 11 months before `to`.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "Last month, inclusive. Default: the current UTC month.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CostSummaryResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "cost-summary"
+        ]
+      }
+    },
+    "/api/v1/dashboard/fleet": {
+      "get": {
+        "operationId": "DashboardController_getFleet_v1",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FleetDashboardResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "dashboard"
+        ]
+      }
+    },
+    "/api/v1/dashboard/me": {
+      "get": {
+        "operationId": "DashboardController_getMe_v1",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyDashboardResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "dashboard"
+        ]
+      }
     }
   },
   "info": {
@@ -2526,6 +2666,15 @@
       "DriverResponseDto": {
         "type": "object",
         "properties": {
+          "licenseStatus": {
+            "description": "Derived from `licenseExpiresOn` (UTC): EXPIRING_SOON means within 30 days.",
+            "enum": [
+              "VALID",
+              "EXPIRING_SOON",
+              "EXPIRED"
+            ],
+            "type": "string"
+          },
           "id": {
             "type": "string"
           },
@@ -2556,6 +2705,7 @@
           }
         },
         "required": [
+          "licenseStatus",
           "id",
           "firstName",
           "lastName",
@@ -3182,6 +3332,224 @@
           "to",
           "months",
           "totals"
+        ]
+      },
+      "FleetServiceStatusCountsDto": {
+        "type": "object",
+        "properties": {
+          "OK": {
+            "type": "number"
+          },
+          "DUE_SOON": {
+            "type": "number"
+          },
+          "OVERDUE": {
+            "type": "number"
+          },
+          "UNKNOWN": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "OK",
+          "DUE_SOON",
+          "OVERDUE",
+          "UNKNOWN"
+        ]
+      },
+      "FleetVehiclesDto": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "number"
+          },
+          "serviceStatus": {
+            "$ref": "#/components/schemas/FleetServiceStatusCountsDto"
+          }
+        },
+        "required": [
+          "total",
+          "serviceStatus"
+        ]
+      },
+      "FleetLicenseStatusCountsDto": {
+        "type": "object",
+        "properties": {
+          "VALID": {
+            "type": "number"
+          },
+          "EXPIRING_SOON": {
+            "type": "number"
+          },
+          "EXPIRED": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "VALID",
+          "EXPIRING_SOON",
+          "EXPIRED"
+        ]
+      },
+      "FleetDriversDto": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "number"
+          },
+          "licenseStatus": {
+            "$ref": "#/components/schemas/FleetLicenseStatusCountsDto"
+          }
+        },
+        "required": [
+          "total",
+          "licenseStatus"
+        ]
+      },
+      "FleetAssignmentsDto": {
+        "type": "object",
+        "properties": {
+          "active": {
+            "type": "number",
+            "description": "Assignments that have not ended."
+          }
+        },
+        "required": [
+          "active"
+        ]
+      },
+      "FleetDashboardResponseDto": {
+        "type": "object",
+        "properties": {
+          "asOf": {
+            "type": "string",
+            "description": "\"YYYY-MM-DD\": the UTC day used for the license windows."
+          },
+          "vehicles": {
+            "$ref": "#/components/schemas/FleetVehiclesDto"
+          },
+          "drivers": {
+            "$ref": "#/components/schemas/FleetDriversDto"
+          },
+          "assignments": {
+            "$ref": "#/components/schemas/FleetAssignmentsDto"
+          }
+        },
+        "required": [
+          "asOf",
+          "vehicles",
+          "drivers",
+          "assignments"
+        ]
+      },
+      "DashboardDriverDto": {
+        "type": "object",
+        "properties": {
+          "licenseStatus": {
+            "enum": [
+              "VALID",
+              "EXPIRING_SOON",
+              "EXPIRED"
+            ],
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "firstName": {
+            "type": "string"
+          },
+          "lastName": {
+            "type": "string"
+          },
+          "licenseNumber": {
+            "type": "string"
+          },
+          "licenseExpiresOn": {
+            "type": "string",
+            "description": "\"YYYY-MM-DD\""
+          }
+        },
+        "required": [
+          "licenseStatus",
+          "id",
+          "firstName",
+          "lastName",
+          "licenseNumber",
+          "licenseExpiresOn"
+        ]
+      },
+      "DashboardVehicleDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "make": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "licensePlate": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "make",
+          "model",
+          "licensePlate"
+        ]
+      },
+      "DashboardAssignmentDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "startedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "vehicle": {
+            "$ref": "#/components/schemas/DashboardVehicleDto"
+          }
+        },
+        "required": [
+          "id",
+          "startedAt",
+          "vehicle"
+        ]
+      },
+      "MyDashboardResponseDto": {
+        "type": "object",
+        "properties": {
+          "driver": {
+            "nullable": true,
+            "description": "The driver profile linked to the caller, or null.",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DashboardDriverDto"
+              }
+            ]
+          },
+          "currentAssignment": {
+            "nullable": true,
+            "description": "The caller's active assignment, or null.",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DashboardAssignmentDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "driver",
+          "currentAssignment"
         ]
       }
     }

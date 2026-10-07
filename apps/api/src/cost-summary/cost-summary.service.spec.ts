@@ -233,4 +233,48 @@ describe('CostSummaryService', () => {
     });
     expect(res.months).toHaveLength(1);
   });
+
+  describe('getFleetSummary', () => {
+    it('does no vehicle lookup and scopes by organization only', async () => {
+      await service.getFleetSummary(ORG, { from: '2026-01', to: '2026-03' });
+      expect(vFindFirst).not.toHaveBeenCalled();
+      const range = {
+        gte: date('2026-01-01'),
+        lt: date('2026-04-01'),
+      };
+      expect(mGroupBy.mock.calls[0][0]).toMatchObject({
+        where: { organizationId: ORG, performedOn: range },
+      });
+      expect(fGroupBy.mock.calls[0][0]).toMatchObject({
+        where: { organizationId: ORG, fueledOn: range },
+      });
+      for (const call of [mGroupBy.mock.calls[0], fGroupBy.mock.calls[0]]) {
+        expect((call[0] as { where: object }).where).not.toHaveProperty(
+          'vehicleId',
+        );
+      }
+    });
+
+    it('applies the same defaults', async () => {
+      const res = await service.getFleetSummary(ORG, {});
+      expect([res.from, res.to]).toEqual(['2025-07', '2026-06']);
+    });
+
+    it('gives the same 400s', async () => {
+      const a = await rejection(
+        service.getFleetSummary(ORG, { from: '2026-05', to: '2026-04' }),
+      );
+      expect(a).toBeInstanceOf(BadRequestException);
+      expect((a as BadRequestException).message).toBe(
+        'from must not be after to',
+      );
+      const b = await rejection(
+        service.getFleetSummary(ORG, { from: '2024-01', to: '2026-01' }),
+      );
+      expect((b as BadRequestException).message).toBe(
+        'The range must not exceed 24 months',
+      );
+      expect($transaction).not.toHaveBeenCalled();
+    });
+  });
 });

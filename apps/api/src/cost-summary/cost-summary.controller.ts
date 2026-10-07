@@ -24,3 +24,19 @@ export class CostSummaryController {
     return this.service.getSummary(user.organizationId, vehicleId, query);
   }
 }
+
+@ApiTags('cost-summary')
+@ApiBearerAuth()
+@Controller('cost-summary')
+@Roles(Role.ADMIN, Role.MANAGER)
+export class FleetCostSummaryController {
+  constructor(private readonly service: CostSummaryService) {}
+
+  @Get()
+  getFleetSummary(
+    @CurrentUser() user: AuthUser,
+    @Query() query: CostSummaryQueryDto,
+  ): Promise<CostSummaryResponseDto> {
+    return this.service.getFleetSummary(user.organizationId, query);
+  }
+}

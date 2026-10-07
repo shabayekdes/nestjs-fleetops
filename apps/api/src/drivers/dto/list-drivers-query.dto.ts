@@ -1,6 +1,7 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsInt, IsOptional, Max, Min } from 'class-validator';
+import { IsIn, IsInt, IsOptional, Max, Min } from 'class-validator';
+import { LicenseStatus } from '../driver-license.js';
 
 export class ListDriversQueryDto {
   @ApiPropertyOptional()
@@ -17,4 +18,9 @@ export class ListDriversQueryDto {
   @Min(1)
   @Max(100)
   limit: number = 20;
+
+  @ApiPropertyOptional({ enum: Object.values(LicenseStatus) })
+  @IsOptional()
+  @IsIn(Object.values(LicenseStatus))
+  licenseStatus?: LicenseStatus;
 }

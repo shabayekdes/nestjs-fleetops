@@ -225,7 +225,7 @@ Rules for working with phases:
 **Out of scope / deferred**
 
 - Client-supplied, backdated or scheduled start/end times; reassigning in one call.
-- Driver self-service and any read access for the DRIVER role.
+- Driver self-service and any read access for the DRIVER role. (Partly resolved: a DRIVER can read their own record and assignment through `/dashboard/me`, FE8 addendum.)
 - Auto-ending assignments on license expiry; expiry reminders (phase 7 scheduler, later notifications).
 - Driver list filters, search, sorting; license class, issuing country.
 - Soft delete or archiving of vehicles and drivers; editing or deleting assignment history.
@@ -276,7 +276,7 @@ Rules for working with phases:
 - Recurring maintenance schedules or service plans; a configurable due-soon window.
 - Multi-currency, fuel type, price per liter, station or vendor entities.
 - File uploads (receipts, invoices).
-- Fleet-wide cost reports, CSV export, dashboards.
+- ~~Fleet-wide cost reports, dashboards~~ (resolved in the FE8 addendum), CSV export.
 - Soft delete or archiving of vehicles.
 - Running the job on startup. Resolved later: distributed lock (phase 9, advisory lock), global error filter (phase 8).
 
@@ -359,6 +359,34 @@ Rules for working with phases:
 ## Repository restructure
 
 API moved to `apps/api/` in preparation for the frontend (`apps/web/`); no behavior, dependency, schema or migration change. Paths in the phase notes above are relative to `apps/api/` (`.nvmrc`, `docker-compose.yml`, `docs/` and `.github/` stay at the repository root).
+
+---
+
+## Backend addendum — FE8 dashboard endpoints
+
+**Status:** Done
+
+**Goal:** give the FE8 dashboard the fleet-wide data it needs (frontend Rule 9: API gaps are fixed in the API). Approved by the user before FE8 started. No migration, schema change or new dependency.
+
+**Built**
+
+- `DashboardModule` (`src/dashboard/`):
+  - `GET /api/v1/dashboard/fleet` (ADMIN, MANAGER): vehicle counts by `serviceStatus`, driver counts by `licenseStatus`, and active assignments, with `asOf` (the UTC date used for license windows). One array `$transaction`, every query filtered by `organizationId`.
+  - `GET /api/v1/dashboard/me` (any role): the caller's own driver profile (or `null`) and current assignment with a vehicle summary (or `null`). No VIN, `organizationId` or `userId`.
+- `GET /api/v1/cost-summary` (ADMIN, MANAGER): a fleet-wide monthly cost summary, sharing the DTOs, defaults (12 months), 24-month maximum and 400 messages of the per-vehicle summary.
+- Drivers: a computed `licenseStatus` (`VALID`, `EXPIRING_SOON`, `EXPIRED`) on every driver response (8 to 9 keys), and a `licenseStatus` filter on `GET /drivers`.
+
+**Decisions**
+
+1. `licenseStatus` is computed when read from `licenseExpiresOn`, not stored (unlike `serviceStatus`, which a job writes). EXPIRED is before UTC today; EXPIRING_SOON is today to today + 30 days, inclusive (`LICENSE_EXPIRING_SOON_DAYS`). The 30-day rule moved here from the web app.
+2. The list filter and the dashboard counts share one helper, `licenseExpiresOnFilter`, so they cannot disagree.
+3. A DRIVER can read their own driver record and current assignment through `/dashboard/me` only. This narrows Phase 6's "no DRIVER read access"; `/drivers` and `/assignments` stay ADMIN and MANAGER.
+4. The dashboard counts may come from slightly different moments (READ COMMITTED). Service counts can be up to a day stale (Phase 7 decision 6).
+
+**Out of scope / deferred**
+
+- Indexes on `(organizationId, performedOn)` and `(organizationId, fueledOn)` for the fleet cost query; add them by migration if fleets grow.
+- Organization currency, multi-value `serviceStatus` filter, top-cost vehicles, CSV export.
 
 ---
 

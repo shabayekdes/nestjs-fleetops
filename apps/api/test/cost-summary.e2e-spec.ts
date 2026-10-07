@@ -10,7 +10,7 @@ import { PrismaService } from '../src/database/prisma.service.js';
 import { errorBody } from './utils/error-body.js';
 
 type Body = Record<string, unknown>;
-type Actor = 'admin' | 'manager' | 'driver' | 'adminB';
+type Actor = 'admin' | 'manager' | 'driver' | 'adminB' | 'adminD';
 type Method = 'get' | 'post' | 'patch' | 'delete';
 
 const FORBIDDEN = errorBody(403, 'Forbidden');
@@ -43,6 +43,7 @@ describe('Cost summary (e2e)', () => {
   const orgIds: string[] = [];
   let orgAId: string;
   let orgBId: string;
+  let orgDId: string;
   let seq = 0;
   const tokens = {} as Record<Actor, string>;
 
@@ -152,12 +153,18 @@ describe('Cost summary (e2e)', () => {
     });
     orgAId = orgA.id;
     orgBId = orgB.id;
-    orgIds.push(orgAId, orgBId);
+    const slugD = `cost-d-${suffix}`;
+    const orgD = await prisma.organization.create({
+      data: { name: `Cost D ${suffix}`, slug: slugD },
+    });
+    orgDId = orgD.id;
+    orgIds.push(orgAId, orgBId, orgDId);
 
     await setupActor('admin', orgAId, slugA, 'ADMIN');
     await setupActor('manager', orgAId, slugA, 'MANAGER');
     await setupActor('driver', orgAId, slugA, 'DRIVER');
     await setupActor('adminB', orgBId, slugB, 'ADMIN');
+    await setupActor('adminD', orgDId, slugD, 'ADMIN');
   });
 
   afterAll(async () => {
@@ -407,6 +414,168 @@ describe('Cost summary (e2e)', () => {
         fuelLiters: '0.000',
         totalCost: '0.00',
       });
+    });
+  });
+
+  describe('GET /cost-summary (fleet-wide)', () => {
+    const FLEET = '/api/v1/cost-summary';
+
+    beforeAll(async () => {
+      // Dedicated org D so the sums are exact; org A/B data must not leak in.
+      const v1 = await mkVehicle(orgDId);
+      const v2 = await mkVehicle(orgDId);
+      const vb = await mkVehicle(orgBId);
+      await mkMaintenance(orgDId, v1.id, dateIn(-3, 10), '0.10');
+      await mkMaintenance(orgDId, v2.id, dateIn(-3, 20), '0.20');
+      await mkMaintenance(orgDId, v2.id, dateIn(-1, 5), '100.50');
+      await mkFuel(orgDId, v1.id, dateIn(-3, 10), '80.10', '45.5');
+      await mkFuel(orgDId, v2.id, dateIn(-3, 10), '0.20', '0.001');
+      await mkFuel(orgDId, v1.id, dateIn(-1, 28), '10', '2.25');
+      // Outside an explicit M-3..M-1 range (but inside the 12 month default).
+      await mkMaintenance(orgDId, v1.id, dateIn(-4, 15), '999.00');
+      // Other orgs only.
+      await mkMaintenance(orgBId, vb.id, dateIn(-3, 10), '7000');
+      await mkFuel(orgBId, vb.id, dateIn(-2, 10), '7000', '700');
+    });
+
+    it('returns 401 without a token', async () => {
+      const res = await call('get', FLEET, null);
+      expect(res.status).toBe(401);
+      expect(res.body).toEqual(UNAUTHORIZED);
+    });
+
+    it('returns 403 for DRIVER, even with a bad query', async () => {
+      for (const qs of ['', '?from=bad']) {
+        const res = await call('get', `${FLEET}${qs}`, 'driver');
+        expect(res.status).toBe(403);
+        expect(res.body).toEqual(FORBIDDEN);
+      }
+    });
+
+    it('allows MANAGER and ADMIN', async () => {
+      await call('get', FLEET, 'manager').expect(200);
+      await call('get', FLEET, 'admin').expect(200);
+    });
+
+    it('sums across vehicles and excludes other orgs', async () => {
+      const res = await call(
+        'get',
+        `${FLEET}?from=${monthOf(-3)}&to=${monthOf(-1)}`,
+        'adminD',
+      ).expect(200);
+      expect(res.body).toEqual({
+        from: monthOf(-3),
+        to: monthOf(-1),
+        months: [
+          {
+            month: monthOf(-3),
+            maintenanceCost: '0.30',
+            fuelCost: '80.30',
+            fuelLiters: '45.501',
+            totalCost: '80.60',
+          },
+          zeroMonth(monthOf(-2)),
+          {
+            month: monthOf(-1),
+            maintenanceCost: '100.50',
+            fuelCost: '10.00',
+            fuelLiters: '2.250',
+            totalCost: '110.50',
+          },
+        ],
+        totals: {
+          maintenanceCost: '100.80',
+          fuelCost: '90.30',
+          fuelLiters: '47.751',
+          totalCost: '191.10',
+        },
+      });
+    });
+
+    it('org B never sees org D records', async () => {
+      // M-4 holds a 999.00 maintenance record in org D and nothing in org B.
+      const res = await call(
+        'get',
+        `${FLEET}?from=${monthOf(-4)}&to=${monthOf(-4)}`,
+        'adminB',
+      ).expect(200);
+      expect((res.body as { totals: Body }).totals).toEqual({
+        maintenanceCost: '0.00',
+        fuelCost: '0.00',
+        fuelLiters: '0.000',
+        totalCost: '0.00',
+      });
+      // Org B's own records are visible to org B only (org D total is exact).
+      const b = await call(
+        'get',
+        `${FLEET}?from=${monthOf(-3)}&to=${monthOf(-3)}`,
+        'adminB',
+      ).expect(200);
+      expect(
+        (b.body as { totals: { maintenanceCost: string } }).totals
+          .maintenanceCost,
+      ).toBe('14000.00');
+    });
+
+    it('defaults to 12 months ending at the current UTC month', async () => {
+      const res = await call('get', FLEET, 'adminD').expect(200);
+      const body = res.body as {
+        from: string;
+        to: string;
+        months: Body[];
+        totals: Body;
+      };
+      expect(body.to).toBe(monthOf(0));
+      expect(body.from).toBe(monthOf(-11));
+      expect(body.months.map((m) => m.month)).toEqual(
+        Array.from({ length: 12 }, (_, i) => monthOf(i - 11)),
+      );
+      expect(body.months.find((m) => m.month === monthOf(-4))).toMatchObject({
+        maintenanceCost: '999.00',
+      });
+      expect(body.totals.maintenanceCost).toBe('1099.80');
+    });
+
+    it('accepts 24 months', async () => {
+      const res = await call(
+        'get',
+        `${FLEET}?from=${monthOf(-23)}&to=${monthOf(0)}`,
+      ).expect(200);
+      expect((res.body as { months: unknown[] }).months).toHaveLength(24);
+    });
+
+    it('rejects from after to with 400', async () => {
+      const res = await call(
+        'get',
+        `${FLEET}?from=${monthOf(-1)}&to=${monthOf(-3)}`,
+      ).expect(400);
+      expect((res.body as Body).message).toBe('from must not be after to');
+    });
+
+    it('rejects more than 24 months with 400', async () => {
+      const res = await call(
+        'get',
+        `${FLEET}?from=${monthOf(-24)}&to=${monthOf(0)}`,
+      ).expect(400);
+      expect((res.body as Body).message).toBe(
+        'The range must not exceed 24 months',
+      );
+    });
+
+    it('rejects months beyond the year cap with 400, not 500', async () => {
+      await call('get', `${FLEET}?to=9999-12`).expect(400);
+    });
+
+    it.each(['2026-13', '2026-1', '2026-01-01', 'abc', ''])(
+      'rejects bad month %j for from and to',
+      async (bad) => {
+        await call('get', `${FLEET}?from=${bad}`).expect(400);
+        await call('get', `${FLEET}?to=${bad}`).expect(400);
+      },
+    );
+
+    it('rejects unknown query keys', async () => {
+      await call('get', `${FLEET}?page=1`).expect(400);
     });
   });
 });

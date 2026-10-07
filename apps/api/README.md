@@ -220,45 +220,48 @@ npm run format      # Prettier
 
 All routes are served under the `/api` prefix with URI versioning (default version `v1`).
 
-| Method | Path                                                  | Description                                                                   |
-| ------ | ----------------------------------------------------- | ----------------------------------------------------------------------------- |
-| GET    | `/api/v1`                                             | Confirms the API is running                                                   |
-| GET    | `/api/v1/health`                                      | Application + database health (200 / 503)                                     |
-| GET    | `/api/v1/health/live`                                 | Liveness: always 200, touches no dependency                                   |
-| GET    | `/api/v1/health/ready`                                | Readiness: database up and migrations applied (200 / 503)                     |
-| POST   | `/api/v1/auth/login`                                  | Public. Exchange credentials for an access token                              |
-| GET    | `/api/v1/auth/me`                                     | Bearer token. Current user profile (with role and organization)               |
-| PATCH  | `/api/v1/auth/me/password`                            | Bearer token, any role. Change own password (204)                             |
-| GET    | `/api/v1/users`                                       | Bearer token, ADMIN. List users (paginated, role filter)                      |
-| POST   | `/api/v1/users`                                       | Bearer token, ADMIN. Create a user                                            |
-| GET    | `/api/v1/users/:id`                                   | Bearer token, ADMIN. Get a user                                               |
-| PATCH  | `/api/v1/users/:id`                                   | Bearer token, ADMIN. Partially update a user                                  |
-| DELETE | `/api/v1/users/:id`                                   | Bearer token, ADMIN. Delete a user (204)                                      |
-| GET    | `/api/v1/vehicles`                                    | Bearer token. List vehicles (paginated, filters)                              |
-| POST   | `/api/v1/vehicles`                                    | Bearer token, ADMIN or MANAGER. Create a vehicle                              |
-| GET    | `/api/v1/vehicles/:id`                                | Bearer token. Get a vehicle                                                   |
-| PATCH  | `/api/v1/vehicles/:id`                                | Bearer token, ADMIN or MANAGER. Partially update a vehicle                    |
-| DELETE | `/api/v1/vehicles/:id`                                | Bearer token, ADMIN or MANAGER. Delete a vehicle (204)                        |
-| GET    | `/api/v1/drivers`                                     | Bearer token, ADMIN or MANAGER. List drivers (paginated)                      |
-| POST   | `/api/v1/drivers`                                     | Bearer token, ADMIN or MANAGER. Create a driver                               |
-| GET    | `/api/v1/drivers/:id`                                 | Bearer token, ADMIN or MANAGER. Get a driver                                  |
-| PATCH  | `/api/v1/drivers/:id`                                 | Bearer token, ADMIN or MANAGER. Partially update a driver                     |
-| DELETE | `/api/v1/drivers/:id`                                 | Bearer token, ADMIN or MANAGER. Delete a driver (204)                         |
-| GET    | `/api/v1/assignments`                                 | Bearer token, ADMIN or MANAGER. List assignments (filters)                    |
-| POST   | `/api/v1/assignments`                                 | Bearer token, ADMIN or MANAGER. Assign a driver to a vehicle                  |
-| GET    | `/api/v1/assignments/:id`                             | Bearer token, ADMIN or MANAGER. Get an assignment                             |
-| POST   | `/api/v1/assignments/:id/end`                         | Bearer token, ADMIN or MANAGER. End an assignment (200)                       |
-| GET    | `/api/v1/vehicles/:vehicleId/maintenance-records`     | Bearer token, ADMIN or MANAGER. List maintenance records (paginated, filters) |
-| POST   | `/api/v1/vehicles/:vehicleId/maintenance-records`     | Bearer token, ADMIN or MANAGER. Create a maintenance record                   |
-| GET    | `/api/v1/vehicles/:vehicleId/maintenance-records/:id` | Bearer token, ADMIN or MANAGER. Get a maintenance record                      |
-| PATCH  | `/api/v1/vehicles/:vehicleId/maintenance-records/:id` | Bearer token, ADMIN or MANAGER. Partially update a maintenance record         |
-| DELETE | `/api/v1/vehicles/:vehicleId/maintenance-records/:id` | Bearer token, ADMIN or MANAGER. Delete a maintenance record (204)             |
-| GET    | `/api/v1/vehicles/:vehicleId/fuel-logs`               | Bearer token, ADMIN or MANAGER. List fuel logs (paginated, date range)        |
-| POST   | `/api/v1/vehicles/:vehicleId/fuel-logs`               | Bearer token, ADMIN or MANAGER. Create a fuel log                             |
-| GET    | `/api/v1/vehicles/:vehicleId/fuel-logs/:id`           | Bearer token, ADMIN or MANAGER. Get a fuel log                                |
-| PATCH  | `/api/v1/vehicles/:vehicleId/fuel-logs/:id`           | Bearer token, ADMIN or MANAGER. Partially update a fuel log                   |
-| DELETE | `/api/v1/vehicles/:vehicleId/fuel-logs/:id`           | Bearer token, ADMIN or MANAGER. Delete a fuel log (204)                       |
-| GET    | `/api/v1/vehicles/:vehicleId/cost-summary`            | Bearer token, ADMIN or MANAGER. Monthly maintenance and fuel costs            |
+| Method | Path                                                  | Description                                                                      |
+| ------ | ----------------------------------------------------- | -------------------------------------------------------------------------------- |
+| GET    | `/api/v1`                                             | Confirms the API is running                                                      |
+| GET    | `/api/v1/health`                                      | Application + database health (200 / 503)                                        |
+| GET    | `/api/v1/health/live`                                 | Liveness: always 200, touches no dependency                                      |
+| GET    | `/api/v1/health/ready`                                | Readiness: database up and migrations applied (200 / 503)                        |
+| POST   | `/api/v1/auth/login`                                  | Public. Exchange credentials for an access token                                 |
+| GET    | `/api/v1/auth/me`                                     | Bearer token. Current user profile (with role and organization)                  |
+| PATCH  | `/api/v1/auth/me/password`                            | Bearer token, any role. Change own password (204)                                |
+| GET    | `/api/v1/users`                                       | Bearer token, ADMIN. List users (paginated, role filter)                         |
+| POST   | `/api/v1/users`                                       | Bearer token, ADMIN. Create a user                                               |
+| GET    | `/api/v1/users/:id`                                   | Bearer token, ADMIN. Get a user                                                  |
+| PATCH  | `/api/v1/users/:id`                                   | Bearer token, ADMIN. Partially update a user                                     |
+| DELETE | `/api/v1/users/:id`                                   | Bearer token, ADMIN. Delete a user (204)                                         |
+| GET    | `/api/v1/vehicles`                                    | Bearer token. List vehicles (paginated, filters)                                 |
+| POST   | `/api/v1/vehicles`                                    | Bearer token, ADMIN or MANAGER. Create a vehicle                                 |
+| GET    | `/api/v1/vehicles/:id`                                | Bearer token. Get a vehicle                                                      |
+| PATCH  | `/api/v1/vehicles/:id`                                | Bearer token, ADMIN or MANAGER. Partially update a vehicle                       |
+| DELETE | `/api/v1/vehicles/:id`                                | Bearer token, ADMIN or MANAGER. Delete a vehicle (204)                           |
+| GET    | `/api/v1/drivers`                                     | Bearer token, ADMIN or MANAGER. List drivers (paginated, `licenseStatus` filter) |
+| POST   | `/api/v1/drivers`                                     | Bearer token, ADMIN or MANAGER. Create a driver                                  |
+| GET    | `/api/v1/drivers/:id`                                 | Bearer token, ADMIN or MANAGER. Get a driver                                     |
+| PATCH  | `/api/v1/drivers/:id`                                 | Bearer token, ADMIN or MANAGER. Partially update a driver                        |
+| DELETE | `/api/v1/drivers/:id`                                 | Bearer token, ADMIN or MANAGER. Delete a driver (204)                            |
+| GET    | `/api/v1/assignments`                                 | Bearer token, ADMIN or MANAGER. List assignments (filters)                       |
+| POST   | `/api/v1/assignments`                                 | Bearer token, ADMIN or MANAGER. Assign a driver to a vehicle                     |
+| GET    | `/api/v1/assignments/:id`                             | Bearer token, ADMIN or MANAGER. Get an assignment                                |
+| POST   | `/api/v1/assignments/:id/end`                         | Bearer token, ADMIN or MANAGER. End an assignment (200)                          |
+| GET    | `/api/v1/vehicles/:vehicleId/maintenance-records`     | Bearer token, ADMIN or MANAGER. List maintenance records (paginated, filters)    |
+| POST   | `/api/v1/vehicles/:vehicleId/maintenance-records`     | Bearer token, ADMIN or MANAGER. Create a maintenance record                      |
+| GET    | `/api/v1/vehicles/:vehicleId/maintenance-records/:id` | Bearer token, ADMIN or MANAGER. Get a maintenance record                         |
+| PATCH  | `/api/v1/vehicles/:vehicleId/maintenance-records/:id` | Bearer token, ADMIN or MANAGER. Partially update a maintenance record            |
+| DELETE | `/api/v1/vehicles/:vehicleId/maintenance-records/:id` | Bearer token, ADMIN or MANAGER. Delete a maintenance record (204)                |
+| GET    | `/api/v1/vehicles/:vehicleId/fuel-logs`               | Bearer token, ADMIN or MANAGER. List fuel logs (paginated, date range)           |
+| POST   | `/api/v1/vehicles/:vehicleId/fuel-logs`               | Bearer token, ADMIN or MANAGER. Create a fuel log                                |
+| GET    | `/api/v1/vehicles/:vehicleId/fuel-logs/:id`           | Bearer token, ADMIN or MANAGER. Get a fuel log                                   |
+| PATCH  | `/api/v1/vehicles/:vehicleId/fuel-logs/:id`           | Bearer token, ADMIN or MANAGER. Partially update a fuel log                      |
+| DELETE | `/api/v1/vehicles/:vehicleId/fuel-logs/:id`           | Bearer token, ADMIN or MANAGER. Delete a fuel log (204)                          |
+| GET    | `/api/v1/vehicles/:vehicleId/cost-summary`            | Bearer token, ADMIN or MANAGER. Monthly maintenance and fuel costs               |
+| GET    | `/api/v1/cost-summary`                                | Bearer token, ADMIN or MANAGER. Fleet-wide monthly maintenance and fuel costs    |
+| GET    | `/api/v1/dashboard/fleet`                             | Bearer token, ADMIN or MANAGER. Fleet counts: vehicles, drivers, assignments     |
+| GET    | `/api/v1/dashboard/me`                                | Bearer token, any role. Own driver profile and active assignment                 |
 
 Every endpoint except `/api/v1` and `/api/v1/health*` requires an `Authorization: Bearer <token>` header.
 
@@ -428,6 +431,20 @@ Rules:
 - Service status: `Vehicle.nextServiceDueOn` is the due date of the vehicle's latest maintenance record that has one (by `performedOn`, then creation time), or `null`. `Vehicle.serviceStatus` is `UNKNOWN` (no due date), `OVERDUE` (due before today, UTC), `DUE_SOON` (due from today through the next 14 days) or `OK` (later). Both are recomputed in the same transaction as every maintenance create, update and delete, with the vehicle row locked so concurrent writes stay consistent. They cannot be set through the vehicle endpoints. Maintenance writes also update the vehicle's `updatedAt`.
 - A daily job at 02:00 UTC advances `serviceStatus` as time passes. It is the only query that spans organizations, and it only writes the derived `serviceStatus` column (and the row's `updatedAt`). Cost-summary months run from 1900-01 to 2999-12. It does not run at startup; if the API is down at 02:00 the statuses catch up on the next run.
 - Cost summary response: `{ from, to, months: [{ month, maintenanceCost, fuelCost, fuelLiters, totalCost }], totals }`. Every month in the range is present (zero-filled) in ascending order; `totalCost` is maintenance plus fuel. `from` / `to` are `YYYY-MM`, from 1900; `from` after `to` or more than 24 months is `400`.
+
+### Dashboard
+
+`GET /dashboard/fleet` (ADMIN or MANAGER) returns organization-wide counts; `GET /dashboard/me` (any role) returns only the caller's own linked driver and active assignment (both `null` when the user is not linked to a driver). `GET /cost-summary` is the fleet-wide version of the per-vehicle cost summary (same `from` / `to` rules, ADMIN or MANAGER).
+
+```bash
+curl http://localhost:3000/api/v1/dashboard/fleet -H "Authorization: Bearer $TOKEN"
+curl http://localhost:3000/api/v1/dashboard/me -H "Authorization: Bearer $TOKEN"
+curl 'http://localhost:3000/api/v1/cost-summary?from=2026-01&to=2026-12' -H "Authorization: Bearer $TOKEN"
+curl 'http://localhost:3000/api/v1/drivers?licenseStatus=EXPIRING_SOON' -H "Authorization: Bearer $TOKEN"
+```
+
+- Fleet response: `{ asOf, vehicles: { total, serviceStatus: { OK, DUE_SOON, OVERDUE, UNKNOWN } }, drivers: { total, licenseStatus: { VALID, EXPIRING_SOON, EXPIRED } }, assignments: { active } }`. `asOf` is the UTC day used for the license windows.
+- Driver responses include `licenseStatus`: `EXPIRED` (expiry before today, UTC), `EXPIRING_SOON` (today through the next 30 days inclusive) or `VALID` (later). `GET /drivers?licenseStatus=` accepts the same three uppercase values; anything else is `400`.
 
 ### Upgrading to phase 7
 
