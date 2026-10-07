@@ -26,26 +26,33 @@ Start the API first (it listens on port 3000). The app refuses to start when the
 
 ## Routes
 
-| Route                 | Access    | Purpose                                                                                                                   |
-| --------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `/login`              | public    | Sign-in form (organization, email, password)                                                                              |
-| `/`                   | protected | Dashboard (empty state) inside the application shell; redirects to `/login` without a valid session                       |
-| `/vehicles`           | protected | Vehicle list: filters (`make`, `model`, `year`), pagination (`page`, `limit`) and flash notices, all in the URL           |
-| `/vehicles/new`       | protected | Add vehicle (ADMIN, MANAGER; a DRIVER sees "not allowed")                                                                 |
-| `/vehicles/[id]`      | protected | Vehicle detail; Edit and Delete for ADMIN and MANAGER; ADMIN and MANAGER also see the Assignment section                  |
-| `/vehicles/[id]/edit` | protected | Edit vehicle (ADMIN, MANAGER); sends only the changed fields                                                              |
-| `/drivers`            | protected | Driver list (ADMIN, MANAGER): pagination in the URL, license expiry badges; a DRIVER sees "not allowed" without any fetch |
-| `/drivers/new`        | protected | Add driver (ADMIN, MANAGER); only an ADMIN can link a login account                                                       |
-| `/drivers/[id]`       | protected | Driver detail; Edit, Delete and the Assignment section (assign a vehicle, end it, past assignments)                       |
-| `/drivers/[id]/edit`  | protected | Edit driver; sends only the changed fields                                                                                |
-| `/assignments`        | protected | Read-only assignment list (ADMIN, MANAGER): `active` filter (All, Current, Ended) and pagination in the URL               |
-| `/users`              | protected | User list (ADMIN only): `role` filter and pagination in the URL; a non-admin sees "not allowed" without any fetch         |
-| `/users/new`          | protected | Add user (ADMIN only)                                                                                                     |
-| `/users/[id]`         | protected | User detail; Edit and Delete (Delete is disabled on your own record)                                                      |
-| `/users/[id]/edit`    | protected | Edit user (names, email, role); the role is locked on your own record; sends only the changed fields                      |
-| `/account/password`   | protected | Change your own password (every role)                                                                                     |
-| `/session-expired`    | public    | Route handler that resolves a render-time 401 (clears the cookie or returns to the page)                                  |
-| `/dev/api-health`     | public    | Development page, 404 in production (see below)                                                                           |
+| Route                                        | Access    | Purpose                                                                                                                                                                                 |
+| -------------------------------------------- | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/login`                                     | public    | Sign-in form (organization, email, password)                                                                                                                                            |
+| `/`                                          | protected | Dashboard (empty state) inside the application shell; redirects to `/login` without a valid session                                                                                     |
+| `/vehicles`                                  | protected | Vehicle list: filters (`make`, `model`, `year`, `serviceStatus`), a Service column (status badge and next service date), pagination (`page`, `limit`) and flash notices, all in the URL |
+| `/vehicles/new`                              | protected | Add vehicle (ADMIN, MANAGER; a DRIVER sees "not allowed")                                                                                                                               |
+| `/vehicles/[id]`                             | protected | Vehicle detail with next service date and service status (all roles); Edit, Delete, the section links and the Assignment section for ADMIN and MANAGER                                  |
+| `/vehicles/[id]/edit`                        | protected | Edit vehicle (ADMIN, MANAGER); sends only the changed fields                                                                                                                            |
+| `/vehicles/[id]/maintenance`                 | protected | Maintenance records of a vehicle (ADMIN, MANAGER; a DRIVER sees "not allowed" without any fetch): `type`, `from`, `to` filters and pagination in the URL                                |
+| `/vehicles/[id]/maintenance/new`             | protected | Add a maintenance record; a next service date sets the vehicle's service status                                                                                                         |
+| `/vehicles/[id]/maintenance/[recordId]/edit` | protected | Edit or delete a maintenance record; sends only the changed fields                                                                                                                      |
+| `/vehicles/[id]/fuel`                        | protected | Fuel logs of a vehicle (ADMIN, MANAGER): `from`, `to` filters and pagination in the URL                                                                                                 |
+| `/vehicles/[id]/fuel/new`                    | protected | Add a fuel log                                                                                                                                                                          |
+| `/vehicles/[id]/fuel/[recordId]/edit`        | protected | Edit or delete a fuel log; sends only the changed fields                                                                                                                                |
+| `/vehicles/[id]/costs`                       | protected | Monthly cost summary (maintenance, fuel, liters, total) for a month range (`from`, `to` as `YYYY-MM`; the API defaults to the last 12 months); no chart                                 |
+| `/drivers`                                   | protected | Driver list (ADMIN, MANAGER): pagination in the URL, license expiry badges; a DRIVER sees "not allowed" without any fetch                                                               |
+| `/drivers/new`                               | protected | Add driver (ADMIN, MANAGER); only an ADMIN can link a login account                                                                                                                     |
+| `/drivers/[id]`                              | protected | Driver detail; Edit, Delete and the Assignment section (assign a vehicle, end it, past assignments)                                                                                     |
+| `/drivers/[id]/edit`                         | protected | Edit driver; sends only the changed fields                                                                                                                                              |
+| `/assignments`                               | protected | Read-only assignment list (ADMIN, MANAGER): `active` filter (All, Current, Ended) and pagination in the URL                                                                             |
+| `/users`                                     | protected | User list (ADMIN only): `role` filter and pagination in the URL; a non-admin sees "not allowed" without any fetch                                                                       |
+| `/users/new`                                 | protected | Add user (ADMIN only)                                                                                                                                                                   |
+| `/users/[id]`                                | protected | User detail; Edit and Delete (Delete is disabled on your own record)                                                                                                                    |
+| `/users/[id]/edit`                           | protected | Edit user (names, email, role); the role is locked on your own record; sends only the changed fields                                                                                    |
+| `/account/password`                          | protected | Change your own password (every role)                                                                                                                                                   |
+| `/session-expired`                           | public    | Route handler that resolves a render-time 401 (clears the cookie or returns to the page)                                                                                                |
+| `/dev/api-health`                            | public    | Development page, 404 in production (see below)                                                                                                                                         |
 
 Unknown paths are treated as protected: without a session they redirect to `/login?returnTo=...`.
 
@@ -80,6 +87,8 @@ npx shadcn@4.21.3 add <name>
 ```
 
 Do not add the CLI as a dependency. After each `add`: remove the `shadcn` devDependency and the `@import "shadcn/tailwind.css"` line if the CLI adds them, pin any `^` version it writes in `package.json`, change `from "cn"` imports to `@/lib/utils`, run `npm run format`, and make sure `npm run lint` passes. Dark mode is not supported (the `dark:` classes in copied files are inert).
+
+Shared building blocks beyond the shadcn primitives are in `src/components/` (`PageHeader`, `EmptyState`, `ErrorState`, `Notice`, `ConfirmDialog`, `NotAllowed`, `Pagination`, `LicenseStatusBadge`, `ServiceStatusBadge`, the form helpers). `Textarea` (shadcn) is used by the maintenance form. `ServiceStatusBadge` always shows the status in words (Overdue, Due soon, OK, No service date); the status and next service date come from the API and are never recomputed in the web app. `VehicleSectionNav` (`vehicles/_components/`) links Overview, Maintenance, Fuel and Costs on a vehicle's pages and is shown only to ADMIN and MANAGER.
 
 New dependencies (exact versions): `radix-ui` 1.7.0, `class-variance-authority` 0.7.1, `cn` 0.4.0, `lucide-react` 1.52.0; dev: `tw-animate-css` 1.4.0.
 

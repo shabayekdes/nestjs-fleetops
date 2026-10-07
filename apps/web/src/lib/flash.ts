@@ -13,6 +13,12 @@ export const FLASH_MESSAGES = {
   'driver-deleted': 'Driver deleted.',
   'assignment-created': 'Driver assigned.',
   'assignment-ended': 'Assignment ended.',
+  'maintenance-created': 'Maintenance record added.',
+  'maintenance-updated': 'Maintenance record updated.',
+  'maintenance-deleted': 'Maintenance record deleted.',
+  'fuel-log-created': 'Fuel log added.',
+  'fuel-log-updated': 'Fuel log updated.',
+  'fuel-log-deleted': 'Fuel log deleted.',
   'password-changed': 'Password changed.',
 } as const;
 

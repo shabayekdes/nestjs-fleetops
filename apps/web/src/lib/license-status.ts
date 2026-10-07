@@ -1,23 +1,8 @@
+import { isDateOnly } from './date-only';
+
 export const LICENSE_EXPIRING_DAYS = 30;
 
 export type LicenseStatus = 'expired' | 'expiring' | 'valid';
-
-/** True for a real calendar date written as "YYYY-MM-DD". */
-export function isDateOnly(value: string): boolean {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-  if (!match) return false;
-  const [year, month, day] = [
-    Number(match[1]),
-    Number(match[2]),
-    Number(match[3]),
-  ];
-  const date = new Date(Date.UTC(year, month - 1, day));
-  return (
-    date.getUTCFullYear() === year &&
-    date.getUTCMonth() === month - 1 &&
-    date.getUTCDate() === day
-  );
-}
 
 function utcDate(time: number): string {
   return new Date(time).toISOString().slice(0, 10);

@@ -117,20 +117,61 @@ export async function deleteVehicleViaApi(
   if (response.status() !== 404) await expectOk(response, 'delete vehicle');
 }
 
+export type ApiMaintenanceRecord = {
+  id: string;
+  vehicleId: string;
+  type: string;
+  description: string | null;
+  vendor: string | null;
+  performedOn: string;
+  odometerKm: number | null;
+  cost: string;
+  nextServiceDueOn: string | null;
+};
+
+export type ApiFuelLog = {
+  id: string;
+  vehicleId: string;
+  fueledOn: string;
+  liters: string;
+  totalCost: string;
+  odometerKm: number | null;
+};
+
+/** Creates a maintenance record; `overrides` replace the default body fields. */
 export async function createMaintenanceRecordViaApi(
   request: APIRequestContext,
   token: string,
   vehicleId: string,
-): Promise<{ id: string }> {
+  overrides: Record<string, unknown> = {},
+): Promise<ApiMaintenanceRecord> {
   const response = await request.post(
     `${API}/vehicles/${vehicleId}/maintenance-records`,
     {
       headers: auth(token),
-      data: { type: 'OIL_CHANGE', performedOn: '2026-01-15', cost: '10.00' },
+      data: {
+        type: 'OIL_CHANGE',
+        performedOn: '2026-01-15',
+        cost: '10.00',
+        ...overrides,
+      },
     },
   );
   await expectOk(response, 'create maintenance record');
-  return (await response.json()) as { id: string };
+  return (await response.json()) as ApiMaintenanceRecord;
+}
+
+export async function listMaintenanceRecordsViaApi(
+  request: APIRequestContext,
+  token: string,
+  vehicleId: string,
+): Promise<ApiMaintenanceRecord[]> {
+  const response = await request.get(
+    `${API}/vehicles/${vehicleId}/maintenance-records`,
+    { headers: auth(token), params: { limit: 100 } },
+  );
+  await expectOk(response, 'list maintenance records');
+  return ((await response.json()) as { data: ApiMaintenanceRecord[] }).data;
 }
 
 export async function deleteMaintenanceRecordViaApi(
@@ -144,6 +185,55 @@ export async function deleteMaintenanceRecordViaApi(
     { headers: auth(token) },
   );
   if (response.status() !== 404) await expectOk(response, 'delete record');
+}
+
+/** Creates a fuel log; `overrides` replace the default body fields. */
+export async function createFuelLogViaApi(
+  request: APIRequestContext,
+  token: string,
+  vehicleId: string,
+  overrides: Record<string, unknown> = {},
+): Promise<ApiFuelLog> {
+  const response = await request.post(
+    `${API}/vehicles/${vehicleId}/fuel-logs`,
+    {
+      headers: auth(token),
+      data: {
+        fueledOn: '2026-01-15',
+        liters: '40.000',
+        totalCost: '60.00',
+        ...overrides,
+      },
+    },
+  );
+  await expectOk(response, 'create fuel log');
+  return (await response.json()) as ApiFuelLog;
+}
+
+export async function listFuelLogsViaApi(
+  request: APIRequestContext,
+  token: string,
+  vehicleId: string,
+): Promise<ApiFuelLog[]> {
+  const response = await request.get(`${API}/vehicles/${vehicleId}/fuel-logs`, {
+    headers: auth(token),
+    params: { limit: 100 },
+  });
+  await expectOk(response, 'list fuel logs');
+  return ((await response.json()) as { data: ApiFuelLog[] }).data;
+}
+
+export async function deleteFuelLogViaApi(
+  request: APIRequestContext,
+  token: string,
+  vehicleId: string,
+  logId: string,
+): Promise<void> {
+  const response = await request.delete(
+    `${API}/vehicles/${vehicleId}/fuel-logs/${logId}`,
+    { headers: auth(token) },
+  );
+  if (response.status() !== 404) await expectOk(response, 'delete fuel log');
 }
 
 /**
@@ -489,9 +579,45 @@ export async function sweepAssignableVehiclesByMake(
 }
 
 /**
+ * Deletes every maintenance record and fuel log of the vehicles whose make is
+ * exactly `make`, so the vehicles can be deleted afterwards (the API refuses
+ * to delete a vehicle that still has records).
+ */
+export async function sweepVehicleRecordsByMake(
+  request: APIRequestContext,
+  token: string,
+  make: string,
+): Promise<void> {
+  const response = await request.get(`${API}/vehicles`, {
+    headers: auth(token),
+    params: { make, limit: 100 },
+  });
+  await expectOk(response, 'list vehicles');
+  const body = (await response.json()) as { data: ApiVehicle[] };
+  for (const vehicle of body.data) {
+    if (vehicle.make.toLowerCase() !== make.toLowerCase()) continue;
+    for (const record of await listMaintenanceRecordsViaApi(
+      request,
+      token,
+      vehicle.id,
+    )) {
+      await deleteMaintenanceRecordViaApi(
+        request,
+        token,
+        vehicle.id,
+        record.id,
+      );
+    }
+    for (const log of await listFuelLogsViaApi(request, token, vehicle.id)) {
+      await deleteFuelLogViaApi(request, token, vehicle.id, log.id);
+    }
+  }
+}
+
+/**
  * Cleans up everything one test created, in the order the API allows: end the
- * active E2E assignments, delete the E2E users, then sweep drivers and
- * vehicles. Rows blocked by assignment history stay until the global teardown
+ * active E2E assignments, delete the E2E users, sweep drivers, delete the
+ * maintenance records and fuel logs of the E2E vehicles, then sweep vehicles. Rows blocked by assignment history stay until the global teardown
  * runs `db:test:e2e-cleanup`.
  */
 export async function cleanupE2eFixtures(
@@ -523,7 +649,11 @@ export async function cleanupE2eFixtures(
       try {
         await sweepDriversByLicensePrefix(request, token, licensePrefix);
       } finally {
-        await sweepAssignableVehiclesByMake(request, token, make);
+        try {
+          await sweepVehicleRecordsByMake(request, token, make);
+        } finally {
+          await sweepAssignableVehiclesByMake(request, token, make);
+        }
       }
     }
   }

@@ -8,6 +8,18 @@ describe('flashMessage', () => {
     expect(flashMessage('user-created')).toBe('User created.');
     expect(flashMessage('user-updated')).toBe('User updated.');
     expect(flashMessage('user-deleted')).toBe('User deleted.');
+    expect(flashMessage('maintenance-created')).toBe(
+      'Maintenance record added.',
+    );
+    expect(flashMessage('maintenance-updated')).toBe(
+      'Maintenance record updated.',
+    );
+    expect(flashMessage('maintenance-deleted')).toBe(
+      'Maintenance record deleted.',
+    );
+    expect(flashMessage('fuel-log-created')).toBe('Fuel log added.');
+    expect(flashMessage('fuel-log-updated')).toBe('Fuel log updated.');
+    expect(flashMessage('fuel-log-deleted')).toBe('Fuel log deleted.');
     expect(flashMessage('password-changed')).toBe('Password changed.');
   });
 

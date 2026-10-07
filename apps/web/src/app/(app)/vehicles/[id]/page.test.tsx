@@ -91,6 +91,56 @@ describe('VehicleDetailPage', () => {
     ).toHaveAttribute('href', '/vehicles');
   });
 
+  it('shows "Not scheduled" and the status in words without a service date', async () => {
+    await renderPage();
+    expect(screen.getByText('Next service')).toBeInTheDocument();
+    expect(screen.getByText('Not scheduled')).toBeInTheDocument();
+    expect(screen.getByText('Service status')).toBeInTheDocument();
+    expect(screen.getByText('No service date')).toBeInTheDocument();
+  });
+
+  it.each(['ADMIN', 'MANAGER', 'DRIVER'])(
+    'shows the service rows to %s',
+    async (role) => {
+      getCurrentUser.mockResolvedValue({ role });
+      getVehicle.mockResolvedValue({
+        ...vehicle,
+        nextServiceDueOn: '2026-04-01',
+        serviceStatus: 'DUE_SOON',
+      });
+      await renderPage();
+      expect(screen.getByText('Apr 1, 2026')).toBeInTheDocument();
+      expect(screen.getByText('Due soon')).toBeInTheDocument();
+    },
+  );
+
+  it.each(['ADMIN', 'MANAGER'])('shows the section nav to %s', async (role) => {
+    getCurrentUser.mockResolvedValue({ role });
+    await renderPage();
+    expect(
+      screen.getByRole('navigation', { name: 'Vehicle sections' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Overview' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    expect(screen.getByRole('link', { name: 'Maintenance' })).toHaveAttribute(
+      'href',
+      `/vehicles/${ID}/maintenance`,
+    );
+  });
+
+  it('hides the section nav from a driver and calls no record endpoint', async () => {
+    getCurrentUser.mockResolvedValue({ role: 'DRIVER' });
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    await renderPage();
+    expect(
+      screen.queryByRole('navigation', { name: 'Vehicle sections' }),
+    ).toBeNull();
+    expect(fetchSpy).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
   it('shows "Not registered" without a plate', async () => {
     getVehicle.mockResolvedValue({ ...vehicle, licensePlate: null });
     await renderPage();

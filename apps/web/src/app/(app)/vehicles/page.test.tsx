@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '@/lib/api/errors';
@@ -89,6 +89,42 @@ describe('VehiclesPage', () => {
     expect(screen.getByText('PLATE1')).toBeInTheDocument();
     expect(screen.getByText('—')).toBeInTheDocument();
     expect(screen.getByText('Showing 1–2 of 2')).toBeInTheDocument();
+  });
+
+  it('shows the service badge and the due date in the Service column', async () => {
+    listVehicles.mockResolvedValue({
+      data: [
+        {
+          ...vehicle(1),
+          serviceStatus: 'OVERDUE',
+          nextServiceDueOn: '2026-01-15',
+        },
+        vehicle(2),
+      ],
+      meta: { page: 1, limit: 20, total: 2 },
+    });
+    await renderPage();
+    expect(
+      screen.getByRole('columnheader', { name: 'Service' }),
+    ).toBeInTheDocument();
+    const table = within(screen.getByRole('table'));
+    expect(table.getByText('Overdue')).toBeInTheDocument();
+    expect(table.getByText('Jan 15, 2026')).toBeInTheDocument();
+    expect(table.getByText('No service date')).toBeInTheDocument();
+  });
+
+  it('offers the Service filter and passes it to the API', async () => {
+    await renderPage({ serviceStatus: 'DUE_SOON' });
+    const select = screen.getByLabelText('Service');
+    expect(select).toHaveValue('DUE_SOON');
+    expect(
+      screen.getAllByRole('option').map((option) => option.textContent),
+    ).toEqual(['Any', 'Overdue', 'Due soon', 'OK', 'No service date']);
+    expect(listVehicles).toHaveBeenCalledWith({
+      page: 1,
+      limit: 20,
+      serviceStatus: 'DUE_SOON',
+    });
   });
 
   it('passes the parsed query to the API', async () => {

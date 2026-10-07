@@ -4,6 +4,11 @@ import { FormField } from '@/components/form/form-field';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
+  NativeSelect,
+  NativeSelectOption,
+} from '@/components/ui/native-select';
+import { SERVICE_STATUSES, SERVICE_STATUS_LABELS } from '@/lib/service-status';
+import {
   DEFAULT_LIMIT,
   vehicleListHref,
   type VehicleListQuery,
@@ -66,6 +71,22 @@ export function VehicleFilters({
             className="w-28"
             defaultValue={query.year ?? ''}
           />
+        )}
+      </FormField>
+      <FormField name="serviceStatus" label="Service">
+        {(props) => (
+          <NativeSelect
+            {...props}
+            name="serviceStatus"
+            defaultValue={query.serviceStatus ?? ''}
+          >
+            <NativeSelectOption value="">Any</NativeSelectOption>
+            {SERVICE_STATUSES.map((status) => (
+              <NativeSelectOption key={status} value={status}>
+                {SERVICE_STATUS_LABELS[status]}
+              </NativeSelectOption>
+            ))}
+          </NativeSelect>
         )}
       </FormField>
       <div className="mt-5 flex items-center gap-2">

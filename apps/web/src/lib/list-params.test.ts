@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { parsePageAndLimit, readSingleParam } from './list-params';
+import {
+  parseDateRange,
+  parsePageAndLimit,
+  readSingleParam,
+} from './list-params';
 
 describe('readSingleParam', () => {
   it('returns a string and reports an array', () => {
@@ -48,5 +52,35 @@ describe('parsePageAndLimit', () => {
 
   it('ignores a repeated key once', () => {
     expect(parse({ page: ['1', '2'] }).ignored).toEqual(['page']);
+  });
+});
+
+describe('parseDateRange', () => {
+  it('reads valid dates and trims them', () => {
+    const ignored: string[] = [];
+    expect(
+      parseDateRange({ from: '2026-01-01', to: ' 2026-02-28 ' }, ignored),
+    ).toEqual({ from: '2026-01-01', to: '2026-02-28' });
+    expect(ignored).toEqual([]);
+  });
+
+  it('leaves absent and empty values out silently', () => {
+    const ignored: string[] = [];
+    expect(parseDateRange({ to: '' }, ignored)).toEqual({});
+    expect(ignored).toEqual([]);
+  });
+
+  it('drops invalid and repeated values with a warning', () => {
+    const ignored: string[] = [];
+    expect(
+      parseDateRange({ from: '2026-02-30', to: ['2026-01-01', 'x'] }, ignored),
+    ).toEqual({});
+    expect(ignored).toEqual(['from', 'to']);
+  });
+
+  it('does not check from against to', () => {
+    expect(
+      parseDateRange({ from: '2026-05-01', to: '2026-01-01' }, []),
+    ).toEqual({ from: '2026-05-01', to: '2026-01-01' });
   });
 });

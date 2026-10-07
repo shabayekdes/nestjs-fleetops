@@ -24,3 +24,17 @@ export type UpdateDriverRequest = Schemas['UpdateDriverDto'];
 export type Assignment = Schemas['AssignmentResponseDto'];
 export type AssignmentList = Schemas['AssignmentListResponseDto'];
 export type CreateAssignmentRequest = Schemas['CreateAssignmentDto'];
+export type ServiceStatus = Vehicle['serviceStatus'];
+export type MaintenanceRecord = Schemas['MaintenanceRecordResponseDto'];
+export type MaintenanceRecordList = Schemas['MaintenanceRecordListResponseDto'];
+export type CreateMaintenanceRecordRequest =
+  Schemas['CreateMaintenanceRecordDto'];
+export type UpdateMaintenanceRecordRequest =
+  Schemas['UpdateMaintenanceRecordDto'];
+export type MaintenanceType = MaintenanceRecord['type'];
+export type FuelLog = Schemas['FuelLogResponseDto'];
+export type FuelLogList = Schemas['FuelLogListResponseDto'];
+export type CreateFuelLogRequest = Schemas['CreateFuelLogDto'];
+export type UpdateFuelLogRequest = Schemas['UpdateFuelLogDto'];
+export type CostSummary = Schemas['CostSummaryResponseDto'];
+export type CostSummaryMonth = Schemas['CostSummaryMonthDto'];

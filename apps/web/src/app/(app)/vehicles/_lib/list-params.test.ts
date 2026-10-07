@@ -95,6 +95,29 @@ describe('parseVehicleListParams', () => {
     );
   });
 
+  it('reads a valid serviceStatus as a filter', () => {
+    const result = parseVehicleListParams({ serviceStatus: 'OVERDUE' });
+    expect(result.query.serviceStatus).toBe('OVERDUE');
+    expect(result.hasFilters).toBe(true);
+    expect(result.ignored).toEqual([]);
+  });
+
+  it.each(['overdue', 'LATE', ['OK', 'OVERDUE']])(
+    'ignores serviceStatus %j',
+    (serviceStatus) => {
+      const result = parseVehicleListParams({ serviceStatus });
+      expect(result.query.serviceStatus).toBeUndefined();
+      expect(result.hasFilters).toBe(false);
+      expect(result.ignored).toEqual(['serviceStatus']);
+    },
+  );
+
+  it('treats an empty serviceStatus as absent without a warning', () => {
+    const result = parseVehicleListParams({ serviceStatus: '' });
+    expect(result.query.serviceStatus).toBeUndefined();
+    expect(result.ignored).toEqual([]);
+  });
+
   it('does not report unknown params such as notice', () => {
     expect(
       parseVehicleListParams({ notice: 'vehicle-deleted', foo: 'x' }).ignored,
@@ -111,6 +134,12 @@ describe('vehicleListHref', () => {
     expect(
       vehicleListHref({ page: 1, limit: 2, make: 'Ford', year: 2021 }),
     ).toBe('/vehicles?make=Ford&year=2021&limit=2');
+  });
+
+  it('keeps the serviceStatus filter', () => {
+    expect(
+      vehicleListHref({ page: 1, limit: 20, serviceStatus: 'DUE_SOON' }),
+    ).toBe('/vehicles?serviceStatus=DUE_SOON');
   });
 
   it('applies overrides', () => {

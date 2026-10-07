@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isDateOnly, licenseStatus } from './license-status';
+import { licenseStatus } from './license-status';
 
 const now = new Date('2026-03-10T12:00:00Z');
 
@@ -32,13 +32,5 @@ describe('licenseStatus', () => {
     expect(licenseStatus('', now)).toBeUndefined();
     expect(licenseStatus('2026-02-30', now)).toBeUndefined();
     expect(licenseStatus('tomorrow', now)).toBeUndefined();
-  });
-});
-
-describe('isDateOnly', () => {
-  it('accepts real calendar dates only', () => {
-    expect(isDateOnly('2024-02-29')).toBe(true);
-    expect(isDateOnly('2023-02-29')).toBe(false);
-    expect(isDateOnly('2024-1-5')).toBe(false);
   });
 });

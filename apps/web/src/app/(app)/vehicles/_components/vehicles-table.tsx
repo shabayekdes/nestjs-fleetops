@@ -8,7 +8,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { ServiceStatusBadge } from '@/components/service-status-badge';
 import type { Vehicle } from '@/lib/api/types';
+import { formatDateOnly } from '@/lib/format';
 
 export function VehiclesTable({ vehicles }: { vehicles: Vehicle[] }) {
   return (
@@ -21,6 +23,7 @@ export function VehiclesTable({ vehicles }: { vehicles: Vehicle[] }) {
           <TableHead>Year</TableHead>
           <TableHead>VIN</TableHead>
           <TableHead>License plate</TableHead>
+          <TableHead>Service</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -38,6 +41,16 @@ export function VehiclesTable({ vehicles }: { vehicles: Vehicle[] }) {
             <TableCell>{vehicle.year}</TableCell>
             <TableCell className="font-mono">{vehicle.vin}</TableCell>
             <TableCell>{vehicle.licensePlate ?? '—'}</TableCell>
+            <TableCell>
+              <div className="flex flex-wrap items-center gap-2">
+                <ServiceStatusBadge status={vehicle.serviceStatus} />
+                {vehicle.nextServiceDueOn ? (
+                  <span className="text-muted-foreground text-sm">
+                    {formatDateOnly(vehicle.nextServiceDueOn)}
+                  </span>
+                ) : null}
+              </div>
+            </TableCell>
           </TableRow>
         ))}
       </TableBody>

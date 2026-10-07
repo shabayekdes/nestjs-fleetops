@@ -4,6 +4,8 @@ import {
   parsePageAndLimit,
   readSingleParam,
 } from '@/lib/list-params';
+import { isServiceStatus } from '@/lib/service-status';
+import type { ServiceStatus } from '@/lib/api/types';
 import { buildHref, type RawSearchParams } from '@/lib/search-params';
 
 export { DEFAULT_LIMIT };
@@ -16,6 +18,7 @@ export type VehicleListQuery = {
   make?: string;
   model?: string;
   year?: number;
+  serviceStatus?: ServiceStatus;
 };
 
 export type ParsedVehicleListParams = {
@@ -68,13 +71,20 @@ export function parseVehicleListParams(
     else query.year = value;
   }
 
+  const serviceStatus = field('serviceStatus');
+  if (serviceStatus !== undefined && serviceStatus !== '') {
+    if (isServiceStatus(serviceStatus)) query.serviceStatus = serviceStatus;
+    else ignored.push('serviceStatus');
+  }
+
   return {
     query,
     ignored,
     hasFilters:
       query.make !== undefined ||
       query.model !== undefined ||
-      query.year !== undefined,
+      query.year !== undefined ||
+      query.serviceStatus !== undefined,
   };
 }
 
@@ -86,6 +96,7 @@ export function vehicleListParams(
     make: query.make,
     model: query.model,
     year: query.year,
+    serviceStatus: query.serviceStatus,
     limit: query.limit === DEFAULT_LIMIT ? undefined : query.limit,
     page: query.page === 1 ? undefined : query.page,
   };

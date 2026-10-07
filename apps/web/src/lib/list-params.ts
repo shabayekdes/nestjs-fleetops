@@ -1,3 +1,4 @@
+import { isDateOnly } from '@/lib/date-only';
 import { singleParam, type RawSearchParams } from '@/lib/search-params';
 
 export const DEFAULT_LIMIT = 20;
@@ -57,4 +58,23 @@ export function parsePageAndLimit(
   }
 
   return result;
+}
+
+/**
+ * Reads the optional `from` and `to` calendar dates ("YYYY-MM-DD") leniently:
+ * an invalid or repeated value is dropped and reported in `ignored`. There is
+ * no `from <= to` check; the API answers 400 and the page shows its message.
+ */
+export function parseDateRange(
+  raw: RawSearchParams,
+  ignored: string[],
+): { from?: string; to?: string } {
+  const range: { from?: string; to?: string } = {};
+  for (const name of ['from', 'to'] as const) {
+    const value = readSingleParam(raw, name, ignored)?.trim();
+    if (value === undefined || value === '') continue;
+    if (isDateOnly(value)) range[name] = value;
+    else ignored.push(name);
+  }
+  return range;
 }

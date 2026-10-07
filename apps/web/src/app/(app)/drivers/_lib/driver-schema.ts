@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { UpdateDriverRequest } from '@/lib/api/types';
 import { isUuid } from '@/lib/ids';
-import { isDateOnly } from '@/lib/license-status';
+import { isDateOnly } from '@/lib/date-only';
 
 export const DRIVER_FIELDS = [
   'firstName',

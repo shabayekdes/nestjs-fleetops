@@ -21,7 +21,7 @@ To avoid confusion with the backend roadmap, frontend phases are always called *
 | FE4            | Vehicles               | Done    | `fa31a81` |
 | FE5            | Users + roles          | Done    | `499fa7d` |
 | FE6            | Drivers + assignments  | Done    | `970993c` |
-| FE7            | Maintenance + fuel     | Planned | —         |
+| FE7            | Maintenance + fuel     | Done    | —         |
 | FE8            | Dashboard + reporting  | Planned | —         |
 | FE9            | Production readiness   | Planned | —         |
 
@@ -88,7 +88,7 @@ For each choice: why it is needed, what it solves, why it fits, and when it is n
 | **Data tables** (plain table component first; TanStack Table only if needed)   | Displaying paginated lists.                                                                                     | Pagination, filtering and sorting are done by the API, so the table only renders rows. A table library is needed only if column features (resizing, column visibility, row selection) are required.                     | **Plain shadcn `table` (FE4).** Library deferred.                                                                                                             |
 | **Client-side data cache** (e.g. TanStack Query)                               | Client-side caching, background refetching, optimistic updates.                                                 | Not needed while data is fetched on the server per request. It may be needed for highly interactive screens.                                                                                                            | Deferred. Adopt only with a concrete screen that needs it.                                                                                                    |
 | **Global client state library** (e.g. Zustand)                                 | Shared client-only state.                                                                                       | The current user comes from the server, and filters live in the URL. There is no known need.                                                                                                                            | Not planned.                                                                                                                                                  |
-| **Charts** (e.g. Recharts, or a similar lightweight library)                   | Time-series and comparison charts.                                                                              | Only the cost summaries (FE7) and the dashboard (FE8) need charts.                                                                                                                                                      | Deferred to FE7/FE8. Choose based on the actual charts needed.                                                                                                |
+| **Charts** (e.g. Recharts, or a similar lightweight library)                   | Time-series and comparison charts.                                                                              | Only the cost summaries (FE7) and the dashboard (FE8) need charts.                                                                                                                                                      | FE7 uses a table only; deferred to FE8. Choose based on the actual charts needed.                                                                             |
 | **Unit/component tests** (e.g. Vitest or Jest + React Testing Library)         | Testing components, form behaviour and API error mapping without a browser.                                     | Matches the backend's unit-test discipline. Choose the runner that works best with the chosen Next.js version, preferring Jest if it works without friction (same runner as the backend).                               | Required, FE1. **Chosen: Vitest 5 + React Testing Library** (the user chose it over Jest).                                                                    |
 | **End-to-end tests** (e.g. Playwright)                                         | Testing real flows (login, CRUD, role behaviour) in a browser against a running API.                            | The most important frontend risks (session expiry, 401/403 handling, tenant isolation in the UI) only show up end to end.                                                                                               | **Chosen: Playwright 1.63.0 (Chromium)**, set up in FE2 with a CI job. Expanded at FE9.                                                                       |
 | **Authentication library** (e.g. Auth.js)                                      | —                                                                                                               | **Not planned.** The API already authenticates users and issues tokens. A small custom session (an encrypted cookie holding the access token) is simpler than adapting an auth library to an external bearer-token API. | Not needed.                                                                                                                                                   |
@@ -438,7 +438,7 @@ For each choice: why it is needed, what it solves, why it fits, and when it is n
 
 ## Frontend Phase 7 — Maintenance + fuel
 
-**Status:** Planned
+**Status:** Done
 
 **Goal:** record and review running costs per vehicle. Built on backend Phase 7.
 
@@ -453,6 +453,41 @@ For each choice: why it is needed, what it solves, why it fits, and when it is n
 **Out of scope**
 
 - Receipt or invoice uploads; email or push notifications (not in the backend).
+
+**Built**
+
+- Routes under `src/app/(app)/vehicles/[id]/`: `maintenance/` and `fuel/` (list with filters and pagination, `new`, `[recordId]/edit`, a segment `not-found.tsx`) and `costs/` (monthly cost summary with a month-range form). Each has route-private `_lib/` (Zod schema and edit diff, list params, API wrappers), `_components/` and `actions.ts` (create, update, delete).
+- Vehicles: a `serviceStatus` filter and a Service column on the list; "Next service" and "Service status" rows on the detail page for all roles; `VehicleSectionNav` (Overview · Maintenance · Fuel · Costs) for ADMIN and MANAGER; `loadVehicle` and `canManageVehicleRecords`.
+- Shared: `lib/date-only.ts` (`isDateOnly` moved from `license-status.ts`, plus `utcDateFromToday`, `isMonth`), `lib/decimal.ts` (`canonicalDecimal`), `formatDecimal`, `formatMonth`, `formatKm`, `lib/service-status.ts`, `ServiceStatusBadge`, `parseDateRange`, shadcn `textarea`, and the `maintenance-*` and `fuel-log-*` flash keys.
+- Tests: unit and component tests for all of the above; Playwright `e2e/maintenance.spec.ts`, `e2e/fuel.spec.ts` and `e2e/cost-summary.spec.ts`, with `e2e/support/dates.ts` and `url.ts`. `cleanupE2eFixtures` now deletes the records and logs of E2E vehicles through the API. The API's `e2e-cleanup.ts` needed no change.
+- No new npm dependency and no API change.
+
+**Decisions**
+
+- Q1: the screens are sub-pages of the vehicle (`/vehicles/[id]/{maintenance,fuel,costs}`) with a section nav, not sections on the detail page. There is no top-level nav item.
+- Q2: no record detail pages. Each row has Edit (a separate page) and Delete (with confirmation).
+- Q3: no chart. The cost summary is a table with a totals row; the chart library is chosen in FE8.
+- Q4: amounts are shown with 2 decimals and no currency symbol, because the API does not expose the organization's currency.
+- Q5: service status is the API's `serviceStatus`, shown as is (badge, list column and filter) to every role. The frontend never recomputes it, unlike `licenseStatus`.
+- Q6: no client check for "next service due must be after the performed date". The API's 400 message is shown as a form-level error. Likewise `from <= to` and the 24-month cost range are left to the API.
+- Q7: after a delete, the user goes back to the unfiltered list with a flash notice.
+- Q8: filters are type, from and to for maintenance; from and to for fuel; a month range for costs (the API's default is the last 12 months). No presets.
+- Q9: no overdue or due-soon widget; fleet-wide views are FE8.
+- Money and liters are handled as strings, never floats. The edit diff compares canonical decimals (`89.9` equals `89.90`); create sends the typed value.
+- Every sub-page checks the role before any fetch, so a DRIVER makes no maintenance, fuel or cost request.
+- Mutations revalidate `/vehicles` as a layout, because maintenance writes change the vehicle's service fields.
+
+**Deferred**
+
+- A cost chart (FE8), currency display, sort controls on record lists, a combined "overdue or due soon" filter, price per liter, driver self-service fuel entry.
+- A 401 inside a Server Action still loses unsaved form input (as in earlier phases).
+
+**Backend gaps recorded**
+
+1. No organization currency.
+2. The `serviceStatus` filter takes a single value.
+3. Service status can be up to one day stale between runs of the daily job.
+4. No sort on maintenance and fuel lists.
 
 ---
 
@@ -513,7 +548,7 @@ Every frontend phase depends on the backend phases below. All backend phases mus
 | FE4 Vehicles              | Phase 4 vehicles CRUD, pagination, filters, 404/409 behaviour; Phase 5 write roles (ADMIN, MANAGER).                                                                | None.                                                                                                                                                                                                                                                                           |
 | FE5 Users + roles         | Phase 5 users CRUD, role filter, `PATCH /auth/me/password`, self-delete/self-demotion `409`.                                                                        | None.                                                                                                                                                                                                                                                                           |
 | FE6 Drivers + assignments | Phase 6 drivers, assignments, current and past assignments, assignment rules.                                                                                       | Gaps: no assignment delete (test cleanup script), no driver search or filters, no license status from the API, no user summary on a driver, a MANAGER cannot list users, a DRIVER cannot see their own assignment.                                                              |
-| FE7 Maintenance + fuel    | Phase 7 maintenance and fuel CRUD, per-vehicle cost summary, service-due flag.                                                                                      | Depends on the final Phase 7 API.                                                                                                                                                                                                                                               |
+| FE7 Maintenance + fuel    | Phase 7 maintenance and fuel CRUD, per-vehicle cost summary, service-due flag.                                                                                      | None blocking. Gaps: no organization currency, single-value `serviceStatus` filter, no sort on record lists.                                                                                                                                                                    |
 | FE8 Dashboard             | Phases 4–7 data.                                                                                                                                                    | **No fleet-wide aggregate endpoints.** A dashboard/statistics endpoint (or a few) must be designed in the backend.                                                                                                                                                              |
 | FE9 Production            | Phase 8 error format, request IDs (shown in error messages to help support); Phase 9 Docker, CI and deployment.                                                     | The API must accept requests from the deployed frontend's server (network/host configuration, no CORS needed).                                                                                                                                                                  |
 

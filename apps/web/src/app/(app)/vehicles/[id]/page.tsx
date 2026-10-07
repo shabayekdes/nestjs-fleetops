@@ -1,10 +1,12 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import type { ReactNode } from 'react';
 import { notFound } from 'next/navigation';
 import { AssignmentSection } from '@/components/assignments/assignment-section';
 import { NotAllowed } from '@/components/not-allowed';
 import { Notice } from '@/components/notice';
 import { PageHeader } from '@/components/page-header';
+import { ServiceStatusBadge } from '@/components/service-status-badge';
 import { Button } from '@/components/ui/button';
 import { ApiError } from '@/lib/api/errors';
 import type { Vehicle } from '@/lib/api/types';
@@ -15,10 +17,14 @@ import { parseAssignmentsPage } from '@/lib/assignments/page-param';
 import { canManageAssignments } from '@/lib/assignments/permissions';
 import { getCurrentUser } from '@/lib/auth/current-user';
 import { flashMessage } from '@/lib/flash';
-import { formatDateTime } from '@/lib/format';
+import { formatDateOnly, formatDateTime } from '@/lib/format';
 import { isUuid } from '@/lib/ids';
 import { singleParam } from '@/lib/search-params';
-import { canManageVehicles } from '../_lib/permissions';
+import { VehicleSectionNav } from '../_components/vehicle-section-nav';
+import {
+  canManageVehicleRecords,
+  canManageVehicles,
+} from '../_lib/permissions';
 import { getVehicle } from '../_lib/vehicles-api';
 import { DeleteVehicleButton } from './delete-vehicle-button';
 
@@ -54,12 +60,25 @@ export default async function VehicleDetailPage({
       )
     : null;
   const flash = flashMessage(singleParam(raw.notice));
-  const rows: [string, string][] = [
+  const rows: [string, ReactNode][] = [
     ['Make', vehicle.make],
     ['Model', vehicle.model],
     ['Year', String(vehicle.year)],
     ['VIN', vehicle.vin],
     ['License plate', vehicle.licensePlate ?? 'Not registered'],
+    [
+      'Next service',
+      vehicle.nextServiceDueOn
+        ? formatDateOnly(vehicle.nextServiceDueOn)
+        : 'Not scheduled',
+    ],
+    [
+      'Service status',
+      <ServiceStatusBadge
+        key="service-status"
+        status={vehicle.serviceStatus}
+      />,
+    ],
     ['Created', formatDateTime(vehicle.createdAt)],
     ['Last updated', formatDateTime(vehicle.updatedAt)],
   ];
@@ -84,6 +103,9 @@ export default async function VehicleDetailPage({
           ) : undefined
         }
       />
+      {canManageVehicleRecords(user.role) ? (
+        <VehicleSectionNav vehicleId={vehicle.id} current="overview" />
+      ) : null}
       {flash ? (
         <div className="mb-4">
           <Notice variant="success">{flash}</Notice>
