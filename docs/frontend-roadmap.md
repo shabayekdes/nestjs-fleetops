@@ -13,17 +13,17 @@ Related documents:
 
 To avoid confusion with the backend roadmap, frontend phases are always called **Frontend Phase N** (FE1–FE9). "Phase N" on its own always means a backend phase.
 
-| Frontend phase | Name                   | Status  | Commit(s) |
-| -------------- | ---------------------- | ------- | --------- |
-| FE1            | Application foundation | Done    | `27b8860` |
-| FE2            | Authentication         | Done    | `be2e028` |
-| FE3            | Application shell      | Done    | `fcd16bb` |
-| FE4            | Vehicles               | Done    | `fa31a81` |
-| FE5            | Users + roles          | Done    | `499fa7d` |
-| FE6            | Drivers + assignments  | Done    | `970993c` |
-| FE7            | Maintenance + fuel     | Done    | `e2f2bfa` |
-| FE8            | Dashboard + reporting  | Done    | —         |
-| FE9            | Production readiness   | Planned | —         |
+| Frontend phase | Name                   | Status  | Commit(s)            |
+| -------------- | ---------------------- | ------- | -------------------- |
+| FE1            | Application foundation | Done    | `27b8860`            |
+| FE2            | Authentication         | Done    | `be2e028`            |
+| FE3            | Application shell      | Done    | `fcd16bb`            |
+| FE4            | Vehicles               | Done    | `fa31a81`            |
+| FE5            | Users + roles          | Done    | `499fa7d`            |
+| FE6            | Drivers + assignments  | Done    | `970993c`            |
+| FE7            | Maintenance + fuel     | Done    | `e2f2bfa`            |
+| FE8            | Dashboard + reporting  | Done    | `04c0178`, `c02f2ff` |
+| FE9            | Production readiness   | Planned | —                    |
 
 ---
 
@@ -493,7 +493,7 @@ For each choice: why it is needed, what it solves, why it fits, and when it is n
 
 ## Frontend Phase 8 — Dashboard + reporting
 
-**Status:** Done
+**Status:** Done (`04c0178` API, `c02f2ff` web)
 
 **Goal:** a fleet overview that answers the questions fleet managers ask most often.
 

@@ -364,7 +364,7 @@ API moved to `apps/api/` in preparation for the frontend (`apps/web/`); no behav
 
 ## Backend addendum — FE8 dashboard endpoints
 
-**Status:** Done
+**Status:** Done (`04c0178`)
 
 **Goal:** give the FE8 dashboard the fleet-wide data it needs (frontend Rule 9: API gaps are fixed in the API). Approved by the user before FE8 started. No migration, schema change or new dependency.
 
