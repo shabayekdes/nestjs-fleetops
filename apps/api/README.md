@@ -165,6 +165,8 @@ Seed data (`DL-*` licenses, Ford/Mercedes-Benz/Volvo, `*@acme-logistics.test`) n
 
 Plus three vehicles (Ford Transit, Mercedes-Benz Sprinter, Volvo FH16 — the latter without a license plate).
 
+Vehicle master data (global, not tied to the organization): 5 makes and 14 models (Toyota, Ford, BMW, Mercedes-Benz, Volvo), upserted on `slug` and `makeId + slug`.
+
 | Driver         | License   | Expires              | Linked user               |
 | -------------- | --------- | -------------------- | ------------------------- |
 | Sam Driver     | `DL-1001` | 1 January next year  | `sam@acme-logistics.test` |
@@ -262,6 +264,9 @@ All routes are served under the `/api` prefix with URI versioning (default versi
 | GET    | `/api/v1/cost-summary`                                | Bearer token, ADMIN or MANAGER. Fleet-wide monthly maintenance and fuel costs    |
 | GET    | `/api/v1/dashboard/fleet`                             | Bearer token, ADMIN or MANAGER. Fleet counts: vehicles, drivers, assignments     |
 | GET    | `/api/v1/dashboard/me`                                | Bearer token, any role. Own driver profile and active assignment                 |
+| GET    | `/api/v1/master-data/vehicle-makes`                   | Bearer token, any role. Global vehicle makes catalog (paginated)                 |
+| GET    | `/api/v1/master-data/vehicle-makes/:slug`             | Bearer token, any role. One make by slug, including retired ones                 |
+| GET    | `/api/v1/master-data/vehicle-makes/:makeId/models`    | Bearer token, any role. Models of one make (paginated)                           |
 
 Every endpoint except `/api/v1` and `/api/v1/health*` requires an `Authorization: Bearer <token>` header.
 
@@ -460,6 +465,20 @@ npm run db:test:migrate
 ### API docs
 
 Swagger UI is served at `/api/docs` and the OpenAPI JSON at `/api/docs-json`. They are mounted in development and test, and not when `NODE_ENV=production`. Schemas are generated from the DTOs by the `@nestjs/swagger` Nest CLI plugin (runs in `nest build` / `nest start`, not in Jest). Protected operations show the bearer scheme.
+
+### Vehicle master data
+
+Makes and models are a global catalog shared by every organization: no `organizationId`, read-only through the API (any authenticated role), and changed only by the seed and migrations, because ADMIN is a per-organization role. Rows are retired (`active: false`), never deleted.
+
+```bash
+curl 'http://localhost:3000/api/v1/master-data/vehicle-makes?search=benz' -H "Authorization: Bearer $TOKEN"
+curl http://localhost:3000/api/v1/master-data/vehicle-makes/toyota -H "Authorization: Bearer $TOKEN"
+curl 'http://localhost:3000/api/v1/master-data/vehicle-makes/<makeId>/models' -H "Authorization: Bearer $TOKEN"
+```
+
+- Lists: `page` / `limit` like other lists, `search` (case-insensitive, anywhere in the name; `%` and `_` are literal), `includeInactive=true` to also return retired rows. Ordered by name. Items are `{ id, name, slug, active }`.
+- A model is offered only if it and its make are active: a retired make returns no models unless `includeInactive=true`. An unknown make is `404`, a malformed `makeId` is `400`.
+- `vehicles` has nullable `make_id` / `model_id` columns (composite FK, so a model always belongs to the vehicle's make) next to the legacy `make` / `model` strings. The API does not read or write them yet.
 
 ### OpenAPI contract (`openapi.json`)
 

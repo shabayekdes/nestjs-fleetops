@@ -79,8 +79,13 @@ model User {
 model Vehicle {
   id               String        @id @default(uuid(7)) @db.Uuid
   organizationId   String        @map("organization_id") @db.Uuid
+  /// Legacy free text; dropped in a later "contract" migration once nothing reads it.
   make             String
+  /// Legacy free text; dropped together with `make`.
   model            String
+  /// Nullable until the backfill has filled every row (expand → backfill → contract).
+  makeId           String?       @map("make_id") @db.Uuid
+  modelId          String?       @map("model_id") @db.Uuid
   year             Int
   vin              String
   /// Nullable: vehicles may be added to a fleet before they are registered.
@@ -96,12 +101,75 @@ model Vehicle {
   maintenanceRecords MaintenanceRecord[]
   fuelLogs           FuelLog[]
 
+  // Restrict: master data is retired, never deleted, and vehicle history must
+  // keep its make/model. The model relation is a composite FK on
+  // (make_id, model_id), so the database rejects a model from another make.
+  vehicleMake  VehicleMake?  @relation(fields: [makeId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  vehicleModel VehicleModel? @relation(fields: [makeId, modelId], references: [makeId, id], onDelete: Restrict, onUpdate: Cascade)
+
   // Tenant-scoped uniqueness: the same physical vehicle may legitimately exist
   // in two organizations (e.g. after a sale), and a global constraint would leak
   // cross-tenant existence. Both indexes lead with organization_id.
   @@unique([organizationId, vin])
   @@unique([organizationId, licensePlate])
+  // Tenant filters by make (and model); leads with organization_id like the rest.
+  @@index([organizationId, makeId, modelId])
   @@map("vehicles")
+}
+
+// ---------------------------------------------------------------------------
+// Vehicle master data (exercise: docs/exercises/vehicle-master-data.md)
+//
+// These are the FIRST global (non-tenant) tables in FleetOps: no
+// organizationId, shared by every organization. That is a deliberate
+// exception to the "every table carries organizationId" convention, so record
+// why in the comment above each model once you have decided.
+// ---------------------------------------------------------------------------
+
+model VehicleMake {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  /// Display name, e.g. "Mercedes-Benz".
+  name      String   @unique
+  /// URL-safe identifier, e.g. "mercedes-benz".
+  /// Stored lowercase; normalized by the application before writes.
+  slug      String   @unique
+  /// false = retired: hidden from pick lists for new vehicles, but kept so
+  /// existing references stay valid. Makes are retired, never deleted.
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  models   VehicleModel[]
+  vehicles Vehicle[]
+
+  @@map("vehicle_makes")
+}
+
+model VehicleModel {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  makeId    String   @map("make_id") @db.Uuid
+  /// Display name, e.g. "Land Cruiser". Unique within its make.
+  name      String
+  /// URL-safe identifier, e.g. "land-cruiser". Unique within its make; stored lowercase.
+  slug      String
+  /// false = retired. Offered only if the model AND its make are active (derived at query time).
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  vehicles Vehicle[]
+
+  // Restrict: a make with models cannot be deleted (retire it instead).
+  make VehicleMake @relation(fields: [makeId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  // Unique per make, not globally: the same model name can exist under two
+  // makes (e.g. the badge-engineered Sprinter). Leading make_id also indexes
+  // the FK and serves "models of a make ORDER BY name".
+  @@unique([makeId, name])
+  @@unique([makeId, slug])
+  // Target of the composite FK from vehicles (make_id, model_id).
+  @@unique([makeId, id])
+  @@map("vehicle_models")
 }
 
 model Driver {

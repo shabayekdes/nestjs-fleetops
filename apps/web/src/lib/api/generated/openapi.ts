@@ -388,6 +388,71 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/master-data/vehicle-makes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List vehicle makes, alphabetically by name.
+         *
+         *     Only active makes unless includeInactive=true. `search` is a
+         *     case-insensitive match anywhere in the name. Paginated like other lists.
+         */
+        get: operations["VehicleMakesController_findAll_v1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/master-data/vehicle-makes/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get one vehicle make by its slug (case-insensitive), including retired
+         *     makes. 404 if no make has this slug.
+         */
+        get: operations["VehicleMakesController_findOneBySlug_v1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/master-data/vehicle-makes/{makeId}/models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the models of one make, alphabetically by name.
+         *
+         *     Only active models of an active make unless includeInactive=true.
+         *     `search` is a case-insensitive match anywhere in the model name.
+         *     404 if the make does not exist.
+         */
+        get: operations["VehicleModelsController_findAll_v1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -828,6 +893,38 @@ export interface components {
             driver: components["schemas"]["DashboardDriverDto"] | null;
             /** @description The caller's active assignment, or null. */
             currentAssignment: components["schemas"]["DashboardAssignmentDto"] | null;
+        };
+        VehicleMakeResponseDto: {
+            id: string;
+            name: string;
+            /** @description Lowercase URL-safe identifier, e.g. "mercedes-benz". */
+            slug: string;
+            /** @description false = retired; only returned with includeInactive=true. */
+            active: boolean;
+        };
+        VehicleMakeListResponseDto: {
+            data: components["schemas"]["VehicleMakeResponseDto"][];
+            meta: {
+                page: number;
+                limit: number;
+                total: number;
+            };
+        };
+        VehicleModelResponseDto: {
+            id: string;
+            name: string;
+            /** @description Lowercase URL-safe identifier, unique within its make, e.g. "land-cruiser". */
+            slug: string;
+            /** @description false = retired; only returned with includeInactive=true. */
+            active: boolean;
+        };
+        VehicleModelListResponseDto: {
+            data: components["schemas"]["VehicleModelResponseDto"][];
+            meta: {
+                page: number;
+                limit: number;
+                total: number;
+            };
         };
     };
     responses: never;
@@ -2098,6 +2195,108 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MyDashboardResponseDto"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    VehicleMakesController_findAll_v1: {
+        parameters: {
+            query?: {
+                page?: number;
+                limit?: number;
+                /** @description Case-insensitive match anywhere in the make name. Blank is rejected. */
+                search?: string;
+                /** @description true = also return retired makes (e.g. to show an existing vehicle's make). */
+                includeInactive?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VehicleMakeListResponseDto"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    VehicleMakesController_findOneBySlug_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VehicleMakeResponseDto"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    VehicleModelsController_findAll_v1: {
+        parameters: {
+            query?: {
+                page?: number;
+                limit?: number;
+                /** @description Case-insensitive match anywhere in the model name. Blank is rejected. */
+                search?: string;
+                /** @description true = also return retired models (e.g. to show an existing vehicle's model). */
+                includeInactive?: boolean;
+            };
+            header?: never;
+            path: {
+                makeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VehicleModelListResponseDto"];
                 };
             };
             /** @description Error */

@@ -66,6 +66,19 @@ const vehicles = [
   },
 ];
 
+/**
+ * Vehicle master data (global, not tenant-owned). Includes the makes and
+ * models of the seeded vehicles above (Ford Transit, Mercedes-Benz Sprinter,
+ * Volvo FH16), so the vehicle integration exercise (Step 6) can link them.
+ */
+const vehicleCatalog: { make: string; models: string[] }[] = [
+  { make: 'Toyota', models: ['Corolla', 'Camry', 'Land Cruiser', 'Hilux'] },
+  { make: 'Ford', models: ['Transit', 'Ranger', 'Explorer'] },
+  { make: 'BMW', models: ['3 Series', '5 Series', 'X5'] },
+  { make: 'Mercedes-Benz', models: ['Sprinter', 'Vito'] },
+  { make: 'Volvo', models: ['FH16', 'FM'] },
+];
+
 const drivers = [
   {
     firstName: 'Sam',
@@ -101,6 +114,36 @@ async function main(): Promise<void> {
   });
 
   try {
+    // Vehicle master data first: it is global and depends on no organization.
+    // Upserted on slug (makes) and (makeId, slug) (models). The seed owns the
+    // display names, so `update` refreshes them; `active` is left alone, and
+    // nothing missing from the catalog is deleted.
+    // Seed-only helper; move it to src/common/ if the API ever creates makes.
+    const toSlug = (name: string): string =>
+      name
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+
+    for (const entry of vehicleCatalog) {
+      const makeSlug = toSlug(entry.make);
+      const make = await prisma.vehicleMake.upsert({
+        where: { slug: makeSlug },
+        update: { name: entry.make },
+        create: { name: entry.make, slug: makeSlug },
+        select: { id: true },
+      });
+      for (const modelName of entry.models) {
+        const slug = toSlug(modelName);
+        await prisma.vehicleModel.upsert({
+          where: { makeId_slug: { makeId: make.id, slug } },
+          update: { name: modelName },
+          create: { makeId: make.id, name: modelName, slug },
+        });
+      }
+    }
+
     const org = await prisma.organization.upsert({
       where: { slug: organization.slug },
       update: { name: organization.name },

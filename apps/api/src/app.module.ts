@@ -11,6 +11,7 @@ import { DriversModule } from './drivers/drivers.module.js';
 import { FuelLogsModule } from './fuel-logs/fuel-logs.module.js';
 import { HealthModule } from './health/health.module.js';
 import { MaintenanceModule } from './maintenance/maintenance.module.js';
+import { MasterDataModule } from './master-data/master-data.module.js';
 import { UsersModule } from './users/users.module.js';
 import { VehiclesModule } from './vehicles/vehicles.module.js';
 
@@ -33,6 +34,7 @@ import { VehiclesModule } from './vehicles/vehicles.module.js';
     FuelLogsModule,
     CostSummaryModule,
     DashboardModule,
+    MasterDataModule,
   ],
   controllers: [AppController],
 })

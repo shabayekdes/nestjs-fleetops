@@ -2043,6 +2043,216 @@
           "dashboard"
         ]
       }
+    },
+    "/api/v1/master-data/vehicle-makes": {
+      "get": {
+        "operationId": "VehicleMakesController_findAll_v1",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Case-insensitive match anywhere in the make name. Blank is rejected.",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          },
+          {
+            "name": "includeInactive",
+            "required": false,
+            "in": "query",
+            "description": "true = also return retired makes (e.g. to show an existing vehicle's make).",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VehicleMakeListResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List vehicle makes, alphabetically by name.\n\nOnly active makes unless includeInactive=true. `search` is a\ncase-insensitive match anywhere in the name. Paginated like other lists.",
+        "tags": [
+          "vehicle-makes"
+        ]
+      }
+    },
+    "/api/v1/master-data/vehicle-makes/{slug}": {
+      "get": {
+        "operationId": "VehicleMakesController_findOneBySlug_v1",
+        "parameters": [
+          {
+            "name": "slug",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VehicleMakeResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get one vehicle make by its slug (case-insensitive), including retired\nmakes. 404 if no make has this slug.",
+        "tags": [
+          "vehicle-makes"
+        ]
+      }
+    },
+    "/api/v1/master-data/vehicle-makes/{makeId}/models": {
+      "get": {
+        "operationId": "VehicleModelsController_findAll_v1",
+        "parameters": [
+          {
+            "name": "makeId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Case-insensitive match anywhere in the model name. Blank is rejected.",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          },
+          {
+            "name": "includeInactive",
+            "required": false,
+            "in": "query",
+            "description": "true = also return retired models (e.g. to show an existing vehicle's model).",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VehicleModelListResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the models of one make, alphabetically by name.\n\nOnly active models of an active make unless includeInactive=true.\n`search` is a case-insensitive match anywhere in the model name.\n404 if the make does not exist.",
+        "tags": [
+          "vehicle-models"
+        ]
+      }
     }
   },
   "info": {
@@ -3550,6 +3760,124 @@
         "required": [
           "driver",
           "currentAssignment"
+        ]
+      },
+      "VehicleMakeResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string",
+            "description": "Lowercase URL-safe identifier, e.g. \"mercedes-benz\"."
+          },
+          "active": {
+            "type": "boolean",
+            "description": "false = retired; only returned with includeInactive=true."
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "active"
+        ]
+      },
+      "VehicleMakeListResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VehicleMakeResponseDto"
+            }
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "page": {
+                "type": "number"
+              },
+              "limit": {
+                "type": "number"
+              },
+              "total": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "page",
+              "limit",
+              "total"
+            ]
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      },
+      "VehicleModelResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string",
+            "description": "Lowercase URL-safe identifier, unique within its make, e.g. \"land-cruiser\"."
+          },
+          "active": {
+            "type": "boolean",
+            "description": "false = retired; only returned with includeInactive=true."
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "active"
+        ]
+      },
+      "VehicleModelListResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VehicleModelResponseDto"
+            }
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "page": {
+                "type": "number"
+              },
+              "limit": {
+                "type": "number"
+              },
+              "total": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "page",
+              "limit",
+              "total"
+            ]
+          }
+        },
+        "required": [
+          "data",
+          "meta"
         ]
       }
     }
