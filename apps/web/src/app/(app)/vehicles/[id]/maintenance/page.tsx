@@ -14,6 +14,7 @@ import { getCurrentUser } from '@/lib/auth/current-user';
 import { flashMessage } from '@/lib/flash';
 import { isUuid } from '@/lib/ids';
 import { singleParam } from '@/lib/search-params';
+import { startEarly } from '@/lib/start-early';
 import { VehicleSectionNav } from '../../_components/vehicle-section-nav';
 import { loadVehicle } from '../../_lib/load-vehicle';
 import { canManageVehicleRecords } from '../../_lib/permissions';
@@ -48,6 +49,11 @@ export default async function MaintenancePage({
   if (!isUuid(id)) notFound();
   const raw = await searchParams;
 
+  // Independent of the vehicle: start now, await after it so a 404/403 on the
+  // vehicle still wins.
+  const { query, ignored, hasFilters } = parseMaintenanceListParams(raw);
+  const listing = startEarly(listMaintenanceRecords(id, query));
+
   const loaded = await loadVehicle(id);
   if (loaded.kind === 'forbidden') {
     return (
@@ -72,12 +78,11 @@ export default async function MaintenancePage({
     />
   );
 
-  const { query, ignored, hasFilters } = parseMaintenanceListParams(raw);
   const flash = flashMessage(singleParam(raw.notice));
 
   let result: MaintenanceRecordList;
   try {
-    result = await listMaintenanceRecords(id, query);
+    result = await listing;
   } catch (error) {
     if (error instanceof ApiError) {
       if (error.status === 404) notFound();

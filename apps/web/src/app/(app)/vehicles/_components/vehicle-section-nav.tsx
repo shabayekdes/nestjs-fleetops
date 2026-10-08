@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { LinkPending } from '@/components/link-pending';
 
 export type VehicleSection = 'overview' | 'maintenance' | 'fuel' | 'costs';
 
@@ -35,6 +36,7 @@ export function VehicleSectionNav({
               }
             >
               {item.label}
+              <LinkPending className="ml-1 inline" />
             </Link>
           </li>
         ))}

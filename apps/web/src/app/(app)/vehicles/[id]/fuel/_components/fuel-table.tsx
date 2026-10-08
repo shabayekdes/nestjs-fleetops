@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { LinkPending } from '@/components/link-pending';
 import {
   Table,
   TableBody,
@@ -54,6 +55,7 @@ export function FuelTable({
                     className="text-sm underline underline-offset-4"
                   >
                     Edit
+                    <LinkPending className="ml-1 inline" />
                   </Link>
                   <DeleteFuelButton
                     vehicleId={vehicleId}

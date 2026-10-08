@@ -1,5 +1,6 @@
 import Form from 'next/form';
 import Link from 'next/link';
+import { FilterSubmitButton } from '@/components/form/filter-submit-button';
 import { FormField } from '@/components/form/form-field';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -74,7 +75,7 @@ export function MaintenanceFilters({
         )}
       </FormField>
       <div className="mt-5 flex items-center gap-2">
-        <Button type="submit">Apply filters</Button>
+        <FilterSubmitButton>Apply filters</FilterSubmitButton>
         <Button variant="outline" asChild>
           <Link href={maintenanceListHref(vehicleId, { limit: query.limit })}>
             Clear filters

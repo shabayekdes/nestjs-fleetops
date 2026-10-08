@@ -18,6 +18,7 @@ import { flashMessage } from '@/lib/flash';
 import { formatDateOnly, formatDateTime } from '@/lib/format';
 import { isUuid } from '@/lib/ids';
 import { singleParam } from '@/lib/search-params';
+import { startEarly } from '@/lib/start-early';
 import { getDriver } from '../_lib/drivers-api';
 import { canManageDrivers } from '../_lib/permissions';
 import { DeleteDriverButton } from './delete-driver-button';
@@ -43,6 +44,13 @@ export default async function DriverDetailPage({
   if (!isUuid(id)) notFound();
   const raw = await searchParams;
 
+  // Started alongside the driver; awaited after it so a 404/403 still wins.
+  const sectionRequest = startEarly(
+    loadAssignmentSection({ driverId: id }, parseAssignmentsPage(raw), {
+      withOptions: true,
+    }),
+  );
+
   let driver: Driver;
   try {
     driver = await getDriver(id);
@@ -61,11 +69,7 @@ export default async function DriverDetailPage({
     throw error;
   }
 
-  const section = await loadAssignmentSection(
-    { driverId: id },
-    parseAssignmentsPage(raw),
-    { withOptions: true },
-  );
+  const section = await sectionRequest;
 
   const name = `${driver.firstName} ${driver.lastName}`;
   const flash = flashMessage(singleParam(raw.notice));

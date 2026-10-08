@@ -18,6 +18,7 @@ vi.mock('next/navigation', () => ({
   notFound: () => {
     throw new Error('NOT_FOUND');
   },
+  useSearchParams: () => new URLSearchParams(),
 }));
 vi.mock('next/form', () => ({
   default: ({
@@ -125,7 +126,15 @@ describe('MaintenancePage', () => {
     expect(screen.getByRole('alert')).toHaveTextContent(
       'You are not allowed to do this.',
     );
-    expect(listMaintenanceRecords).not.toHaveBeenCalled();
+  });
+
+  it('lets a forbidden vehicle win over a failing list request', async () => {
+    loadVehicle.mockResolvedValue({ kind: 'forbidden' });
+    listMaintenanceRecords.mockRejectedValue(new Error('boom'));
+    await renderPage();
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'You are not allowed to do this.',
+    );
   });
 
   it('shows NotAllowed when the list answers 403 and rethrows a 500', async () => {

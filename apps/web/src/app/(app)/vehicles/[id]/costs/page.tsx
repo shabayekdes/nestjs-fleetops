@@ -17,6 +17,7 @@ import { parseCostParams } from '@/lib/costs/cost-params';
 import { getCostSummary } from '@/lib/costs/cost-summary-api';
 import { formatMonth } from '@/lib/format';
 import { isUuid } from '@/lib/ids';
+import { startEarly } from '@/lib/start-early';
 import { VehicleSectionNav } from '../../_components/vehicle-section-nav';
 import { loadVehicle } from '../../_lib/load-vehicle';
 import { canManageVehicleRecords } from '../../_lib/permissions';
@@ -42,6 +43,11 @@ export default async function CostsPage({
   if (!isUuid(id)) notFound();
   const raw = await searchParams;
 
+  // Independent of the vehicle: start now, await after it so a 404/403 on the
+  // vehicle still wins.
+  const { query, ignored } = parseCostParams(raw);
+  const summaryRequest = startEarly(getCostSummary(id, query));
+
   const loaded = await loadVehicle(id);
   if (loaded.kind === 'forbidden') {
     return (
@@ -53,12 +59,11 @@ export default async function CostsPage({
   }
   const { vehicle } = loaded;
   const name = `${vehicle.make} ${vehicle.model}`;
-  const { query, ignored } = parseCostParams(raw);
   const path = `/vehicles/${id}/costs`;
 
   let summary: CostSummary;
   try {
-    summary = await getCostSummary(id, query);
+    summary = await summaryRequest;
   } catch (error) {
     if (error instanceof ApiError) {
       if (error.status === 404) notFound();

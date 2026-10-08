@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { LinkPending } from '@/components/link-pending';
 import { buildHref } from '@/lib/search-params';
 
 type Params = Record<string, string | number | undefined>;
@@ -13,7 +14,7 @@ function PageLink({
   disabled: boolean;
 }) {
   const className =
-    'inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium';
+    'inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-sm font-medium';
   if (disabled) {
     return (
       <span
@@ -27,6 +28,7 @@ function PageLink({
   return (
     <Link href={href} className={`${className} hover:bg-accent`}>
       {label}
+      <LinkPending />
     </Link>
   );
 }

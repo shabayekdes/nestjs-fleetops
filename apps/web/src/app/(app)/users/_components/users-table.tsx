@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { LinkPending } from '@/components/link-pending';
 import {
   Table,
   TableBody,
@@ -39,6 +40,7 @@ export function UsersTable({
                 className="font-medium underline-offset-4 hover:underline"
               >
                 {user.firstName} {user.lastName}
+                <LinkPending className="ml-1 inline" />
               </Link>
               {user.id === currentUserId ? (
                 <span className="text-muted-foreground ml-2 text-sm">

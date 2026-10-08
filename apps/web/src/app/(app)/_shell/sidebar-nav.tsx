@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { LinkPending } from '@/components/link-pending';
 import type { Role } from '@/lib/api/types';
 import { cn } from '@/lib/utils';
 import {
@@ -43,6 +44,7 @@ export function SidebarNav({
               >
                 <Icon aria-hidden="true" className="size-4" />
                 {item.label}
+                <LinkPending className="ml-auto" />
               </Link>
             </li>
           );

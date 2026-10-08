@@ -18,6 +18,7 @@ vi.mock('next/navigation', () => ({
   notFound: () => {
     throw new Error('NOT_FOUND');
   },
+  useSearchParams: () => new URLSearchParams(),
 }));
 vi.mock('next/form', () => ({
   default: ({

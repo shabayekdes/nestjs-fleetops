@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { LinkPending } from '@/components/link-pending';
 import { LicenseStatusBadge } from '@/components/license-status-badge';
 import {
   Table,
@@ -33,6 +34,7 @@ export function DriversTable({ drivers }: { drivers: Driver[] }) {
                 className="font-medium underline-offset-4 hover:underline"
               >
                 {driver.firstName} {driver.lastName}
+                <LinkPending className="ml-1 inline" />
               </Link>
             </TableCell>
             <TableCell className="font-mono">{driver.licenseNumber}</TableCell>

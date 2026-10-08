@@ -20,6 +20,7 @@ import { flashMessage } from '@/lib/flash';
 import { formatDateOnly, formatDateTime } from '@/lib/format';
 import { isUuid } from '@/lib/ids';
 import { singleParam } from '@/lib/search-params';
+import { startEarly } from '@/lib/start-early';
 import { VehicleSectionNav } from '../_components/vehicle-section-nav';
 import {
   canManageVehicleRecords,
@@ -39,6 +40,16 @@ export default async function VehicleDetailPage({
   const raw = await searchParams;
   const user = await getCurrentUser();
 
+  // Drivers cannot use the assignment endpoints: no call and no section.
+  // Started alongside the vehicle; awaited after it so a 404/403 still wins.
+  const sectionRequest = canManageAssignments(user.role)
+    ? startEarly(
+        loadAssignmentSection({ vehicleId: id }, parseAssignmentsPage(raw), {
+          withOptions: true,
+        }),
+      )
+    : null;
+
   let vehicle: Vehicle;
   try {
     vehicle = await getVehicle(id);
@@ -51,14 +62,7 @@ export default async function VehicleDetailPage({
   }
 
   const canManage = canManageVehicles(user.role);
-  // Drivers cannot use the assignment endpoints: no call and no section.
-  const section = canManageAssignments(user.role)
-    ? await loadAssignmentSection(
-        { vehicleId: id },
-        parseAssignmentsPage(raw),
-        { withOptions: true },
-      )
-    : null;
+  const section = sectionRequest ? await sectionRequest : null;
   const flash = flashMessage(singleParam(raw.notice));
   const rows: [string, ReactNode][] = [
     ['Make', vehicle.make],

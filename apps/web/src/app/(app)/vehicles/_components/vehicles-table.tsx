@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { LinkPending } from '@/components/link-pending';
 import {
   Table,
   TableCaption,
@@ -35,6 +36,7 @@ export function VehiclesTable({ vehicles }: { vehicles: Vehicle[] }) {
                 className="font-medium underline-offset-4 hover:underline"
               >
                 {vehicle.make}
+                <LinkPending className="ml-1 inline" />
               </Link>
             </TableCell>
             <TableCell>{vehicle.model}</TableCell>

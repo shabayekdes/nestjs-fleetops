@@ -17,4 +17,18 @@ describe('PageSkeleton', () => {
       screen.getByRole('status').querySelectorAll('[data-slot="skeleton"]'),
     ).toHaveLength(3);
   });
+
+  it('renders a detail variant', () => {
+    render(<PageSkeleton variant="detail" rows={3} />);
+    expect(
+      screen.getByRole('status').querySelectorAll('[data-slot="skeleton"]'),
+    ).toHaveLength(7);
+  });
+
+  it('renders a form variant', () => {
+    render(<PageSkeleton variant="form" rows={2} />);
+    const status = screen.getByRole('status');
+    expect(status).toHaveTextContent('Loading…');
+    expect(status.querySelectorAll('[data-slot="skeleton"]')).toHaveLength(6);
+  });
 });

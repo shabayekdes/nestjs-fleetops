@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { LinkPending } from '@/components/link-pending';
 import {
   Table,
   TableBody,
@@ -41,6 +42,7 @@ export function AssignmentHistoryTable({
                   className="font-medium underline-offset-4 hover:underline"
                 >
                   {assignment.driver.firstName} {assignment.driver.lastName}
+                  <LinkPending className="ml-1 inline" />
                 </Link>
               ) : (
                 <Link
@@ -48,6 +50,7 @@ export function AssignmentHistoryTable({
                   className="font-medium underline-offset-4 hover:underline"
                 >
                   {assignment.vehicle.make} {assignment.vehicle.model}
+                  <LinkPending className="ml-1 inline" />
                 </Link>
               )}
             </TableCell>
