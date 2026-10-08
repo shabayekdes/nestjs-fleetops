@@ -556,23 +556,24 @@ Compose does not pass `.env` into the containers (each service sets its own vari
 
 Probes: `/api/v1/health/live` for liveness, `/api/v1/health/ready` for readiness. Set `TRUST_PROXY` behind a load balancer and provide `DATABASE_URL` and `JWT_SECRET` through the platform's secret store.
 
-### Production: Render + Neon (API) and Vercel (web)
+### Production: Railway + Neon (API) and Vercel (web)
 
 `.github/workflows/deploy.yml` runs after `CI` succeeds on a push to `main` (or manually from the Actions tab). It deploys the commit CI tested:
 
-1. `api`: `npm run db:migrate:deploy` against the production database, then the Render deploy hook with `ref=<sha>`.
-2. `web` (after `api`): `vercel pull`, `vercel build --prod`, `vercel deploy --prebuilt --prod` from `apps/web`.
+1. `migrate`: `npm run db:migrate:deploy` against the production database.
+2. `api` (after `migrate`): `railway up apps/api --path-as-root --ci`, which uploads `apps/api` and builds its `Dockerfile` on Railway.
+3. `web` (after `api`): `vercel pull`, `vercel build --prod`, `vercel deploy --prebuilt --prod` from `apps/web`.
 
 Because migrations run before the new API version starts, they must stay backward compatible with the running version (expand, then contract).
 
 One-time setup:
 
 - **Neon**: create the production database. Use the direct (non `-pooler`) connection string.
-- **Render**: New → Blueprint, pick this repository (`render.yaml` at the root). Enter `DATABASE_URL`. Auto-deploy is off. Copy the service's deploy hook URL (Settings → Deploy Hook).
-- **Vercel**: in `apps/web`, run `vercel link` to create the project. Leave Root Directory empty and turn off Git auto-deploys (Settings → Git), because the workflow deploys. Add the production env vars `API_BASE_URL` (the Render URL, without `/api/v1`) and `SESSION_SECRET`. Create a token (Account Settings → Tokens). `apps/web/.vercel/project.json` holds the org and project IDs.
-- **GitHub**: create a `production` environment (Settings → Environments) with the secrets `DATABASE_URL`, `RENDER_DEPLOY_HOOK_URL`, `VERCEL_TOKEN`, `VERCEL_ORG_ID` and `VERCEL_PROJECT_ID`.
+- **Railway**: create a project with an **empty** service named `fleetops-api` (not connected to GitHub, so only the workflow deploys). In the service settings, set the variables `DATABASE_URL`, `JWT_SECRET` (`openssl rand -base64 48`) and `TRUST_PROXY=1`, the healthcheck path `/api/v1/health/ready`, and generate a public domain. Create a project token for the `production` environment (Project Settings → Tokens). Railway's config-as-code files are deprecated, so these settings live in the dashboard.
+- **Vercel**: in `apps/web`, run `vercel link` to create the project. Leave Root Directory empty and turn off Git auto-deploys (Settings → Git), because the workflow deploys. Add the production env vars `API_BASE_URL` (the Railway public URL, without `/api/v1`) and `SESSION_SECRET`. Create a token (Account Settings → Tokens). `apps/web/.vercel/project.json` holds the org and project IDs.
+- **GitHub**: create a `production` environment (Settings → Environments) with the secrets `DATABASE_URL`, `RAILWAY_TOKEN`, `VERCEL_TOKEN`, `VERCEL_ORG_ID` and `VERCEL_PROJECT_ID`.
 
-The free Render instance sleeps after 15 minutes without traffic, so the first request after that takes about a minute.
+Railway's free trial is a one-time $5 credit for 30 days, then $1 per month, which is not enough to keep the API running all month. Plan to upgrade or move hosts after the trial.
 
 ### Daily service-status job with several instances
 
