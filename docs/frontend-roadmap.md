@@ -9,6 +9,7 @@ Related documents:
 - [`PHASES.md`](PHASES.md): the backend roadmap (Phases 1–9). It is the source of truth for what the API does.
 - [`product-roadmap.md`](product-roadmap.md): product versions after v1.0, and the master development sequence.
 - [`mongodb-microservices-track.md`](mongodb-microservices-track.md): a learning track that runs **in parallel** with the frontend. The frontend does not depend on it, and no frontend phase waits for it.
+- [`advanced-backend-roadmap.md`](advanced-backend-roadmap.md): the Advanced Backend Engineering Track (A1–A12), after the learning track. No frontend phase depends on it. Its UI work (live tracking, maps, geofences, notifications in A5–A8) starts only after FE9 and is recorded in that file, not as new frontend phases.
 - `CLAUDE.md`: backend conventions. Frontend conventions are in [`apps/web/CLAUDE.md`](../apps/web/CLAUDE.md).
 
 To avoid confusion with the backend roadmap, frontend phases are always called **Frontend Phase N** (FE1–FE9). "Phase N" on its own always means a backend phase.

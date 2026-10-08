@@ -45,6 +45,8 @@ The project is built in phases. `docs/PHASES.md` records what each phase built, 
 
 Phase 9 is the last backend phase (there is no Phase 10). `docs/mongodb-microservices-track.md` is a separate learning track (L1–L15) that runs in parallel with the frontend. Follow its rules and working rules, do one stage at a time, and get the user's approval before each stage.
 
+`docs/advanced-backend-roadmap.md` is the Advanced Backend Engineering Track (A1–A12, "Advanced Stage N"). It starts after L15 and follows the same rules: one stage at a time, the user's approval before each stage, and no infrastructure before its stage.
+
 ---
 
 ## Project Conventions (FleetOps API, `apps/api/`)

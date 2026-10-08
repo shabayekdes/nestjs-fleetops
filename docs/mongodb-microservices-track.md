@@ -9,6 +9,7 @@ Related documents:
 - [`PHASES.md`](PHASES.md): the backend roadmap (Phases 1–9). The FleetOps core.
 - [`frontend-roadmap.md`](frontend-roadmap.md): the Next.js frontend (FE1–FE9). Runs in parallel with this track.
 - [`product-roadmap.md`](product-roadmap.md): product versions. This track feeds **v2.x GPS + telematics**.
+- [`advanced-backend-roadmap.md`](advanced-backend-roadmap.md): the Advanced Backend Engineering Track (A1–A12). It starts after L15 and builds on this track's results (telemetry service, broker choice, L13 failure handling).
 - `CLAUDE.md`: conventions for the existing API. They still apply to any code this track adds to `apps/api/`.
 
 To avoid confusion with the other roadmaps, stages are always called **Learning Stage N** (L1–L15). "Phase N" means a backend phase, and "FE N" a frontend phase.
@@ -61,6 +62,7 @@ Backend Phase 1 → … → Backend Phase 9
 - The track starts after backend Phase 9 (done). It does not wait for the frontend.
 - **The frontend does not depend on this track, and this track does not depend on the frontend.** Neither blocks the other. FleetOps v1.0 is reached through the frontend roadmap alone.
 - What the track produces is **knowledge and a validated prototype**, which v2.x GPS + telematics can use. See "Connection to the product roadmap".
+- When L15 is done, the [Advanced Backend Engineering Track](advanced-backend-roadmap.md) (A1–A12) follows. It reuses the broker chosen in L11 and goes deeper than L13 on observability and resilience.
 
 ---
 

@@ -8,7 +8,7 @@ This roadmap starts only after:
 2. Frontend Phases FE1–FE9 are complete ([`frontend-roadmap.md`](frontend-roadmap.md)).
 3. FleetOps has reached a usable **v1.0** product.
 
-The [MongoDB + microservices learning track](mongodb-microservices-track.md) is **not** a prerequisite for v1.0. It runs in parallel with the frontend and feeds v2.x GPS + telematics.
+The [MongoDB + microservices learning track](mongodb-microservices-track.md) is **not** a prerequisite for v1.0. It runs in parallel with the frontend and feeds v2.x GPS + telematics. The [Advanced Backend Engineering Track](advanced-backend-roadmap.md) (A1–A12) follows it. That track produces **candidates** for v1.x and v2.x capabilities (see "Input from the advanced backend track"), never commitments.
 
 Every version below is directional. Before any version starts, its scope is validated (see "Principles"), confirmed with the user, and planned with `cto-esmail` the same way backend phases are. Technologies named here are candidates to evaluate at that time, not decisions.
 
@@ -329,7 +329,30 @@ GPS / telematics product capability
 
 It provides a telemetry prototype, experience with service extraction and events, and an architecture decision record comparing PostgreSQL and MongoDB for telemetry (Learning Stage 15).
 
+The [Advanced Backend Engineering Track](advanced-backend-roadmap.md) builds on it with real-time tracking (A5), maps and route history (A6) and geofencing (A7).
+
 > The learning implementation does not automatically become the final production architecture. The production architecture will be decided after validating actual product requirements, traffic, data volume, and operational needs.
+
+### Input from the advanced backend track
+
+Each stage of the [Advanced Backend Engineering Track](advanced-backend-roadmap.md) gives a validated option for a capability. It is **not** a committed feature. Each version still goes through the validation in "Principles".
+
+| Stage                    | Capability candidate                  | Version it could inform |
+| ------------------------ | ------------------------------------- | ----------------------- |
+| A1 Redis                 | Fast fleet dashboards, shared limits  | v1.0 hardening, v1.3    |
+| A2 Message broker        | Domain events, asynchronous workflows | v1.2, v1.4              |
+| A3 Outbox                | Reliable events for webhooks          | v1.4                    |
+| A4 Observability         | Production observability              | All versions            |
+| A5 Real-time (WebSocket) | Live fleet tracking                   | v2.x                    |
+| A6 Maps                  | Vehicle map, route history            | v2.x                    |
+| A7 Geofencing            | Location-based alerts                 | v2.x                    |
+| A8 Notifications         | Maintenance and location alerts       | v1.2, v2.x              |
+| A9 ERP integration       | Enterprise fleet operations           | v1.4                    |
+| A10 Search               | Large-fleet search                    | v1.3, v1.4              |
+| A11 Reliability          | Production reliability                | All versions            |
+| A12 Kubernetes           | Independent scaling                   | v2.x                    |
+
+If a product version is approved before the matching stage (for example v1.2 notifications before A8), the stage extends what the product built instead of building it twice.
 
 ---
 
@@ -409,9 +432,9 @@ v1.2 Automation                   │
    ↓                              │
 v1.3 Analytics                    │
    ↓                              │
-v1.4 Enterprise                   │
-   ↓                              │
-v2.0 Fleet operations             │
+v1.4 Enterprise                   ↓
+   ↓                           Advanced backend engineering track
+v2.0 Fleet operations          (A1 → A12, see advanced-backend-roadmap.md)
    ↓                              │
 v2.x GPS + telematics  ←──────────┘
    ↓
@@ -422,6 +445,7 @@ Why this order:
 
 - **Backend before frontend:** the frontend consumes a finished, documented and deployed API instead of a moving target.
 - **Learning track in parallel, not in the v1.0 path:** it teaches MongoDB and microservices on telemetry without delaying the product or changing the core. Its results are input to v2.x, not a prerequisite for anything earlier.
+- **Advanced backend track after the learning track:** it needs the telemetry service, broker and failure handling from L10–L13. Its stages inform v1.x and v2.x versions as candidates and never block them.
 - **v1.0 before monetization:** there must be a product worth paying for before adding plans and billing.
 - **Monetization before automation, analytics and enterprise:** later features can then be offered as plan entitlements.
 - **Enterprise before fleet operations:** audit logs, API keys and webhooks make trips and telematics safer to integrate.
