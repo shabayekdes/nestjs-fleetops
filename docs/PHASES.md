@@ -4,7 +4,7 @@ FleetOps is built in phases, partly as a way to learn NestJS. This file records 
 
 This file covers the backend only. The web frontend is planned in [`frontend-roadmap.md`](frontend-roadmap.md) and starts only after Phase 9. Product versions after v1.0 are in [`product-roadmap.md`](product-roadmap.md).
 
-Phase 9 is the last backend phase: the roadmap stays focused on the production FleetOps core, and there is no Phase 10. MongoDB and microservices are learned in a separate track, [`mongodb-microservices-track.md`](mongodb-microservices-track.md), which runs in parallel with the frontend and does not change the core into microservices. After it, the [Advanced Backend Engineering Track](advanced-backend-roadmap.md) (A1–A12) continues with caching, messaging, real time, integration, observability and scaling. It is also a separate track, not more backend phases.
+Phase 10 — Vehicle master data is the last backend phase. It was added after Phase 9 (while the frontend was under way) to replace the free-text vehicle make and model with a shared catalog; the roadmap otherwise stays focused on the production FleetOps core. MongoDB and microservices are learned in a separate track, [`mongodb-microservices-track.md`](mongodb-microservices-track.md), which runs in parallel with the frontend and does not change the core into microservices. After it, the [Advanced Backend Engineering Track](advanced-backend-roadmap.md) (A1–A12) continues with caching, messaging, real time, integration, observability and scaling. It is also a separate track, not more backend phases.
 
 Rules for working with phases:
 
@@ -13,17 +13,18 @@ Rules for working with phases:
 - Conventions live in `CLAUDE.md`. This file covers scope and history only.
 - Planned phases are a direction, not a spec. Before starting one, confirm its scope with the user, then ask `cto-esmail` for a plan. The order and content of planned phases may change.
 
-| Phase | Name                             | Status | Commit(s) |
-| ----- | -------------------------------- | ------ | --------- |
-| 1     | Application foundation           | Done   | `4b1d372` |
-| 2     | PostgreSQL + Prisma              | Done   | `5623cff` |
-| 3     | Authentication + tenant context  | Done   | `0195815` |
-| 4     | Vehicles API                     | Done   | `9e4a426` |
-| 5     | Users + roles                    | Done   | `c80e806` |
-| 6     | Drivers + vehicle assignments    | Done   | `961d586` |
-| 7     | Maintenance + fuel records       | Done   | `f12eeed` |
-| 8     | API docs, logging + error format | Done   | `2395d09` |
-| 9     | Docker, CI + deployment          | Done   | `a0217d0` |
+| Phase | Name                             | Status      | Commit(s)                  |
+| ----- | -------------------------------- | ----------- | -------------------------- |
+| 1     | Application foundation           | Done        | `4b1d372`                  |
+| 2     | PostgreSQL + Prisma              | Done        | `5623cff`                  |
+| 3     | Authentication + tenant context  | Done        | `0195815`                  |
+| 4     | Vehicles API                     | Done        | `9e4a426`                  |
+| 5     | Users + roles                    | Done        | `c80e806`                  |
+| 6     | Drivers + vehicle assignments    | Done        | `961d586`                  |
+| 7     | Maintenance + fuel records       | Done        | `f12eeed`                  |
+| 8     | API docs, logging + error format | Done        | `2395d09`                  |
+| 9     | Docker, CI + deployment          | Done        | `a0217d0`                  |
+| 10    | Vehicle master data              | In progress | `964d26c` (makes + models) |
 
 ---
 
@@ -387,6 +388,57 @@ API moved to `apps/api/` in preparation for the frontend (`apps/web/`); no behav
 
 - Indexes on `(organizationId, performedOn)` and `(organizationId, fueledOn)` for the fleet cost query; add them by migration if fleets grow.
 - Organization currency, multi-value `serviceStatus` filter, top-cost vehicles, CSV export.
+
+---
+
+## Phase 10 — Vehicle master data
+
+**Status:** In progress. Part 1 done (`964d26c`); parts 2 and 3 planned.
+
+**Goal:** vehicles reference a shared catalog of makes, models and types instead of free text, and the web vehicle form picks them from dependent dropdowns.
+
+**NestJS concepts:** global (non-tenant) reference data, composite foreign keys, expand → backfill → contract migrations, dependent lookups.
+
+The work is done as guided exercises in [`docs/exercises/`](exercises/): the user writes the code, Claude prepares and reviews.
+
+### Part 1 — Makes and models catalog (done, `964d26c`)
+
+Exercise: [`exercises/vehicle-master-data.md`](exercises/vehicle-master-data.md) (its decision log has the full reasoning).
+
+**Built**
+
+- Migration `add_vehicle_master_data`: tables `vehicle_makes` and `vehicle_models`; nullable `vehicles.make_id` / `model_id` with a composite FK `(make_id, model_id)` → `vehicle_models (make_id, id)`, a CHECK that a model needs a make, and an index on `(organization_id, make_id, model_id)`.
+- `MasterDataModule` (`src/master-data/`): `GET /master-data/vehicle-makes`, `GET /master-data/vehicle-makes/:slug`, `GET /master-data/vehicle-makes/:makeId/models`.
+- `src/common/like.ts` (`escapeLike`). Seed: 5 makes, 14 models.
+
+**Decisions**
+
+1. The first tables without `organizationId`: one catalog shared by all tenants. Global unique constraints leak nothing across tenants here.
+2. Rows are retired (`active` boolean), never deleted; all FKs are Restrict.
+3. Make `name` and `slug` are globally unique; model `name` and `slug` are unique per make. Slugs are stored lowercase.
+4. A model is offered only if it and its make are active (derived when queried). `includeInactive=true` returns retired rows.
+5. Read-only through the API for any authenticated role. ADMIN is per organization, so nobody edits the shared catalog through the API yet (see product roadmap, platform admin dashboard).
+6. Lists use the usual `page`/`limit` contract; `search` is a case-insensitive `contains` with `%`, `_` and `\` escaped, because Prisma does not escape them.
+7. The legacy `vehicles.make` / `model` strings coexist with the new FKs until part 3.
+
+### Part 2 — Vehicle types (planned)
+
+Exercise: [`exercises/vehicle-types.md`](exercises/vehicle-types.md).
+
+- `vehicle_types` table and `GET /master-data/vehicle-types` in `MasterDataModule`, same patterns as makes.
+- No change to `vehicles` in this part.
+
+### Part 3 — Vehicle refactor (planned)
+
+- **Schema:** add `vehicles.vehicle_type_id`; make `make_id`, `model_id` and `vehicle_type_id` required; drop the legacy `make` and `model` columns. The project is not in production, so dev and test data can be re-seeded instead of backfilled; the order of migrations still has to apply cleanly on a fresh database.
+- **Vehicles API:** create and update take `makeId`, `modelId` and `vehicleTypeId`; the model must belong to the make (composite FK, mapped to a 400/409 rather than a 500) and new vehicles may only use active makes, models and types. Responses return the names (shape decided at planning time). List filters move from `make`/`model` strings to ids.
+- **Other readers of make/model:** assignments and `/dashboard/me` vehicle summaries, the seed, `prisma/e2e-cleanup.ts` (it finds test vehicles by a `make` prefix), and every e2e test that creates vehicles.
+- **Web (dependent dropdowns):** the vehicle form selects a make first, then loads that make's models (`GET /master-data/vehicle-makes/:makeId/models`); changing the make clears the model. Vehicle type is its own dropdown. Planned as [Frontend Phase 10](frontend-roadmap.md#frontend-phase-10--vehicle-master-data-forms).
+
+**Out of scope**
+
+- Creating, editing or retiring master data through the API or UI. Planned for the platform admin dashboard in the [product roadmap](product-roadmap.md) (v1.1).
+- A production data migration for the catalog. Needed before the first production deploy, because the seed refuses to run in production.
 
 ---
 

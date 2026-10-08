@@ -1,6 +1,6 @@
 # FleetOps — MongoDB + Microservices Learning Track
 
-This file plans a **learning track**: a guided way to learn MongoDB, NoSQL data modeling and microservices architecture using FleetOps telemetry as the example. It is **not** a continuation of the backend phases. There is no backend Phase 10. The backend roadmap ([`PHASES.md`](PHASES.md)) stays focused on the production FleetOps core and ends at Phase 9.
+This file plans a **learning track**: a guided way to learn MongoDB, NoSQL data modeling and microservices architecture using FleetOps telemetry as the example. It is **not** a continuation of the backend phases. The backend roadmap ([`PHASES.md`](PHASES.md)) stays focused on the production FleetOps core and ends at Phase 10 (Vehicle master data).
 
 Nothing in this file is built yet. Every stage is a plan, started only with the user's approval.
 

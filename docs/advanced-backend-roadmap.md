@@ -1,6 +1,6 @@
 # FleetOps — Advanced Backend Engineering Track
 
-This file plans a second **learning track**. It teaches production backend engineering (caching, messaging, real-time, geospatial, integration, search, observability, resilience, orchestration) through real FleetOps features. It is **not** a continuation of the backend phases: there is no backend Phase 10. It is also not part of the MongoDB + microservices track, which stays L1–L15.
+This file plans a second **learning track**. It teaches production backend engineering (caching, messaging, real-time, geospatial, integration, search, observability, resilience, orchestration) through real FleetOps features. It is **not** a continuation of the backend phases, which end at Phase 10 (Vehicle master data). It is also not part of the MongoDB + microservices track, which stays L1–L15.
 
 Nothing in this file is built yet. Every stage is a plan, started only with the user's approval.
 

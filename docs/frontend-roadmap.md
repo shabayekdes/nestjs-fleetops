@@ -12,19 +12,20 @@ Related documents:
 - [`advanced-backend-roadmap.md`](advanced-backend-roadmap.md): the Advanced Backend Engineering Track (A1–A12), after the learning track. No frontend phase depends on it. Its UI work (live tracking, maps, geofences, notifications in A5–A8) starts only after FE9 and is recorded in that file, not as new frontend phases.
 - `CLAUDE.md`: backend conventions. Frontend conventions are in [`apps/web/CLAUDE.md`](../apps/web/CLAUDE.md).
 
-To avoid confusion with the backend roadmap, frontend phases are always called **Frontend Phase N** (FE1–FE9). "Phase N" on its own always means a backend phase.
+To avoid confusion with the backend roadmap, frontend phases are always called **Frontend Phase N** (FE1–FE10). "Phase N" on its own always means a backend phase.
 
-| Frontend phase | Name                   | Status  | Commit(s)            |
-| -------------- | ---------------------- | ------- | -------------------- |
-| FE1            | Application foundation | Done    | `27b8860`            |
-| FE2            | Authentication         | Done    | `be2e028`            |
-| FE3            | Application shell      | Done    | `fcd16bb`            |
-| FE4            | Vehicles               | Done    | `fa31a81`            |
-| FE5            | Users + roles          | Done    | `499fa7d`            |
-| FE6            | Drivers + assignments  | Done    | `970993c`            |
-| FE7            | Maintenance + fuel     | Done    | `e2f2bfa`            |
-| FE8            | Dashboard + reporting  | Done    | `04c0178`, `c02f2ff` |
-| FE9            | Production readiness   | Planned | —                    |
+| Frontend phase | Name                      | Status  | Commit(s)            |
+| -------------- | ------------------------- | ------- | -------------------- |
+| FE1            | Application foundation    | Done    | `27b8860`            |
+| FE2            | Authentication            | Done    | `be2e028`            |
+| FE3            | Application shell         | Done    | `fcd16bb`            |
+| FE4            | Vehicles                  | Done    | `fa31a81`            |
+| FE5            | Users + roles             | Done    | `499fa7d`            |
+| FE6            | Drivers + assignments     | Done    | `970993c`            |
+| FE7            | Maintenance + fuel        | Done    | `e2f2bfa`            |
+| FE8            | Dashboard + reporting     | Done    | `04c0178`, `c02f2ff` |
+| FE9            | Production readiness      | Planned | —                    |
+| FE10           | Vehicle master data forms | Planned | —                    |
 
 ---
 
@@ -575,6 +576,31 @@ For each choice: why it is needed, what it solves, why it fits, and when it is n
 
 ---
 
+## Frontend Phase 10 — Vehicle master data forms
+
+**Status:** Planned. Starts after Backend [Phase 10](PHASES.md#phase-10--vehicle-master-data) part 3 (vehicle refactor) is done and approved.
+
+**Goal:** vehicles are created, edited and filtered with dropdowns from the shared catalog instead of free-text make and model.
+
+**Next.js concepts:** dependent form fields, loading options from a Route Handler or Server Action, resetting dependent state, Server Components for static option lists.
+
+**Scope**
+
+- **Dependent dropdowns** in the vehicle create and edit forms:
+  - **Make** loads from `GET /master-data/vehicle-makes` (active only).
+  - **Model** is disabled until a make is selected, then loads `GET /master-data/vehicle-makes/:makeId/models`. Changing the make clears the selected model and reloads the options.
+  - **Vehicle type** loads from `GET /master-data/vehicle-types`, independent of make and model.
+- **Editing a vehicle whose make, model or type is retired:** the current value is still shown and kept (`includeInactive=true` for the current value only), but cannot be newly selected.
+- **Vehicle list filters** move from free-text make/model to the same dropdowns (ids).
+- Vehicle tables, detail pages, assignments and the dashboard show the catalog names returned by the API.
+- Loading, empty ("this make has no models") and error states for each dropdown. The API stays the source of truth for "model belongs to make" (rule 3); the UI only prevents the obvious mistake.
+
+**Out of scope**
+
+- Managing master data (create, edit, retire). Planned for the platform admin dashboard in [`product-roadmap.md`](product-roadmap.md).
+
+---
+
 ## Dependency on Backend
 
 Every frontend phase depends on the backend phases below. All backend phases must be done before FE1 starts (rule 1); this table shows which backend work each screen relies on, and which **gaps** exist today.
@@ -590,6 +616,7 @@ Every frontend phase depends on the backend phases below. All backend phases mus
 | FE7 Maintenance + fuel    | Phase 7 maintenance and fuel CRUD, per-vehicle cost summary, service-due flag.                                                                                      | None blocking. Gaps: no organization currency, single-value `serviceStatus` filter, no sort on record lists.                                                                                                                                                                    |
 | FE8 Dashboard             | Phases 4–7 data.                                                                                                                                                    | ~~No fleet-wide aggregate endpoints.~~ **Resolved (FE8 addendum):** `/dashboard/fleet`, `/dashboard/me`, `/cost-summary`, driver `licenseStatus`.                                                                                                                               |
 | FE9 Production            | Phase 8 error format, request IDs (shown in error messages to help support); Phase 9 Docker, CI and deployment.                                                     | The API must accept requests from the deployed frontend's server (network/host configuration, no CORS needed).                                                                                                                                                                  |
+| FE10 Master data forms    | Phase 10 master data endpoints (makes, models per make, vehicle types) and the refactored vehicles API (`makeId`, `modelId`, `vehicleTypeId`).                      | All of Phase 10 part 3 (vehicle refactor).                                                                                                                                                                                                                                      |
 
 ---
 

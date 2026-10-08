@@ -4,8 +4,8 @@ This file describes how FleetOps could grow from a portfolio project into a comm
 
 This roadmap starts only after:
 
-1. Backend Phases 1–9 are complete ([`PHASES.md`](PHASES.md)).
-2. Frontend Phases FE1–FE9 are complete ([`frontend-roadmap.md`](frontend-roadmap.md)).
+1. Backend Phases 1–10 are complete ([`PHASES.md`](PHASES.md)).
+2. Frontend Phases FE1–FE10 are complete ([`frontend-roadmap.md`](frontend-roadmap.md)).
 3. FleetOps has reached a usable **v1.0** product.
 
 The [MongoDB + microservices learning track](mongodb-microservices-track.md) is **not** a prerequisite for v1.0. It runs in parallel with the frontend and feeds v2.x GPS + telematics. The [Advanced Backend Engineering Track](advanced-backend-roadmap.md) (A1–A12) follows it. That track produces **candidates** for v1.x and v2.x capabilities (see "Input from the advanced backend track"), never commitments.
@@ -127,7 +127,22 @@ Limit checks must stay correct under concurrent requests (e.g. two vehicles crea
 - **Failed payments:** move the subscription to `past_due`, start the grace period, notify the organization's admins (after v1.2, or with a minimal email in v1.1 if needed).
 - **Billing history:** invoices and payments visible to organization admins.
 
-**NestJS concepts:** a dedicated billing module, raw-body handling for webhook signatures, idempotency, guards or service-level checks for entitlements.
+### Platform admin (SaaS) dashboard
+
+Selling FleetOps to many organizations needs an operator console that sits **above** organizations. Today every role (ADMIN, MANAGER, DRIVER) belongs to one organization, so nobody can manage data shared by all of them.
+
+- **Platform role:** a platform operator identity, separate from organization users and their roles, with its own authentication and audit trail. An organization ADMIN never gets it.
+- **Organizations and subscriptions:** list organizations, see their plan, status and usage, and handle support actions (extend a trial, apply a grace period).
+- **Master data CRUD:** create, edit and retire the shared catalogs built in backend Phase 10, which are read-only through the API until then:
+  - vehicle makes;
+  - vehicle models, always within a make;
+  - vehicle types.
+
+  The Phase 10 rules still apply: rows are retired (`active: false`), never deleted, because vehicles in every organization reference them; slugs stay unique and lowercase; a model cannot move to another make while vehicles use it.
+
+- Every platform action is audit-logged (who, what, before/after), because it affects all tenants at once.
+
+**NestJS concepts:** a dedicated billing module, raw-body handling for webhook signatures, idempotency, guards or service-level checks for entitlements, a separate platform-level guard and role.
 
 **Out of scope**
 
@@ -391,7 +406,7 @@ Start with simple, explainable statistics (averages, thresholds, trends). Introd
 
 ## Master development sequence
 
-The order below is **intentional**. Within each track, every step depends on the one before it being complete, tested, reviewed and approved, and steps are not skipped. After backend Phase 9, two tracks run **in parallel**: the frontend roadmap and the MongoDB + microservices learning track. Neither blocks the other.
+The order below is **intentional**. Backend Phase 10 (vehicle master data) was added after Phase 9, while the frontend was under way; it runs before FE10 and is not shown separately in the diagram. Within each track, every step depends on the one before it being complete, tested, reviewed and approved, and steps are not skipped. After backend Phase 9, two tracks run **in parallel**: the frontend roadmap and the MongoDB + microservices learning track. Neither blocks the other.
 
 ```text
 Backend

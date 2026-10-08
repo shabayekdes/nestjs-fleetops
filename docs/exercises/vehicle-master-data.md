@@ -1,12 +1,14 @@
 # Exercise — Vehicle master data
 
+**Status:** Done (`964d26c`). Every `TODO(LEARN)` is solved; the sections below describe the exercise as it was set. It is the first part of [Phase 10 — Vehicle master data](../PHASES.md#phase-10--vehicle-master-data). The next exercise is [`vehicle-types.md`](vehicle-types.md).
+
 A guided coding exercise. The skeleton is in place; you write the logic. Every place to write code is marked `TODO(LEARN)`:
 
 ```sh
 grep -rn --exclude-dir=generated "TODO(LEARN)" apps/api/src apps/api/prisma apps/api/test
 ```
 
-This is not a numbered backend phase. When it is finished, add an addendum entry to [`docs/PHASES.md`](../PHASES.md) (status, what was built, decisions, out of scope), like the FE8 addendum.
+Progress, decisions and deferred items are recorded in the Phase 10 entry of [`docs/PHASES.md`](../PHASES.md).
 
 ## What already exists
 
