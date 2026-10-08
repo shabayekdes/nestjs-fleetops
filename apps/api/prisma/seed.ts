@@ -79,6 +79,12 @@ const vehicleCatalog: { make: string; models: string[] }[] = [
   { make: 'Volvo', models: ['FH16', 'FM'] },
 ];
 
+/**
+ * Vehicle types (global, not tenant-owned). Seed only: the catalog is
+ * read-only through the API. Pickup covers the Ford Ranger and Toyota Hilux.
+ */
+const vehicleTypes = ['Car', 'Van', 'Pickup', 'Truck', 'Bus', 'Motorcycle'];
+
 const drivers = [
   {
     firstName: 'Sam',
@@ -142,6 +148,15 @@ async function main(): Promise<void> {
           create: { makeId: make.id, name: modelName, slug },
         });
       }
+    }
+
+    for (const name of vehicleTypes) {
+      const slug = toSlug(name);
+      await prisma.vehicleType.upsert({
+        where: { slug },
+        update: { name },
+        create: { name, slug },
+      });
     }
 
     const org = await prisma.organization.upsert({
@@ -300,7 +315,7 @@ async function main(): Promise<void> {
     }
 
     console.log(
-      `Seeded organization "${org.slug}" with ${users.length} users, ${vehicles.length} vehicles and ${drivers.length} drivers, maintenance and fuel records`,
+      `Seeded ${vehicleCatalog.length} vehicle makes, ${vehicleCatalog.reduce((n, c) => n + c.models.length, 0)} models and ${vehicleTypes.length} vehicle types; organization "${org.slug}" with ${users.length} users, ${vehicles.length} vehicles and ${drivers.length} drivers, maintenance and fuel records`,
     );
   } finally {
     await prisma.$disconnect();

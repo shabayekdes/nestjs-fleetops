@@ -14,7 +14,7 @@ No skeleton is prepared. Writing the files yourself is the exercise. Ask for a r
 
 **Not in scope** (these are the Phase 10 vehicle refactor, done afterwards):
 
-- `vehicle_type_id` on `vehicles`, and any change to the vehicles API.
+- Making `vehicles.vehicle_type_id` required, and any change to the vehicles API. (The nullable column itself was added in Step 1, see decision 9.)
 - Write endpoints. Master data stays read-only through the API (decision 10 in the first exercise).
 
 ## What to reuse
@@ -35,16 +35,17 @@ Everything below already exists. Reuse it instead of writing a second version.
 
 Fill this in before writing code. One line of reasoning per row.
 
-| #   | Decision                                                                         | Your choice | Why |
-| --- | -------------------------------------------------------------------------------- | ----------- | --- |
-| 1   | Is a type independent of make and model, or does a model imply its type?         |             |     |
-| 2   | Uniqueness: `name`, `slug`, both? Case handling?                                 |             |     |
-| 3   | Retire with `active` like makes/models, or something else?                       |             |     |
-| 4   | Pagination: same `{ data, meta }` contract, or return the whole (small) list?    |             |     |
-| 5   | Search: needed at all for a list of ~10 rows?                                    |             |     |
-| 6   | Ordering: alphabetical, or a curated `sortOrder` column (e.g. Car before Truck)? |             |     |
-| 7   | `GET /vehicle-types/:slug` too, like makes? Only if a client needs it.           |             |     |
-| 8   | Response fields                                                                  |             |     |
+| #   | Decision                                                                         | Your choice                                                                                  | Why                                                                                                                                           |
+| --- | -------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Is a type independent of make and model, or does a model imply its type?         | Independent: the type belongs to the vehicle (`vehicles.vehicle_type_id`), no link to models | One model can be built as several body types (a Transit is a van, a minibus or a chassis cab).                                                |
+| 2   | Uniqueness: `name`, `slug`, both? Case handling?                                 | `name` and `slug` both globally unique; slug stored lowercase                                | Flat list with no parent, same rules as makes; the lowercase slug catches case-only duplicates.                                               |
+| 3   | Retire with `active` like makes/models, or something else?                       | Boolean `active` (default true)                                                              | Same as makes and models: rows are retired, never deleted, so vehicles keep their type.                                                       |
+| 4   | Pagination: same `{ data, meta }` contract, or return the whole (small) list?    |                                                                                              |                                                                                                                                               |
+| 5   | Search: needed at all for a list of ~10 rows?                                    |                                                                                              |                                                                                                                                               |
+| 6   | Ordering: alphabetical, or a curated `sortOrder` column (e.g. Car before Truck)? | Alphabetical by name; no `sortOrder` column                                                  | A short list reads fine alphabetically; a curated order is a column to add only if users ask.                                                 |
+| 7   | `GET /vehicle-types/:slug` too, like makes? Only if a client needs it.           |                                                                                              |                                                                                                                                               |
+| 8   | Response fields                                                                  |                                                                                              |                                                                                                                                               |
+| 9   | Add `vehicles.vehicle_type_id` now or in Part 3?                                 | Now, nullable, with a Restrict FK (expand step)                                              | Same expand step as `make_id`/`model_id`; Part 3 makes it required and adds the `(organizationId, vehicleTypeId)` index with the type filter. |
 
 Hints:
 

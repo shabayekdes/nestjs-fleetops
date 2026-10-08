@@ -165,7 +165,7 @@ Seed data (`DL-*` licenses, Ford/Mercedes-Benz/Volvo, `*@acme-logistics.test`) n
 
 Plus three vehicles (Ford Transit, Mercedes-Benz Sprinter, Volvo FH16 — the latter without a license plate).
 
-Vehicle master data (global, not tied to the organization): 5 makes and 14 models (Toyota, Ford, BMW, Mercedes-Benz, Volvo), upserted on `slug` and `makeId + slug`.
+Vehicle master data (global, not tied to the organization): 5 makes and 14 models (Toyota, Ford, BMW, Mercedes-Benz, Volvo), upserted on `slug` and `makeId + slug`, and 6 vehicle types (Car, Van, Pickup, Truck, Bus, Motorcycle), upserted on `slug`.
 
 | Driver         | License   | Expires              | Linked user               |
 | -------------- | --------- | -------------------- | ------------------------- |

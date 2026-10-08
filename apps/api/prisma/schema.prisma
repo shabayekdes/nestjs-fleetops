@@ -86,6 +86,7 @@ model Vehicle {
   /// Nullable until the backfill has filled every row (expand → backfill → contract).
   makeId           String?       @map("make_id") @db.Uuid
   modelId          String?       @map("model_id") @db.Uuid
+  vehicleTypeId    String?       @map("vehicle_type_id") @db.Uuid
   year             Int
   vin              String
   /// Nullable: vehicles may be added to a fleet before they are registered.
@@ -106,6 +107,7 @@ model Vehicle {
   // (make_id, model_id), so the database rejects a model from another make.
   vehicleMake  VehicleMake?  @relation(fields: [makeId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   vehicleModel VehicleModel? @relation(fields: [makeId, modelId], references: [makeId, id], onDelete: Restrict, onUpdate: Cascade)
+  vehicleType  VehicleType?  @relation(fields: [vehicleTypeId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
   // Tenant-scoped uniqueness: the same physical vehicle may legitimately exist
   // in two organizations (e.g. after a sale), and a global constraint would leak
@@ -170,6 +172,26 @@ model VehicleModel {
   // Target of the composite FK from vehicles (make_id, model_id).
   @@unique([makeId, id])
   @@map("vehicle_models")
+}
+
+// Global like makes and models: no organizationId, one list shared by every
+// organization. A flat list (no parent); the type belongs to the vehicle, not
+// to the model, because one model can be built as several body types.
+model VehicleType {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  /// Display name, e.g. "Truck".
+  name      String   @unique
+  /// URL-safe identifier, e.g. "truck".
+  /// Stored lowercase; normalized by the application before writes.
+  slug      String   @unique
+  /// false = retired: hidden from pick lists, kept for vehicles that use it.
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  vehicles Vehicle[]
+
+  @@map("vehicle_types")
 }
 
 model Driver {

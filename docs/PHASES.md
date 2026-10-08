@@ -426,11 +426,11 @@ Exercise: [`exercises/vehicle-master-data.md`](exercises/vehicle-master-data.md)
 Exercise: [`exercises/vehicle-types.md`](exercises/vehicle-types.md).
 
 - `vehicle_types` table and `GET /master-data/vehicle-types` in `MasterDataModule`, same patterns as makes.
-- No change to `vehicles` in this part.
+- `vehicles.vehicle_type_id`: nullable, Restrict FK (expand step, like `make_id`/`model_id`). No change to the vehicles API in this part.
 
 ### Part 3 — Vehicle refactor (planned)
 
-- **Schema:** add `vehicles.vehicle_type_id`; make `make_id`, `model_id` and `vehicle_type_id` required; drop the legacy `make` and `model` columns. The project is not in production, so dev and test data can be re-seeded instead of backfilled; the order of migrations still has to apply cleanly on a fresh database.
+- **Schema:** make `make_id`, `model_id` and `vehicle_type_id` required (`vehicle_type_id` exists since part 2); add an `(organization_id, vehicle_type_id)` index for the type filter; drop the legacy `make` and `model` columns. The project is not in production, so dev and test data can be re-seeded instead of backfilled; the order of migrations still has to apply cleanly on a fresh database.
 - **Vehicles API:** create and update take `makeId`, `modelId` and `vehicleTypeId`; the model must belong to the make (composite FK, mapped to a 400/409 rather than a 500) and new vehicles may only use active makes, models and types. Responses return the names (shape decided at planning time). List filters move from `make`/`model` strings to ids.
 - **Other readers of make/model:** assignments and `/dashboard/me` vehicle summaries, the seed, `prisma/e2e-cleanup.ts` (it finds test vehicles by a `make` prefix), and every e2e test that creates vehicles.
 - **Web (dependent dropdowns):** the vehicle form selects a make first, then loads that make's models (`GET /master-data/vehicle-makes/:makeId/models`); changing the make clears the model. Vehicle type is its own dropdown. Planned as [Frontend Phase 10](frontend-roadmap.md#frontend-phase-10--vehicle-master-data-forms).
