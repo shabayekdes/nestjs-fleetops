@@ -34,3 +34,6 @@ apps/api/src/generated
 
 # Claude Code personal settings
 .claude/settings.local.json
+
+# Vercel CLI project link
+.vercel/

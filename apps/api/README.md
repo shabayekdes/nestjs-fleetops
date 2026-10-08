@@ -556,6 +556,24 @@ Compose does not pass `.env` into the containers (each service sets its own vari
 
 Probes: `/api/v1/health/live` for liveness, `/api/v1/health/ready` for readiness. Set `TRUST_PROXY` behind a load balancer and provide `DATABASE_URL` and `JWT_SECRET` through the platform's secret store.
 
+### Production: Render + Neon (API) and Vercel (web)
+
+`.github/workflows/deploy.yml` runs after `CI` succeeds on a push to `main` (or manually from the Actions tab). It deploys the commit CI tested:
+
+1. `api`: `npm run db:migrate:deploy` against the production database, then the Render deploy hook with `ref=<sha>`.
+2. `web` (after `api`): `vercel pull`, `vercel build --prod`, `vercel deploy --prebuilt --prod` from `apps/web`.
+
+Because migrations run before the new API version starts, they must stay backward compatible with the running version (expand, then contract).
+
+One-time setup:
+
+- **Neon**: create the production database. Use the direct (non `-pooler`) connection string.
+- **Render**: New → Blueprint, pick this repository (`render.yaml` at the root). Enter `DATABASE_URL`. Auto-deploy is off. Copy the service's deploy hook URL (Settings → Deploy Hook).
+- **Vercel**: in `apps/web`, run `vercel link` to create the project. Leave Root Directory empty and turn off Git auto-deploys (Settings → Git), because the workflow deploys. Add the production env vars `API_BASE_URL` (the Render URL, without `/api/v1`) and `SESSION_SECRET`. Create a token (Account Settings → Tokens). `apps/web/.vercel/project.json` holds the org and project IDs.
+- **GitHub**: create a `production` environment (Settings → Environments) with the secrets `DATABASE_URL`, `RENDER_DEPLOY_HOOK_URL`, `VERCEL_TOKEN`, `VERCEL_ORG_ID` and `VERCEL_PROJECT_ID`.
+
+The free Render instance sleeps after 15 minutes without traffic, so the first request after that takes about a minute.
+
 ### Daily service-status job with several instances
 
 The job takes a transaction-scoped PostgreSQL advisory lock (`pg_try_advisory_xact_lock`). If another instance is already running it, the run is skipped and logged. No extra infrastructure is needed.
@@ -567,4 +585,4 @@ The job takes a transaction-scoped PostgreSQL advisory lock (`pg_try_advisory_xa
 - `api`: lint, unit tests, `db:test:migrate`, e2e tests against a `postgres:18-alpine` service, the build, and a check that the committed `openapi.json` is up to date.
 - `docker`: builds the `migrate` target (`apps/api`) and smoke-tests `docker compose up` against `/health/ready`.
 
-Images are not published and there is no deploy job yet.
+Images are not published. Deployment is a separate workflow (see [Deployment](#deployment)).
