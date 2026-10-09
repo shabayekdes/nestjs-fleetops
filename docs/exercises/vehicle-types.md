@@ -2,6 +2,8 @@
 
 The second guided exercise in the vehicle master data work ([Phase 10](../PHASES.md#phase-10--vehicle-master-data)). You add a **vehicle types** catalog (Van, Truck, Pickup, …) to the existing `MasterDataModule`, on your own this time, following the patterns from [`vehicle-master-data.md`](vehicle-master-data.md).
 
+**Status:** Done. Steps 1–2 were written by the user (`e2b019d`); Steps 3–6 were finished together after review.
+
 No skeleton is prepared. Writing the files yourself is the exercise. Ask for a review after each step.
 
 ## Scope
@@ -40,11 +42,11 @@ Fill this in before writing code. One line of reasoning per row.
 | 1   | Is a type independent of make and model, or does a model imply its type?         | Independent: the type belongs to the vehicle (`vehicles.vehicle_type_id`), no link to models | One model can be built as several body types (a Transit is a van, a minibus or a chassis cab).                                                |
 | 2   | Uniqueness: `name`, `slug`, both? Case handling?                                 | `name` and `slug` both globally unique; slug stored lowercase                                | Flat list with no parent, same rules as makes; the lowercase slug catches case-only duplicates.                                               |
 | 3   | Retire with `active` like makes/models, or something else?                       | Boolean `active` (default true)                                                              | Same as makes and models: rows are retired, never deleted, so vehicles keep their type.                                                       |
-| 4   | Pagination: same `{ data, meta }` contract, or return the whole (small) list?    |                                                                                              |                                                                                                                                               |
-| 5   | Search: needed at all for a list of ~10 rows?                                    |                                                                                              |                                                                                                                                               |
+| 4   | Pagination: same `{ data, meta }` contract, or return the whole (small) list?    | Yes: `page`/`limit`, `{ data, meta }`                                                        | Same contract as every FleetOps list; clients reuse one list handler.                                                                         |
+| 5   | Search: needed at all for a list of ~10 rows?                                    | Yes, same `search` as makes                                                                  | Not needed for ~6 rows, kept for consistency so all master data lists accept the same query.                                                  |
 | 6   | Ordering: alphabetical, or a curated `sortOrder` column (e.g. Car before Truck)? | Alphabetical by name; no `sortOrder` column                                                  | A short list reads fine alphabetically; a curated order is a column to add only if users ask.                                                 |
-| 7   | `GET /vehicle-types/:slug` too, like makes? Only if a client needs it.           |                                                                                              |                                                                                                                                               |
-| 8   | Response fields                                                                  |                                                                                              |                                                                                                                                               |
+| 7   | `GET /vehicle-types/:slug` too, like makes? Only if a client needs it.           | Yes, `GET /master-data/vehicle-types/:slug` (404 if unknown, retired types included)         | Same as makes, so a client can resolve a slug from a URL.                                                                                     |
+| 8   | Response fields                                                                  | `id`, `name`, `slug`, `active`                                                               | Same shape as makes and models; no timestamps for a pick list.                                                                                |
 | 9   | Add `vehicles.vehicle_type_id` now or in Part 3?                                 | Now, nullable, with a Restrict FK (expand step)                                              | Same expand step as `make_id`/`model_id`; Part 3 makes it required and adds the `(organizationId, vehicleTypeId)` index with the type filter. |
 
 Hints:

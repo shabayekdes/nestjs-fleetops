@@ -267,6 +267,8 @@ All routes are served under the `/api` prefix with URI versioning (default versi
 | GET    | `/api/v1/master-data/vehicle-makes`                   | Bearer token, any role. Global vehicle makes catalog (paginated)                 |
 | GET    | `/api/v1/master-data/vehicle-makes/:slug`             | Bearer token, any role. One make by slug, including retired ones                 |
 | GET    | `/api/v1/master-data/vehicle-makes/:makeId/models`    | Bearer token, any role. Models of one make (paginated)                           |
+| GET    | `/api/v1/master-data/vehicle-types`                   | Bearer token, any role. Global vehicle types catalog (paginated)                 |
+| GET    | `/api/v1/master-data/vehicle-types/:slug`             | Bearer token, any role. One vehicle type by slug, including retired ones         |
 
 Every endpoint except `/api/v1` and `/api/v1/health*` requires an `Authorization: Bearer <token>` header.
 
@@ -468,17 +470,19 @@ Swagger UI is served at `/api/docs` and the OpenAPI JSON at `/api/docs-json`. Th
 
 ### Vehicle master data
 
-Makes and models are a global catalog shared by every organization: no `organizationId`, read-only through the API (any authenticated role), and changed only by the seed and migrations, because ADMIN is a per-organization role. Rows are retired (`active: false`), never deleted.
+Makes, models and vehicle types are global catalogs shared by every organization: no `organizationId`, read-only through the API (any authenticated role), and changed only by the seed and migrations, because ADMIN is a per-organization role. Rows are retired (`active: false`), never deleted.
 
 ```bash
 curl 'http://localhost:3000/api/v1/master-data/vehicle-makes?search=benz' -H "Authorization: Bearer $TOKEN"
 curl http://localhost:3000/api/v1/master-data/vehicle-makes/toyota -H "Authorization: Bearer $TOKEN"
 curl 'http://localhost:3000/api/v1/master-data/vehicle-makes/<makeId>/models' -H "Authorization: Bearer $TOKEN"
+curl http://localhost:3000/api/v1/master-data/vehicle-types -H "Authorization: Bearer $TOKEN"
 ```
 
 - Lists: `page` / `limit` like other lists, `search` (case-insensitive, anywhere in the name; `%` and `_` are literal), `includeInactive=true` to also return retired rows. Ordered by name. Items are `{ id, name, slug, active }`.
 - A model is offered only if it and its make are active: a retired make returns no models unless `includeInactive=true`. An unknown make is `404`, a malformed `makeId` is `400`.
-- `vehicles` has nullable `make_id` / `model_id` columns (composite FK, so a model always belongs to the vehicle's make) next to the legacy `make` / `model` strings. The API does not read or write them yet.
+- Vehicle types are a flat list with the same list rules, plus `GET /vehicle-types/:slug` (404 if unknown).
+- `vehicles` has nullable `make_id` / `model_id` columns (composite FK, so a model always belongs to the vehicle's make) and `vehicle_type_id`, next to the legacy `make` / `model` strings. The API does not read or write them yet.
 
 ### OpenAPI contract (`openapi.json`)
 

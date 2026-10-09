@@ -453,6 +453,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/master-data/vehicle-types": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List vehicle types, alphabetically by name.
+         *
+         *     Only active types unless includeInactive=true. `search` is a
+         *     case-insensitive match anywhere in the name. Paginated like other lists.
+         */
+        get: operations["VehicleTypesController_findAll_v1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/master-data/vehicle-types/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get one vehicle type by its slug (case-insensitive), including retired
+         *     types. 404 if no type has this slug.
+         */
+        get: operations["VehicleTypesController_findOneBySlug_v1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -920,6 +962,22 @@ export interface components {
         };
         VehicleModelListResponseDto: {
             data: components["schemas"]["VehicleModelResponseDto"][];
+            meta: {
+                page: number;
+                limit: number;
+                total: number;
+            };
+        };
+        VehicleTypeResponseDto: {
+            id: string;
+            name: string;
+            /** @description Lowercase URL-safe identifier, e.g. "pickup". */
+            slug: string;
+            /** @description false = retired; only listed with includeInactive=true. */
+            active: boolean;
+        };
+        VehicleTypeListResponseDto: {
+            data: components["schemas"]["VehicleTypeResponseDto"][];
             meta: {
                 page: number;
                 limit: number;
@@ -2297,6 +2355,71 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["VehicleModelListResponseDto"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    VehicleTypesController_findAll_v1: {
+        parameters: {
+            query?: {
+                page?: number;
+                limit?: number;
+                /** @description Case-insensitive match anywhere in the type name. Blank is rejected. */
+                search?: string;
+                /** @description true = also return retired types (e.g. to show an existing vehicle's type). */
+                includeInactive?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VehicleTypeListResponseDto"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    VehicleTypesController_findOneBySlug_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VehicleTypeResponseDto"];
                 };
             };
             /** @description Error */

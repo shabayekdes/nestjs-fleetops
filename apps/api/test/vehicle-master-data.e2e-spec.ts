@@ -17,6 +17,7 @@ type ListBody = {
 };
 
 const MAKES = '/api/v1/master-data/vehicle-makes';
+const TYPES = '/api/v1/master-data/vehicle-types';
 const RESPONSE_KEYS = ['active', 'id', 'name', 'slug'];
 const BAD_UUID = 'Validation failed (uuid v 7 is expected)';
 // Valid UUIDv7 that no make has.
@@ -37,6 +38,7 @@ describe('Vehicle master data (e2e)', () => {
   };
   let orgId = '';
   const makeIds: string[] = [];
+  const typeIds: string[] = [];
 
   const makeName = (label: string): string => `E2E ${label} ${suffix}`;
   const slugOf = (name: string): string =>
@@ -57,6 +59,26 @@ describe('Vehicle master data (e2e)', () => {
       data: { makeId, name, slug: slugOf(name), active },
     });
 
+  const createType = async (label: string, active = true): Promise<string> => {
+    const name = makeName(label);
+    const type = await prisma.vehicleType.create({
+      data: { name, slug: slugOf(name), active },
+      select: { id: true },
+    });
+    typeIds.push(type.id);
+    return type.id;
+  };
+
+  const getTypes = (
+    path: string,
+    role: keyof typeof tokens | null = 'ADMIN',
+  ) => {
+    const req = request(app.getHttpServer()).get(`${TYPES}${path}`);
+    return role === null
+      ? req
+      : req.set('Authorization', `Bearer ${tokens[role]}`);
+  };
+
   const get = (path: string, role: keyof typeof tokens | null = 'ADMIN') => {
     const req = request(app.getHttpServer()).get(`${MAKES}${path}`);
     return role === null
@@ -74,6 +96,9 @@ describe('Vehicle master data (e2e)', () => {
   let makeB = '';
   let makeEmpty = '';
   let makeRetired = '';
+  let typeZulu = '';
+  let typeAlpha = '';
+  let typeRetired = '';
 
   beforeAll(async () => {
     const moduleRef: TestingModule = await Test.createTestingModule({
@@ -120,6 +145,11 @@ describe('Vehicle master data (e2e)', () => {
     await createModel(makeA, 'Oscar', false);
     await createModel(makeB, 'Alpha');
     await createModel(makeRetired, 'Legacy');
+
+    // Vehicle types, also created out of alphabetical order.
+    typeZulu = await createType('Type Zulu');
+    typeAlpha = await createType('Type Alpha');
+    typeRetired = await createType('Type Retired', false);
   });
 
   afterAll(async () => {
@@ -130,6 +160,9 @@ describe('Vehicle master data (e2e)', () => {
           where: { makeId: { in: makeIds } },
         });
         await prisma.vehicleMake.deleteMany({ where: { id: { in: makeIds } } });
+      }
+      if (typeIds.length > 0) {
+        await prisma.vehicleType.deleteMany({ where: { id: { in: typeIds } } });
       }
       if (orgId) {
         await prisma.user.deleteMany({ where: { organizationId: orgId } });
@@ -333,6 +366,101 @@ describe('Vehicle master data (e2e)', () => {
     });
   });
 
+  describe('GET /master-data/vehicle-types', () => {
+    it('returns 401 without a token', async () => {
+      const res = await getTypes('', null).expect(401);
+      expect(res.body).toEqual(errorBody(401, 'Unauthorized'));
+    });
+
+    it.each(['ADMIN', 'MANAGER', 'DRIVER'] as const)(
+      'allows %s to read vehicle types',
+      async (role) => {
+        await getTypes(`?search=${suffix}`, role).expect(200);
+      },
+    );
+
+    it('returns active types alphabetically and hides retired ones', async () => {
+      const res = await getTypes(`?search=${suffix}`).expect(200);
+      expect(names(res.body)).toEqual([
+        makeName('Type Alpha'),
+        makeName('Type Zulu'),
+      ]);
+      expect((res.body as ListBody).meta).toEqual({
+        page: 1,
+        limit: 20,
+        total: 2,
+      });
+    });
+
+    it('returns retired types with includeInactive=true', async () => {
+      const res = await getTypes(
+        `?search=${suffix}&includeInactive=true`,
+      ).expect(200);
+      const retired = (res.body as ListBody).data.find(
+        (d) => d.id === typeRetired,
+      );
+      expect(retired?.active).toBe(false);
+    });
+
+    it('search is case-insensitive and treats % literally', async () => {
+      const upper = await getTypes(
+        `?search=${encodeURIComponent(`TYPE ZULU ${suffix.toUpperCase()}`)}`,
+      ).expect(200);
+      expect((upper.body as ListBody).data.map((d) => d.id)).toEqual([
+        typeZulu,
+      ]);
+      const wildcard = await getTypes(
+        `?search=${encodeURIComponent(`${suffix}%`)}`,
+      ).expect(200);
+      expect((wildcard.body as ListBody).meta.total).toBe(0);
+    });
+
+    it('returns exactly the documented response keys', async () => {
+      const res = await getTypes(`?search=${suffix}`).expect(200);
+      expect(Object.keys(res.body as Body).sort()).toEqual(['data', 'meta']);
+      for (const item of (res.body as ListBody).data) {
+        expect(Object.keys(item).sort()).toEqual(RESPONSE_KEYS);
+      }
+    });
+
+    it.each(['page=0', 'limit=101', 'search=', 'includeInactive=yes'])(
+      'rejects invalid query %s with 400',
+      async (qs) => {
+        const res = await getTypes(`?${qs}`).expect(400);
+        expect(res.body).toMatchObject(errorBody(400, 'Validation failed'));
+      },
+    );
+
+    it('rejects unknown query parameters with 400', async () => {
+      await getTypes('?organizationId=x').expect(400);
+    });
+  });
+
+  describe('GET /master-data/vehicle-types/:slug', () => {
+    it('returns one type by slug, case-insensitively', async () => {
+      const slug = slugOf(makeName('Type Alpha'));
+      const res = await getTypes(`/${slug.toUpperCase()}`).expect(200);
+      expect(res.body).toEqual({
+        id: typeAlpha,
+        name: makeName('Type Alpha'),
+        slug,
+        active: true,
+      });
+    });
+
+    it('returns a retired type with active=false', async () => {
+      const res = await getTypes(`/${slugOf(makeName('Type Retired'))}`).expect(
+        200,
+      );
+      expect((res.body as Item).active).toBe(false);
+    });
+
+    it('returns 404 for an unknown slug', async () => {
+      const res = await getTypes(`/nomatch-${suffix}`).expect(404);
+      expect(res.body).toEqual(errorBody(404, 'Vehicle type not found'));
+    });
+  });
+
   describe('relationships and constraints', () => {
     it('rejects a model whose make does not exist', async () => {
       await expect(
@@ -357,6 +485,20 @@ describe('Vehicle master data (e2e)', () => {
       // Same name, different slug.
       await expect(
         prisma.vehicleMake.create({
+          data: { name, slug: `${slugOf(name)}-2` },
+        }),
+      ).rejects.toMatchObject({ code: 'P2002' });
+    });
+
+    it('enforces the vehicle type uniqueness rules', async () => {
+      const name = makeName('Type Alpha');
+      await expect(
+        prisma.vehicleType.create({
+          data: { name: name.toUpperCase(), slug: slugOf(name) },
+        }),
+      ).rejects.toMatchObject({ code: 'P2002' });
+      await expect(
+        prisma.vehicleType.create({
           data: { name, slug: `${slugOf(name)}-2` },
         }),
       ).rejects.toMatchObject({ code: 'P2002' });

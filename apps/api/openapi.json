@@ -2253,6 +2253,130 @@
           "vehicle-models"
         ]
       }
+    },
+    "/api/v1/master-data/vehicle-types": {
+      "get": {
+        "operationId": "VehicleTypesController_findAll_v1",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Case-insensitive match anywhere in the type name. Blank is rejected.",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          },
+          {
+            "name": "includeInactive",
+            "required": false,
+            "in": "query",
+            "description": "true = also return retired types (e.g. to show an existing vehicle's type).",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VehicleTypeListResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List vehicle types, alphabetically by name.\n\nOnly active types unless includeInactive=true. `search` is a\ncase-insensitive match anywhere in the name. Paginated like other lists.",
+        "tags": [
+          "vehicle-types"
+        ]
+      }
+    },
+    "/api/v1/master-data/vehicle-types/{slug}": {
+      "get": {
+        "operationId": "VehicleTypesController_findOneBySlug_v1",
+        "parameters": [
+          {
+            "name": "slug",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VehicleTypeResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get one vehicle type by its slug (case-insensitive), including retired\ntypes. 404 if no type has this slug.",
+        "tags": [
+          "vehicle-types"
+        ]
+      }
     }
   },
   "info": {
@@ -3853,6 +3977,65 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/VehicleModelResponseDto"
+            }
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "page": {
+                "type": "number"
+              },
+              "limit": {
+                "type": "number"
+              },
+              "total": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "page",
+              "limit",
+              "total"
+            ]
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      },
+      "VehicleTypeResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string",
+            "description": "Lowercase URL-safe identifier, e.g. \"pickup\"."
+          },
+          "active": {
+            "type": "boolean",
+            "description": "false = retired; only listed with includeInactive=true."
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "active"
+        ]
+      },
+      "VehicleTypeListResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VehicleTypeResponseDto"
             }
           },
           "meta": {

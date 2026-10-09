@@ -13,18 +13,18 @@ Rules for working with phases:
 - Conventions live in `CLAUDE.md`. This file covers scope and history only.
 - Planned phases are a direction, not a spec. Before starting one, confirm its scope with the user, then ask `cto-esmail` for a plan. The order and content of planned phases may change.
 
-| Phase | Name                             | Status      | Commit(s)                  |
-| ----- | -------------------------------- | ----------- | -------------------------- |
-| 1     | Application foundation           | Done        | `4b1d372`                  |
-| 2     | PostgreSQL + Prisma              | Done        | `5623cff`                  |
-| 3     | Authentication + tenant context  | Done        | `0195815`                  |
-| 4     | Vehicles API                     | Done        | `9e4a426`                  |
-| 5     | Users + roles                    | Done        | `c80e806`                  |
-| 6     | Drivers + vehicle assignments    | Done        | `961d586`                  |
-| 7     | Maintenance + fuel records       | Done        | `f12eeed`                  |
-| 8     | API docs, logging + error format | Done        | `2395d09`                  |
-| 9     | Docker, CI + deployment          | Done        | `a0217d0`                  |
-| 10    | Vehicle master data              | In progress | `964d26c` (makes + models) |
+| Phase | Name                             | Status      | Commit(s)                                     |
+| ----- | -------------------------------- | ----------- | --------------------------------------------- |
+| 1     | Application foundation           | Done        | `4b1d372`                                     |
+| 2     | PostgreSQL + Prisma              | Done        | `5623cff`                                     |
+| 3     | Authentication + tenant context  | Done        | `0195815`                                     |
+| 4     | Vehicles API                     | Done        | `9e4a426`                                     |
+| 5     | Users + roles                    | Done        | `c80e806`                                     |
+| 6     | Drivers + vehicle assignments    | Done        | `961d586`                                     |
+| 7     | Maintenance + fuel records       | Done        | `f12eeed`                                     |
+| 8     | API docs, logging + error format | Done        | `2395d09`                                     |
+| 9     | Docker, CI + deployment          | Done        | `a0217d0`                                     |
+| 10    | Vehicle master data              | In progress | `964d26c` (makes + models), `e2b019d` (types) |
 
 ---
 
@@ -393,7 +393,7 @@ API moved to `apps/api/` in preparation for the frontend (`apps/web/`); no behav
 
 ## Phase 10 — Vehicle master data
 
-**Status:** In progress. Part 1 done (`964d26c`); parts 2 and 3 planned.
+**Status:** In progress. Parts 1 and 2 done; part 3 planned.
 
 **Goal:** vehicles reference a shared catalog of makes, models and types instead of free text, and the web vehicle form picks them from dependent dropdowns.
 
@@ -421,11 +421,11 @@ Exercise: [`exercises/vehicle-master-data.md`](exercises/vehicle-master-data.md)
 6. Lists use the usual `page`/`limit` contract; `search` is a case-insensitive `contains` with `%`, `_` and `\` escaped, because Prisma does not escape them.
 7. The legacy `vehicles.make` / `model` strings coexist with the new FKs until part 3.
 
-### Part 2 — Vehicle types (planned)
+### Part 2 — Vehicle types (done)
 
 Exercise: [`exercises/vehicle-types.md`](exercises/vehicle-types.md).
 
-- `vehicle_types` table and `GET /master-data/vehicle-types` in `MasterDataModule`, same patterns as makes.
+- `vehicle_types` table (6 seeded types) and `GET /master-data/vehicle-types` and `GET /master-data/vehicle-types/:slug` in `MasterDataModule`, same rules as makes (decision log in the exercise).
 - `vehicles.vehicle_type_id`: nullable, Restrict FK (expand step, like `make_id`/`model_id`). No change to the vehicles API in this part.
 
 ### Part 3 — Vehicle refactor (planned)
