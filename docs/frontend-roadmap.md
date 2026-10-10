@@ -25,7 +25,7 @@ To avoid confusion with the backend roadmap, frontend phases are always called *
 | FE7            | Maintenance + fuel        | Done    | `e2f2bfa`            |
 | FE8            | Dashboard + reporting     | Done    | `04c0178`, `c02f2ff` |
 | FE9            | Production readiness      | Planned | —                    |
-| FE10           | Vehicle master data forms | Done    | see the FE10 entry   |
+| FE10           | Vehicle master data forms | Done    | `24ba80e`            |
 
 ---
 
