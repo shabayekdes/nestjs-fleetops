@@ -5,6 +5,7 @@ import { UpdateVehicleDto } from './update-vehicle.dto.js';
 import { maxVehicleYear } from './vehicle-normalizers.js';
 
 const VIN = '1HGCM82633A004352';
+const ID = '01900000-0000-7000-8000-000000000001';
 
 const run = async (plain: Record<string, unknown>) => {
   const dto = plainToInstance(UpdateVehicleDto, plain);
@@ -19,13 +20,13 @@ describe('UpdateVehicleDto', () => {
   it('accepts an empty body', async () => {
     const { errors, dto } = await run({});
     expect(errors).toHaveLength(0);
-    expect(dto.make).toBeUndefined();
+    expect(dto.makeId).toBeUndefined();
     expect(dto.licensePlate).toBeUndefined();
   });
 
   it.each<[string, unknown]>([
-    ['make', 'Ford'],
-    ['model', 'Transit'],
+    ['modelId', ID],
+    ['vehicleTypeId', ID],
     ['year', 2020],
     ['year', maxVehicleYear()],
     ['vin', VIN],
@@ -36,22 +37,44 @@ describe('UpdateVehicleDto', () => {
 
   it('normalizes provided fields', async () => {
     const { dto, errors } = await run({
-      make: ' Ford ',
-      model: ' T ',
       vin: ` ${VIN.toLowerCase()} `,
       licensePlate: ' ab-1 ',
     });
     expect(errors).toHaveLength(0);
     expect(dto).toMatchObject({
-      make: 'Ford',
-      model: 'T',
       vin: VIN,
       licensePlate: 'AB-1',
     });
   });
 
-  it.each(['make', 'model', 'year', 'vin'])('rejects null %s', async (f) => {
-    expect((await run({ [f]: null })).fields).toContain(f);
+  it.each(['makeId', 'modelId', 'vehicleTypeId', 'year', 'vin'])(
+    'rejects null %s',
+    async (f) => {
+      expect((await run({ [f]: null })).fields).toContain(f);
+    },
+  );
+
+  it('reports the dedicated message when makeId is sent without modelId', async () => {
+    const { errors } = await run({ makeId: ID });
+    const modelError = errors.find((e) => e.property === 'modelId');
+    expect(Object.values(modelError?.constraints ?? {})).toContain(
+      'modelId is required when makeId is changed',
+    );
+  });
+
+  it('accepts modelId alone and vehicleTypeId alone', async () => {
+    expect((await run({ modelId: ID })).errors).toHaveLength(0);
+    expect((await run({ vehicleTypeId: ID })).errors).toHaveLength(0);
+  });
+
+  it.each(['make', 'model'])('rejects the legacy %s property', async (f) => {
+    expect((await run({ [f]: 'Ford' })).fields).toContain(f);
+  });
+
+  it('requires modelId when makeId is sent', async () => {
+    const { fields } = await run({ makeId: ID });
+    expect(fields).toContain('modelId');
+    expect((await run({ makeId: ID, modelId: ID })).errors).toHaveLength(0);
   });
 
   it('accepts licensePlate null and keeps it null', async () => {
@@ -61,10 +84,9 @@ describe('UpdateVehicleDto', () => {
   });
 
   it.each<[string, unknown]>([
-    ['make', ''],
-    ['make', '   '],
-    ['make', 'a'.repeat(51)],
-    ['model', ''],
+    ['makeId', 'abc'],
+    ['modelId', 'abc'],
+    ['vehicleTypeId', 'abc'],
     ['year', 1899],
     ['year', maxVehicleYear() + 1],
     ['year', '2020'],

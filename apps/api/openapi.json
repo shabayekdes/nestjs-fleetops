@@ -529,20 +529,29 @@
             }
           },
           {
-            "name": "make",
+            "name": "makeId",
             "required": false,
             "in": "query",
             "schema": {
-              "maxLength": 50,
+              "format": "uuid",
               "type": "string"
             }
           },
           {
-            "name": "model",
+            "name": "modelId",
             "required": false,
             "in": "query",
             "schema": {
-              "maxLength": 50,
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "vehicleTypeId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
               "type": "string"
             }
           },
@@ -2848,6 +2857,21 @@
           }
         }
       },
+      "VehicleCatalogRefDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
       "VehicleResponseDto": {
         "type": "object",
         "properties": {
@@ -2855,10 +2879,13 @@
             "type": "string"
           },
           "make": {
-            "type": "string"
+            "$ref": "#/components/schemas/VehicleCatalogRefDto"
           },
           "model": {
-            "type": "string"
+            "$ref": "#/components/schemas/VehicleCatalogRefDto"
+          },
+          "vehicleType": {
+            "$ref": "#/components/schemas/VehicleCatalogRefDto"
           },
           "year": {
             "type": "number"
@@ -2897,6 +2924,7 @@
           "id",
           "make",
           "model",
+          "vehicleType",
           "year",
           "vin",
           "licensePlate",
@@ -2943,13 +2971,17 @@
       "CreateVehicleDto": {
         "type": "object",
         "properties": {
-          "make": {
+          "makeId": {
             "type": "string",
-            "maxLength": 50
+            "format": "uuid"
           },
-          "model": {
+          "modelId": {
             "type": "string",
-            "maxLength": 50
+            "format": "uuid"
+          },
+          "vehicleTypeId": {
+            "type": "string",
+            "format": "uuid"
           },
           "year": {
             "type": "number",
@@ -2966,8 +2998,9 @@
           }
         },
         "required": [
-          "make",
-          "model",
+          "makeId",
+          "modelId",
+          "vehicleTypeId",
           "year",
           "vin"
         ]
@@ -2975,13 +3008,18 @@
       "UpdateVehicleDto": {
         "type": "object",
         "properties": {
-          "make": {
+          "makeId": {
             "type": "string",
-            "maxLength": 50
+            "format": "uuid"
           },
-          "model": {
+          "modelId": {
             "type": "string",
-            "maxLength": 50
+            "description": "Required whenever makeId is sent: a model belongs to exactly one make.",
+            "format": "uuid"
+          },
+          "vehicleTypeId": {
+            "type": "string",
+            "format": "uuid"
           },
           "year": {
             "type": "number",

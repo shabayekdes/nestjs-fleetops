@@ -63,6 +63,24 @@ describe('AssignmentsService', () => {
     }
     throw new Error('expected rejection');
   };
+  const asgRow = (id: string, o: Record<string, unknown> = {}) => ({
+    id,
+    vehicle: {
+      id: VEHICLE,
+      vin: 'V',
+      licensePlate: null,
+      vehicleMake: { name: 'Ford' },
+      vehicleModel: { name: 'Transit' },
+    },
+    ...o,
+  });
+  const flatVehicle = {
+    id: VEHICLE,
+    vin: 'V',
+    licensePlate: null,
+    make: 'Ford',
+    model: 'Transit',
+  };
   const futureDate = (): Date => new Date(Date.now() + 30 * 86_400_000);
 
   beforeEach(async () => {
@@ -75,7 +93,7 @@ describe('AssignmentsService', () => {
       licenseExpiresOn: futureDate(),
     });
     asgFindFirst.mockResolvedValue(null);
-    asgCreate.mockResolvedValue({ id: ID });
+    asgCreate.mockResolvedValue(asgRow(ID));
 
     const prismaMock = {
       vehicle: { findFirst: vehicleFindFirst },
@@ -193,7 +211,7 @@ describe('AssignmentsService', () => {
         startedAt: '2000-01-01',
         organizationId: 'evil',
       } as typeof dto);
-      expect(res).toEqual({ id: ID });
+      expect(res).toEqual({ id: ID, vehicle: flatVehicle });
       const data = (
         asgCreate.mock.calls[0][0] as { data: Record<string, unknown> }
       ).data;
@@ -261,7 +279,7 @@ describe('AssignmentsService', () => {
   describe('end', () => {
     it('conditionally updates by id, organizationId and endedAt null, then returns the row', async () => {
       asgUpdateMany.mockResolvedValue({ count: 1 });
-      asgFindFirst.mockResolvedValue({ id: ID, endedAt: new Date() });
+      asgFindFirst.mockResolvedValue(asgRow(ID, { endedAt: new Date() }));
       const res = await service.end(ORG, ID);
       const args = asgUpdateMany.mock.calls[0][0] as {
         where: unknown;
@@ -353,12 +371,42 @@ describe('AssignmentsService', () => {
       });
     });
 
+    it('flattens the vehicle summary to make/model strings without leaking catalog relations', async () => {
+      asgFindMany.mockResolvedValue([asgRow('a')]);
+      const res = await service.findAll(ORG, query());
+      const vehicle = res.data[0].vehicle as unknown as Record<string, unknown>;
+      expect(Object.keys(vehicle).sort()).toEqual([
+        'id',
+        'licensePlate',
+        'make',
+        'model',
+        'vin',
+      ]);
+      expect(vehicle).not.toHaveProperty('vehicleMake');
+      expect(vehicle).not.toHaveProperty('vehicleModel');
+      expect(typeof vehicle.make).toBe('string');
+      expect(typeof vehicle.model).toBe('string');
+    });
+
+    it('selects the catalog names for the vehicle summary', async () => {
+      await service.findAll(ORG, query());
+      const args = asgFindMany.mock.calls[0][0] as {
+        select: { vehicle: { select: Record<string, unknown> } };
+      };
+      expect(args.select.vehicle.select).toMatchObject({
+        vehicleMake: { select: { name: true } },
+        vehicleModel: { select: { name: true } },
+      });
+      expect(args.select.vehicle.select).not.toHaveProperty('make');
+      expect(args.select.vehicle.select).not.toHaveProperty('model');
+    });
+
     it('takes total from count', async () => {
-      asgFindMany.mockResolvedValue([{ id: 'a' }]);
+      asgFindMany.mockResolvedValue([asgRow('a')]);
       asgCount.mockResolvedValue(9);
       const res = await service.findAll(ORG, query({ page: 2, limit: 1 }));
       expect(res).toEqual({
-        data: [{ id: 'a' }],
+        data: [{ id: 'a', vehicle: flatVehicle }],
         meta: { page: 2, limit: 1, total: 9 },
       });
     });

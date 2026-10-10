@@ -1,9 +1,9 @@
 import { Transform } from 'class-transformer';
 import {
   IsInt,
-  IsNotEmpty,
   IsOptional,
   IsString,
+  IsUUID,
   Matches,
   MaxLength,
   Min,
@@ -13,24 +13,20 @@ import {
   LICENSE_PLATE_MESSAGE,
   LICENSE_PLATE_PATTERN,
   MIN_VEHICLE_YEAR,
-  trim,
   trimUpper,
   VIN_MESSAGE,
   VIN_PATTERN,
 } from './vehicle-normalizers.js';
 
 export class CreateVehicleDto {
-  @Transform(trim)
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(50)
-  make: string;
+  @IsUUID('7')
+  makeId: string;
 
-  @Transform(trim)
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(50)
-  model: string;
+  @IsUUID('7')
+  modelId: string;
+
+  @IsUUID('7')
+  vehicleTypeId: string;
 
   /** JSON number only; no @Type, so "2023" is rejected. */
   @IsInt()

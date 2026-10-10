@@ -2,6 +2,7 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 import { toDateOnly } from '../common/date-only.js';
 import { PrismaService } from '../database/prisma.service.js';
@@ -17,8 +18,9 @@ import type {
 
 const VEHICLE_SELECT = {
   id: true,
-  make: true,
-  model: true,
+  vehicleMake: { select: { id: true, name: true } },
+  vehicleModel: { select: { id: true, name: true } },
+  vehicleType: { select: { id: true, name: true } },
   year: true,
   vin: true,
   licensePlate: true,
@@ -32,8 +34,9 @@ type VehicleRow = Prisma.VehicleGetPayload<{ select: typeof VEHICLE_SELECT }>;
 
 const toVehicleResponse = (row: VehicleRow): VehicleResponseDto => ({
   id: row.id,
-  make: row.make,
-  model: row.model,
+  make: row.vehicleMake,
+  model: row.vehicleModel,
+  vehicleType: row.vehicleType,
   year: row.year,
   vin: row.vin,
   licensePlate: row.licensePlate,
@@ -49,6 +52,11 @@ const toVehicleResponse = (row: VehicleRow): VehicleResponseDto => ({
 function toHttpError(error: unknown): unknown {
   if (!(error instanceof Prisma.PrismaClientKnownRequestError)) return error;
   if (error.code === 'P2025') return new NotFoundException('Vehicle not found');
+  if (error.code === 'P2003') {
+    return new UnprocessableEntityException(
+      'Vehicle make, model or type is not valid',
+    );
+  }
   if (error.code !== 'P2002') return error;
   const hints = uniqueConstraintHints(error.meta);
   if (hints.some((h) => h === 'licensePlate' || h.includes('license_plate'))) {
@@ -72,15 +80,13 @@ export class VehiclesService {
     organizationId: string,
     query: ListVehiclesQueryDto,
   ): Promise<VehicleListResponseDto> {
-    const { page, limit, make, model, year, serviceStatus } = query;
+    const { page, limit, makeId, modelId, vehicleTypeId, year, serviceStatus } =
+      query;
     const where: Prisma.VehicleWhereInput = {
       organizationId,
-      ...(make !== undefined && {
-        make: { equals: make, mode: 'insensitive' },
-      }),
-      ...(model !== undefined && {
-        model: { equals: model, mode: 'insensitive' },
-      }),
+      ...(makeId !== undefined && { makeId }),
+      ...(modelId !== undefined && { modelId }),
+      ...(vehicleTypeId !== undefined && { vehicleTypeId }),
       ...(year !== undefined && { year }),
       ...(serviceStatus !== undefined && { serviceStatus }),
     };
@@ -113,12 +119,21 @@ export class VehiclesService {
     organizationId: string,
     dto: CreateVehicleDto,
   ): Promise<VehicleResponseDto> {
+    await this.assertCatalogRefs(
+      {
+        makeId: dto.makeId,
+        modelId: dto.modelId,
+        vehicleTypeId: dto.vehicleTypeId,
+      },
+      null,
+    );
     try {
       const vehicle = await this.prisma.vehicle.create({
         data: {
           organizationId,
-          make: dto.make,
-          model: dto.model,
+          makeId: dto.makeId,
+          modelId: dto.modelId,
+          vehicleTypeId: dto.vehicleTypeId,
           year: dto.year,
           vin: dto.vin,
           licensePlate: dto.licensePlate ?? null,
@@ -136,13 +151,33 @@ export class VehiclesService {
     id: string,
     dto: UpdateVehicleDto,
   ): Promise<VehicleResponseDto> {
+    if (
+      dto.makeId !== undefined ||
+      dto.modelId !== undefined ||
+      dto.vehicleTypeId !== undefined
+    ) {
+      const current = await this.prisma.vehicle.findFirst({
+        where: { id, organizationId },
+        select: { makeId: true, modelId: true, vehicleTypeId: true },
+      });
+      if (!current) throw new NotFoundException('Vehicle not found');
+      await this.assertCatalogRefs(
+        {
+          makeId: dto.makeId ?? current.makeId,
+          modelId: dto.modelId ?? current.modelId,
+          vehicleTypeId: dto.vehicleTypeId ?? current.vehicleTypeId,
+        },
+        current,
+      );
+    }
     try {
       // undefined = unchanged, null (licensePlate only) = clear.
       const vehicle = await this.prisma.vehicle.update({
         where: { id, organizationId },
         data: {
-          make: dto.make,
-          model: dto.model,
+          makeId: dto.makeId,
+          modelId: dto.modelId,
+          vehicleTypeId: dto.vehicleTypeId,
           year: dto.year,
           vin: dto.vin,
           licensePlate: dto.licensePlate,
@@ -152,6 +187,55 @@ export class VehiclesService {
       return toVehicleResponse(vehicle);
     } catch (error) {
       throw toHttpError(error);
+    }
+  }
+
+  /**
+   * Validates the catalog references of a create or update. Values are checked
+   * only when newly used (`current` null = create): an unchanged retired make,
+   * model or type passes. Throws 422 in a fixed order.
+   */
+  private async assertCatalogRefs(
+    refs: { makeId: string; modelId: string; vehicleTypeId: string },
+    current: { makeId: string; modelId: string; vehicleTypeId: string } | null,
+  ): Promise<void> {
+    const pairChanged =
+      current === null ||
+      refs.makeId !== current.makeId ||
+      refs.modelId !== current.modelId;
+    if (pairChanged) {
+      const make = await this.prisma.vehicleMake.findUnique({
+        where: { id: refs.makeId },
+        select: { active: true },
+      });
+      if (!make)
+        throw new UnprocessableEntityException('Vehicle make not found');
+      if (!make.active) {
+        throw new UnprocessableEntityException('Vehicle make is retired');
+      }
+      const model = await this.prisma.vehicleModel.findUnique({
+        where: { makeId_id: { makeId: refs.makeId, id: refs.modelId } },
+        select: { active: true },
+      });
+      if (!model) {
+        throw new UnprocessableEntityException(
+          'Vehicle model not found for this make',
+        );
+      }
+      if (!model.active) {
+        throw new UnprocessableEntityException('Vehicle model is retired');
+      }
+    }
+    if (current === null || refs.vehicleTypeId !== current.vehicleTypeId) {
+      const type = await this.prisma.vehicleType.findUnique({
+        where: { id: refs.vehicleTypeId },
+        select: { active: true },
+      });
+      if (!type)
+        throw new UnprocessableEntityException('Vehicle type not found');
+      if (!type.active) {
+        throw new UnprocessableEntityException('Vehicle type is retired');
+      }
     }
   }
 

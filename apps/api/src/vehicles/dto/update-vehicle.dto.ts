@@ -1,9 +1,10 @@
 import { Transform } from 'class-transformer';
 import {
+  IsDefined,
   IsInt,
-  IsNotEmpty,
   IsOptional,
   IsString,
+  IsUUID,
   Matches,
   MaxLength,
   Min,
@@ -14,31 +15,33 @@ import {
   LICENSE_PLATE_MESSAGE,
   LICENSE_PLATE_PATTERN,
   MIN_VEHICLE_YEAR,
-  trim,
   trimUpper,
   VIN_MESSAGE,
   VIN_PATTERN,
 } from './vehicle-normalizers.js';
 
 /**
- * Omitted = unchanged. make/model/year/vin are NOT NULL columns, so an
+ * Omitted = unchanged. makeId/modelId/vehicleTypeId/year/vin are NOT NULL columns, so an
  * explicit null is rejected (ValidateIf only skips undefined). licensePlate
  * accepts null to clear it.
  */
 export class UpdateVehicleDto {
   @ValidateIf((_, value: unknown) => value !== undefined)
-  @Transform(trim)
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(50)
-  make?: string;
+  @IsUUID('7')
+  makeId?: string;
+
+  /** Required whenever makeId is sent: a model belongs to exactly one make. */
+  @ValidateIf(
+    (o: UpdateVehicleDto, value: unknown) =>
+      value !== undefined || o.makeId !== undefined,
+  )
+  @IsDefined({ message: 'modelId is required when makeId is changed' })
+  @IsUUID('7')
+  modelId?: string;
 
   @ValidateIf((_, value: unknown) => value !== undefined)
-  @Transform(trim)
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(50)
-  model?: string;
+  @IsUUID('7')
+  vehicleTypeId?: string;
 
   @ValidateIf((_, value: unknown) => value !== undefined)
   @IsInt()

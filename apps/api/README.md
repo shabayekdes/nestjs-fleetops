@@ -139,13 +139,13 @@ npm run db:test:e2e-cleanup  # TEST ONLY: delete E2E rows left by the web Playwr
 
 It refuses to run (non-zero exit) unless `NODE_ENV=test`, `DATABASE_URL` is set and the database name contains `test`. It only touches the `acme-logistics` organization (exit 0 with a message if it is missing) and deletes, in one transaction, and logs the count per table:
 
-1. `vehicle_assignments` whose driver `licenseNumber` or vehicle `make` starts with `E2E-`
-2. `maintenance_records` and `fuel_logs` of vehicles whose `make` starts with `E2E-`
+1. `vehicle_assignments` whose driver `licenseNumber` starts with `E2E-` or vehicle `vin` starts with `E2E`
+2. `maintenance_records` and `fuel_logs` of vehicles whose `vin` starts with `E2E`
 3. `drivers` whose `licenseNumber` starts with `E2E-`
-4. `vehicles` whose `make` starts with `E2E-`
+4. `vehicles` whose `vin` starts with `E2E`
 5. `users` whose email starts with `e2e-` (drivers still linked to them are unlinked first)
 
-Seed data (`DL-*` licenses, Ford/Mercedes-Benz/Volvo, `*@acme-logistics.test`) never matches these prefixes. The web Playwright `globalTeardown` runs it with `npm --prefix ../api run db:test:e2e-cleanup`.
+Seed data (`DL-*` licenses, VINs starting `1FT`/`WD3`/`YV2`, `*@acme-logistics.test`) never matches these prefixes. The web Playwright `globalTeardown` runs it with `npm --prefix ../api run db:test:e2e-cleanup`.
 
 `prisma migrate dev` is for development only — it may prompt to reset the database on drift. Deployed environments use `prisma migrate deploy`.
 
@@ -323,9 +323,9 @@ TOKEN=<accessToken from login>
 
 curl -X POST http://localhost:3000/api/v1/vehicles \
   -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
-  -d '{"make":"Ford","model":"Transit","year":2023,"vin":"1FTBW2CM5HKA12345","licensePlate":"ABC-123"}'
+  -d '{"makeId":"<makeId>","modelId":"<modelId>","vehicleTypeId":"<vehicleTypeId>","year":2023,"vin":"1FTBW2CM5HKA12345","licensePlate":"ABC-123"}'
 
-curl 'http://localhost:3000/api/v1/vehicles?page=1&limit=20&make=ford' -H "Authorization: Bearer $TOKEN"
+curl 'http://localhost:3000/api/v1/vehicles?page=1&limit=20&makeId=<makeId>&vehicleTypeId=<vehicleTypeId>' -H "Authorization: Bearer $TOKEN"
 
 curl -X PATCH http://localhost:3000/api/v1/vehicles/<id> \
   -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
@@ -334,7 +334,7 @@ curl -X PATCH http://localhost:3000/api/v1/vehicles/<id> \
 curl -X DELETE http://localhost:3000/api/v1/vehicles/<id> -H "Authorization: Bearer $TOKEN"
 ```
 
-Rules: the VIN is 17 characters (digits and letters except I, O, Q) and is stored uppercase. The license plate is optional, stored uppercase, at most 15 characters (letters, digits, spaces, hyphens); `null` clears it on PATCH. The year must be between 1900 and next year. Lists are paginated (`page` default 1, `limit` default 20, max 100), newest first, and can be filtered by `make`, `model` (case-insensitive, exact) and `year`. Responses never include `organizationId`. Another organization's vehicle returns `404`, the same as a missing one. `:id` must be a UUIDv7 (otherwise `400`). A duplicate VIN or license plate within the organization returns `409`. A vehicle that has any assignment, maintenance record or fuel log cannot be deleted (`409`, `Vehicle has related records and cannot be deleted`); the history is kept. Vehicle responses also contain `nextServiceDueOn` and `serviceStatus` (see Maintenance, fuel and costs), and `GET /vehicles` accepts a `serviceStatus` filter.
+Rules: the VIN is 17 characters (digits and letters except I, O, Q) and is stored uppercase. The license plate is optional, stored uppercase, at most 15 characters (letters, digits, spaces, hyphens); `null` clears it on PATCH. The year must be between 1900 and next year. Lists are paginated (`page` default 1, `limit` default 20, max 100), newest first, and can be filtered by `makeId`, `modelId`, `vehicleTypeId` (UUIDv7, exact; unknown ids give an empty list, retired ids still filter) and `year`. Responses return `make`, `model` and `vehicleType` as `{ id, name }`, and never include `organizationId`. Take the ids from the `master-data` endpoints. `makeId`, `modelId` and `vehicleTypeId` are required on create. On PATCH they are optional, and `modelId` is required whenever `makeId` is sent (a model belongs to one make); `null` is `400`. Catalog values are checked only when newly used, so an unchanged retired make, model or type is accepted. Invalid references return `422`: `Vehicle make not found`, `Vehicle make is retired`, `Vehicle model not found for this make`, `Vehicle model is retired`, `Vehicle type not found`, `Vehicle type is retired`. Another organization's vehicle returns `404`, the same as a missing one. `:id` must be a UUIDv7 (otherwise `400`). A duplicate VIN or license plate within the organization returns `409`. A vehicle that has any assignment, maintenance record or fuel log cannot be deleted (`409`, `Vehicle has related records and cannot be deleted`); the history is kept. Vehicle responses also contain `nextServiceDueOn` and `serviceStatus` (see Maintenance, fuel and costs), and `GET /vehicles` accepts a `serviceStatus` filter.
 
 ### Roles
 
@@ -482,7 +482,7 @@ curl http://localhost:3000/api/v1/master-data/vehicle-types -H "Authorization: B
 - Lists: `page` / `limit` like other lists, `search` (case-insensitive, anywhere in the name; `%` and `_` are literal), `includeInactive=true` to also return retired rows. Ordered by name. Items are `{ id, name, slug, active }`.
 - A model is offered only if it and its make are active: a retired make returns no models unless `includeInactive=true`. An unknown make is `404`, a malformed `makeId` is `400`.
 - Vehicle types are a flat list with the same list rules, plus `GET /vehicle-types/:slug` (404 if unknown).
-- `vehicles` has nullable `make_id` / `model_id` columns (composite FK, so a model always belongs to the vehicle's make) and `vehicle_type_id`, next to the legacy `make` / `model` strings. The API does not read or write them yet.
+- `vehicles` has required `make_id`, `model_id` (composite FK, so a model always belongs to the vehicle's make) and `vehicle_type_id` columns; the legacy `make` / `model` strings were dropped. The vehicles API reads and writes them (see Vehicles).
 
 ### OpenAPI contract (`openapi.json`)
 

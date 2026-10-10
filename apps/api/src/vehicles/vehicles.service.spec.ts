@@ -1,5 +1,9 @@
 import { jest } from '@jest/globals';
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  NotFoundException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../database/prisma.service.js';
 import { Prisma } from '../generated/prisma/client.js';
@@ -37,11 +41,15 @@ const VIN_MSG = 'A vehicle with this VIN already exists';
 const PLATE_MSG = 'A vehicle with this license plate already exists';
 const GENERIC_MSG = 'A vehicle with this VIN or license plate already exists';
 
+const MAKE_ID = '01900000-0000-7000-8000-0000000000a1';
+const MODEL_ID = '01900000-0000-7000-8000-0000000000b1';
+const TYPE_ID = '01900000-0000-7000-8000-0000000000c1';
 const NOW = new Date('2026-06-15T10:00:00.000Z');
 const vehicleRow = (o: Record<string, unknown> = {}) => ({
   id: ID,
-  make: 'Ford',
-  model: 'Transit',
+  vehicleMake: { id: MAKE_ID, name: 'Ford' },
+  vehicleModel: { id: MODEL_ID, name: 'Transit' },
+  vehicleType: { id: TYPE_ID, name: 'Van' },
   year: 2023,
   vin: '1FTBW3XM5PKA00001',
   licensePlate: null,
@@ -52,6 +60,21 @@ const vehicleRow = (o: Record<string, unknown> = {}) => ({
   ...o,
 });
 
+/** The response shape the service builds from a `vehicleRow`. */
+const toResponse = (row: ReturnType<typeof vehicleRow>) => ({
+  id: row.id,
+  make: row.vehicleMake,
+  model: row.vehicleModel,
+  vehicleType: row.vehicleType,
+  year: row.year,
+  vin: row.vin,
+  licensePlate: row.licensePlate,
+  nextServiceDueOn: row.nextServiceDueOn,
+  serviceStatus: row.serviceStatus,
+  createdAt: row.createdAt,
+  updatedAt: row.updatedAt,
+});
+
 describe('VehiclesService', () => {
   const findMany = jest.fn<Fn>();
   const count = jest.fn<Fn>();
@@ -59,6 +82,9 @@ describe('VehiclesService', () => {
   const create = jest.fn<Fn>();
   const update = jest.fn<Fn>();
   const del = jest.fn<Fn>();
+  const makeFind = jest.fn<Fn>();
+  const modelFind = jest.fn<Fn>();
+  const typeFind = jest.fn<Fn>();
   const $transaction =
     jest.fn<(ops: Promise<unknown>[]) => Promise<unknown[]>>();
   let service: VehiclesService;
@@ -72,8 +98,9 @@ describe('VehiclesService', () => {
   });
 
   const createDto = (o: Partial<CreateVehicleDto> = {}): CreateVehicleDto => ({
-    make: 'Ford',
-    model: 'Transit',
+    makeId: MAKE_ID,
+    modelId: MODEL_ID,
+    vehicleTypeId: TYPE_ID,
     year: 2022,
     vin: '1HGCM82633A004352',
     ...o,
@@ -97,9 +124,15 @@ describe('VehiclesService', () => {
       update,
       del,
       $transaction,
+      makeFind,
+      modelFind,
+      typeFind,
     ]) {
       m.mockReset();
     }
+    makeFind.mockResolvedValue({ active: true });
+    modelFind.mockResolvedValue({ active: true });
+    typeFind.mockResolvedValue({ active: true });
     findMany.mockResolvedValue([]);
     count.mockResolvedValue(0);
     $transaction.mockImplementation((ops) => Promise.all(ops));
@@ -118,6 +151,9 @@ describe('VehiclesService', () => {
               update,
               delete: del,
             },
+            vehicleMake: { findUnique: makeFind },
+            vehicleModel: { findUnique: modelFind },
+            vehicleType: { findUnique: typeFind },
             $transaction,
           },
         },
@@ -133,16 +169,22 @@ describe('VehiclesService', () => {
       expect(args.where).toEqual({ organizationId: ORG });
     });
 
-    it('applies insensitive equals for make/model and exact year', async () => {
+    it('applies id equality for make/model/type and exact year', async () => {
       await service.findAll(
         ORG,
-        query({ make: 'Ford', model: 'T', year: 2020 }),
+        query({
+          makeId: MAKE_ID,
+          modelId: MODEL_ID,
+          vehicleTypeId: TYPE_ID,
+          year: 2020,
+        }),
       );
       const args = findMany.mock.calls[0][0] as { where: unknown };
       expect(args.where).toEqual({
         organizationId: ORG,
-        make: { equals: 'Ford', mode: 'insensitive' },
-        model: { equals: 'T', mode: 'insensitive' },
+        makeId: MAKE_ID,
+        modelId: MODEL_ID,
+        vehicleTypeId: TYPE_ID,
         year: 2020,
       });
     });
@@ -177,17 +219,17 @@ describe('VehiclesService', () => {
         nextServiceDueOn: null,
         serviceStatus: 'UNKNOWN',
       });
-      expect(Object.keys(res.data[0])).toHaveLength(10);
+      expect(Object.keys(res.data[0])).toHaveLength(11);
     });
 
     it('uses the same where for findMany and count', async () => {
-      await service.findAll(ORG, query({ make: 'Ford', year: 2020 }));
+      await service.findAll(ORG, query({ makeId: MAKE_ID, year: 2020 }));
       const a = findMany.mock.calls[0][0] as { where: unknown };
       const b = count.mock.calls[0][0] as { where: unknown };
       expect(b.where).toEqual(a.where);
     });
 
-    it('orders newest first with id tie-break and selects exactly 10 fields', async () => {
+    it('orders newest first with id tie-break and selects exactly 11 fields', async () => {
       await service.findAll(ORG, query());
       const args = findMany.mock.calls[0][0] as {
         orderBy: unknown;
@@ -198,15 +240,15 @@ describe('VehiclesService', () => {
         'createdAt',
         'id',
         'licensePlate',
-        'make',
-        'model',
         'nextServiceDueOn',
         'serviceStatus',
         'updatedAt',
+        'vehicleMake',
+        'vehicleModel',
+        'vehicleType',
         'vin',
         'year',
       ]);
-      expect(Object.values(args.select).every((v) => v === true)).toBe(true);
       expect(args.select).not.toHaveProperty('organizationId');
     });
 
@@ -235,7 +277,7 @@ describe('VehiclesService', () => {
       count.mockResolvedValue(57);
       const res = await service.findAll(ORG, query({ page: 2, limit: 2 }));
       expect(res).toEqual({
-        data: rows,
+        data: rows.map(toResponse),
         meta: { page: 2, limit: 2, total: 57 },
       });
     });
@@ -249,7 +291,9 @@ describe('VehiclesService', () => {
   describe('findOne', () => {
     it('queries by id and organizationId', async () => {
       findFirst.mockResolvedValue(vehicleRow());
-      await expect(service.findOne(ORG, ID)).resolves.toEqual(vehicleRow());
+      await expect(service.findOne(ORG, ID)).resolves.toEqual(
+        toResponse(vehicleRow()),
+      );
       expect(findFirst.mock.calls[0][0]).toMatchObject({
         where: { id: ID, organizationId: ORG },
       });
@@ -281,8 +325,9 @@ describe('VehiclesService', () => {
       expect(args.data.organizationId).toBe(ORG);
       expect(args.data).toEqual({
         organizationId: ORG,
-        make: 'Ford',
-        model: 'Transit',
+        makeId: MAKE_ID,
+        modelId: MODEL_ID,
+        vehicleTypeId: TYPE_ID,
         year: 2022,
         vin: '1HGCM82633A004352',
         licensePlate: null,
@@ -300,13 +345,13 @@ describe('VehiclesService', () => {
       expect(plates).toEqual(['AB-1', null, null]);
     });
 
-    it('selects exactly the 10 response fields', async () => {
+    it('selects exactly the 11 response fields', async () => {
       create.mockResolvedValue(vehicleRow());
       await service.create(ORG, createDto());
       const args = create.mock.calls[0][0] as {
         select: Record<string, boolean>;
       };
-      expect(Object.keys(args.select)).toHaveLength(10);
+      expect(Object.keys(args.select)).toHaveLength(11);
       expect(args.select).not.toHaveProperty('organizationId');
     });
 
@@ -360,10 +405,10 @@ describe('VehiclesService', () => {
       expect((err as ConflictException).message).toBe(message);
     });
 
-    it('rethrows P2003 unchanged', async () => {
-      const e = prismaError('P2003');
-      create.mockRejectedValue(e);
-      expect(await rejection(service.create(ORG, createDto()))).toBe(e);
+    it('maps P2003 to 422', async () => {
+      create.mockRejectedValue(prismaError('P2003'));
+      const err = await rejection(service.create(ORG, createDto()));
+      expect(err).toBeInstanceOf(UnprocessableEntityException);
     });
 
     it('rethrows a plain Error unchanged', async () => {
@@ -376,20 +421,21 @@ describe('VehiclesService', () => {
   describe('update', () => {
     it('filters by exactly { id, organizationId }', async () => {
       update.mockResolvedValue(vehicleRow());
-      await service.update(ORG, ID, { make: 'Fiat' });
+      await service.update(ORG, ID, { year: 2021 });
       const args = update.mock.calls[0][0] as { where: unknown };
       expect(args.where).toEqual({ id: ID, organizationId: ORG });
     });
 
     it('leaves omitted fields undefined and never touches organizationId', async () => {
       update.mockResolvedValue(vehicleRow());
-      await service.update(ORG, ID, { make: 'Fiat' });
+      await service.update(ORG, ID, { year: 2021 });
       const data = (
         update.mock.calls[0][0] as { data: Record<string, unknown> }
       ).data;
-      expect(data.make).toBe('Fiat');
-      expect(data.model).toBeUndefined();
-      expect(data.year).toBeUndefined();
+      expect(data.year).toBe(2021);
+      expect(data.makeId).toBeUndefined();
+      expect(data.modelId).toBeUndefined();
+      expect(data.vehicleTypeId).toBeUndefined();
       expect(data.vin).toBeUndefined();
       expect(data.licensePlate).toBeUndefined();
       expect(data).not.toHaveProperty('organizationId');
@@ -406,7 +452,7 @@ describe('VehiclesService', () => {
 
     it('does not spread unknown DTO keys into data', async () => {
       update.mockResolvedValue(vehicleRow());
-      const dto = { make: 'A', organizationId: 'evil' } as UpdateVehicleDto;
+      const dto = { year: 2021, organizationId: 'evil' } as UpdateVehicleDto;
       await service.update(ORG, ID, dto);
       const data = (
         update.mock.calls[0][0] as { data: Record<string, unknown> }
@@ -432,12 +478,272 @@ describe('VehiclesService', () => {
       expect((err as ConflictException).message).toBe(VIN_MSG);
     });
 
-    it.each<[string, unknown]>([
-      ['P2003', prismaError('P2003')],
-      ['plain Error', new Error('boom')],
-    ])('rethrows %s unchanged', async (_n, e) => {
-      update.mockRejectedValue(e);
-      expect(await rejection(service.update(ORG, ID, {}))).toBe(e);
+    it.each<[string, unknown]>([['plain Error', new Error('boom')]])(
+      'rethrows %s unchanged',
+      async (_n, e) => {
+        update.mockRejectedValue(e);
+        expect(await rejection(service.update(ORG, ID, {}))).toBe(e);
+      },
+    );
+  });
+
+  describe('create catalog checks', () => {
+    const msg = async (p: Promise<unknown>): Promise<string> => {
+      const err = await rejection(p);
+      expect(err).toBeInstanceOf(UnprocessableEntityException);
+      return (err as UnprocessableEntityException).message;
+    };
+
+    it.each<[string, () => void, string]>([
+      [
+        'unknown make',
+        () => makeFind.mockResolvedValue(null),
+        'Vehicle make not found',
+      ],
+      [
+        'retired make',
+        () => makeFind.mockResolvedValue({ active: false }),
+        'Vehicle make is retired',
+      ],
+      [
+        'unknown model',
+        () => modelFind.mockResolvedValue(null),
+        'Vehicle model not found for this make',
+      ],
+      [
+        'retired model',
+        () => modelFind.mockResolvedValue({ active: false }),
+        'Vehicle model is retired',
+      ],
+      [
+        'unknown type',
+        () => typeFind.mockResolvedValue(null),
+        'Vehicle type not found',
+      ],
+      [
+        'retired type',
+        () => typeFind.mockResolvedValue({ active: false }),
+        'Vehicle type is retired',
+      ],
+    ])(
+      'rejects %s with 422 and creates nothing',
+      async (_n, arrange, message) => {
+        arrange();
+        expect(await msg(service.create(ORG, createDto()))).toBe(message);
+        expect(create).not.toHaveBeenCalled();
+      },
+    );
+
+    it('reports an unknown make before any model or type problem and stops there', async () => {
+      makeFind.mockResolvedValue(null);
+      modelFind.mockResolvedValue(null);
+      typeFind.mockResolvedValue(null);
+      expect(await msg(service.create(ORG, createDto()))).toBe(
+        'Vehicle make not found',
+      );
+      expect(modelFind).not.toHaveBeenCalled();
+      expect(typeFind).not.toHaveBeenCalled();
+    });
+
+    it('reports a retired make before a missing model', async () => {
+      makeFind.mockResolvedValue({ active: false });
+      modelFind.mockResolvedValue(null);
+      expect(await msg(service.create(ORG, createDto()))).toBe(
+        'Vehicle make is retired',
+      );
+    });
+
+    it('reports a model problem before a type problem', async () => {
+      modelFind.mockResolvedValue(null);
+      typeFind.mockResolvedValue(null);
+      expect(await msg(service.create(ORG, createDto()))).toBe(
+        'Vehicle model not found for this make',
+      );
+      expect(typeFind).not.toHaveBeenCalled();
+    });
+
+    it('looks the model up by its make and id', async () => {
+      create.mockResolvedValue(vehicleRow());
+      await service.create(ORG, createDto());
+      expect(makeFind.mock.calls[0][0]).toMatchObject({
+        where: { id: MAKE_ID },
+      });
+      expect(modelFind.mock.calls[0][0]).toMatchObject({
+        where: { makeId_id: { makeId: MAKE_ID, id: MODEL_ID } },
+      });
+      expect(typeFind.mock.calls[0][0]).toMatchObject({
+        where: { id: TYPE_ID },
+      });
+    });
+
+    it('returns the nested make, model and type refs on success', async () => {
+      create.mockResolvedValue(vehicleRow());
+      const res = await service.create(ORG, createDto());
+      expect(res).toEqual(toResponse(vehicleRow()));
+      expect(res.make).toEqual({ id: MAKE_ID, name: 'Ford' });
+      expect(res.vehicleType).toEqual({ id: TYPE_ID, name: 'Van' });
+    });
+
+    it('maps P2003 from the insert to the 422 "not valid" message', async () => {
+      create.mockRejectedValue(prismaError('P2003'));
+      expect(await msg(service.create(ORG, createDto()))).toBe(
+        'Vehicle make, model or type is not valid',
+      );
+    });
+  });
+
+  describe('update catalog checks', () => {
+    const CURRENT = {
+      makeId: MAKE_ID,
+      modelId: MODEL_ID,
+      vehicleTypeId: TYPE_ID,
+    };
+    const OTHER_MODEL = '01900000-0000-7000-8000-0000000000b2';
+    const OTHER_MAKE = '01900000-0000-7000-8000-0000000000a2';
+    const OTHER_TYPE = '01900000-0000-7000-8000-0000000000c2';
+    const lookups = () =>
+      makeFind.mock.calls.length +
+      modelFind.mock.calls.length +
+      typeFind.mock.calls.length;
+    const msg = async (p: Promise<unknown>): Promise<string> => {
+      const err = await rejection(p);
+      expect(err).toBeInstanceOf(UnprocessableEntityException);
+      return (err as UnprocessableEntityException).message;
+    };
+
+    beforeEach(() => {
+      findFirst.mockResolvedValue(CURRENT);
+      update.mockResolvedValue(vehicleRow());
+    });
+
+    it('does no existence check and no catalog lookup without ref fields', async () => {
+      await service.update(ORG, ID, { year: 2021, vin: '1HGCM82633A004352' });
+      expect(findFirst).not.toHaveBeenCalled();
+      expect(lookups()).toBe(0);
+    });
+
+    it('loads the current vehicle scoped to the organization when refs change', async () => {
+      await service.update(ORG, ID, { vehicleTypeId: OTHER_TYPE });
+      expect(findFirst.mock.calls[0][0]).toMatchObject({
+        where: { id: ID, organizationId: ORG },
+      });
+    });
+
+    it('returns 404 without catalog lookups or update when the vehicle is missing', async () => {
+      findFirst.mockResolvedValue(null);
+      const err = await rejection(
+        service.update(ORG, ID, { makeId: OTHER_MAKE, modelId: OTHER_MODEL }),
+      );
+      expect(err).toBeInstanceOf(NotFoundException);
+      expect((err as NotFoundException).message).toBe('Vehicle not found');
+      expect(lookups()).toBe(0);
+      expect(update).not.toHaveBeenCalled();
+    });
+
+    it('passes unchanged retired pair and type (same ids resent) without lookups', async () => {
+      makeFind.mockResolvedValue({ active: false });
+      modelFind.mockResolvedValue({ active: false });
+      typeFind.mockResolvedValue({ active: false });
+      await service.update(ORG, ID, CURRENT);
+      expect(lookups()).toBe(0);
+      expect(update).toHaveBeenCalledTimes(1);
+    });
+
+    it('looks a model-only change up with the CURRENT makeId', async () => {
+      await service.update(ORG, ID, { modelId: OTHER_MODEL });
+      expect(makeFind.mock.calls[0][0]).toMatchObject({
+        where: { id: MAKE_ID },
+      });
+      expect(modelFind.mock.calls[0][0]).toMatchObject({
+        where: { makeId_id: { makeId: MAKE_ID, id: OTHER_MODEL } },
+      });
+      expect(typeFind).not.toHaveBeenCalled();
+    });
+
+    it('rejects a model-only change while the current make is retired', async () => {
+      makeFind.mockResolvedValue({ active: false });
+      expect(await msg(service.update(ORG, ID, { modelId: OTHER_MODEL }))).toBe(
+        'Vehicle make is retired',
+      );
+      expect(update).not.toHaveBeenCalled();
+    });
+
+    it('rejects a model of another make as not found for this make', async () => {
+      modelFind.mockResolvedValue(null);
+      expect(await msg(service.update(ORG, ID, { modelId: OTHER_MODEL }))).toBe(
+        'Vehicle model not found for this make',
+      );
+    });
+
+    it('rejects a newly chosen retired model', async () => {
+      modelFind.mockResolvedValue({ active: false });
+      expect(await msg(service.update(ORG, ID, { modelId: OTHER_MODEL }))).toBe(
+        'Vehicle model is retired',
+      );
+    });
+
+    it('checks make and model for a make+model change', async () => {
+      await service.update(ORG, ID, {
+        makeId: OTHER_MAKE,
+        modelId: OTHER_MODEL,
+      });
+      expect(makeFind.mock.calls[0][0]).toMatchObject({
+        where: { id: OTHER_MAKE },
+      });
+      expect(modelFind.mock.calls[0][0]).toMatchObject({
+        where: { makeId_id: { makeId: OTHER_MAKE, id: OTHER_MODEL } },
+      });
+    });
+
+    it('rejects a type change to a retired type', async () => {
+      typeFind.mockResolvedValue({ active: false });
+      expect(
+        await msg(service.update(ORG, ID, { vehicleTypeId: OTHER_TYPE })),
+      ).toBe('Vehicle type is retired');
+      expect(update).not.toHaveBeenCalled();
+    });
+
+    it('rejects a type change to an unknown type', async () => {
+      typeFind.mockResolvedValue(null);
+      expect(
+        await msg(service.update(ORG, ID, { vehicleTypeId: OTHER_TYPE })),
+      ).toBe('Vehicle type not found');
+    });
+
+    it('accepts a type change while the make and model are retired and unchanged', async () => {
+      makeFind.mockResolvedValue({ active: false });
+      modelFind.mockResolvedValue({ active: false });
+      await service.update(ORG, ID, { vehicleTypeId: OTHER_TYPE });
+      expect(makeFind).not.toHaveBeenCalled();
+      expect(modelFind).not.toHaveBeenCalled();
+      expect(typeFind).toHaveBeenCalledTimes(1);
+    });
+
+    it('maps P2003 from the update to the 422 "not valid" message', async () => {
+      update.mockRejectedValue(prismaError('P2003'));
+      expect(
+        await msg(service.update(ORG, ID, { vehicleTypeId: OTHER_TYPE })),
+      ).toBe('Vehicle make, model or type is not valid');
+    });
+
+    it('maps P2025 from the update to 404 even after the catalog checks', async () => {
+      update.mockRejectedValue(prismaError('P2025'));
+      const err = await rejection(
+        service.update(ORG, ID, { vehicleTypeId: OTHER_TYPE }),
+      );
+      expect(err).toBeInstanceOf(NotFoundException);
+    });
+
+    it('writes the scalar ids to the update', async () => {
+      await service.update(ORG, ID, {
+        makeId: OTHER_MAKE,
+        modelId: OTHER_MODEL,
+      });
+      const data = (
+        update.mock.calls[0][0] as { data: Record<string, unknown> }
+      ).data;
+      expect(data).toMatchObject({ makeId: OTHER_MAKE, modelId: OTHER_MODEL });
+      expect(data.vehicleTypeId).toBeUndefined();
     });
   });
 

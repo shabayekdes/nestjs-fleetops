@@ -1,9 +1,15 @@
 import type { ServiceStatus } from '../../generated/prisma/client.js';
 
+export class VehicleCatalogRefDto {
+  id: string;
+  name: string;
+}
+
 export class VehicleResponseDto {
   id: string;
-  make: string;
-  model: string;
+  make: VehicleCatalogRefDto;
+  model: VehicleCatalogRefDto;
+  vehicleType: VehicleCatalogRefDto;
   year: number;
   vin: string;
   licensePlate: string | null;

@@ -79,14 +79,9 @@ model User {
 model Vehicle {
   id               String        @id @default(uuid(7)) @db.Uuid
   organizationId   String        @map("organization_id") @db.Uuid
-  /// Legacy free text; dropped in a later "contract" migration once nothing reads it.
-  make             String
-  /// Legacy free text; dropped together with `make`.
-  model            String
-  /// Nullable until the backfill has filled every row (expand → backfill → contract).
-  makeId           String?       @map("make_id") @db.Uuid
-  modelId          String?       @map("model_id") @db.Uuid
-  vehicleTypeId    String?       @map("vehicle_type_id") @db.Uuid
+  makeId           String        @map("make_id") @db.Uuid
+  modelId          String        @map("model_id") @db.Uuid
+  vehicleTypeId    String        @map("vehicle_type_id") @db.Uuid
   year             Int
   vin              String
   /// Nullable: vehicles may be added to a fleet before they are registered.
@@ -105,9 +100,9 @@ model Vehicle {
   // Restrict: master data is retired, never deleted, and vehicle history must
   // keep its make/model. The model relation is a composite FK on
   // (make_id, model_id), so the database rejects a model from another make.
-  vehicleMake  VehicleMake?  @relation(fields: [makeId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  vehicleModel VehicleModel? @relation(fields: [makeId, modelId], references: [makeId, id], onDelete: Restrict, onUpdate: Cascade)
-  vehicleType  VehicleType?  @relation(fields: [vehicleTypeId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  vehicleMake  VehicleMake  @relation(fields: [makeId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  vehicleModel VehicleModel @relation(fields: [makeId, modelId], references: [makeId, id], onDelete: Restrict, onUpdate: Cascade)
+  vehicleType  VehicleType  @relation(fields: [vehicleTypeId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
   // Tenant-scoped uniqueness: the same physical vehicle may legitimately exist
   // in two organizations (e.g. after a sale), and a global constraint would leak
@@ -116,6 +111,8 @@ model Vehicle {
   @@unique([organizationId, licensePlate])
   // Tenant filters by make (and model); leads with organization_id like the rest.
   @@index([organizationId, makeId, modelId])
+  // Tenant filter by type; leads with organization_id.
+  @@index([organizationId, vehicleTypeId])
   @@map("vehicles")
 }
 

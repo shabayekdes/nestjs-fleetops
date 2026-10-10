@@ -10,10 +10,12 @@ import {
 } from './vehicle-normalizers.js';
 
 const VIN = '1HGCM82633A004352';
+const ID = '01900000-0000-7000-8000-000000000001';
 
 const valid = (): Record<string, unknown> => ({
-  make: 'Ford',
-  model: 'Transit',
+  makeId: ID,
+  modelId: ID,
+  vehicleTypeId: ID,
   year: 2022,
   vin: VIN,
 });
@@ -37,45 +39,56 @@ describe('CreateVehicleDto', () => {
     expect(errors).toHaveLength(0);
   });
 
-  it('trims make/model and trims+uppercases vin and plate', async () => {
+  it('trims+uppercases vin and plate', async () => {
     const { dto, errors } = await run({
-      make: '  Ford ',
-      model: ' Transit  ',
+      makeId: ID,
+      modelId: ID,
+      vehicleTypeId: ID,
       year: 2022,
       vin: `  ${VIN.toLowerCase()} `,
       licensePlate: '  ab-12 c ',
     });
     expect(errors).toHaveLength(0);
-    expect(dto.make).toBe('Ford');
-    expect(dto.model).toBe('Transit');
     expect(dto.vin).toBe(VIN);
     expect(dto.licensePlate).toBe('AB-12 C');
   });
 
   it('reports exactly the required fields for an empty body', async () => {
     const { fields } = await run({});
-    expect([...fields].sort()).toEqual(['make', 'model', 'vin', 'year']);
+    expect([...fields].sort()).toEqual([
+      'makeId',
+      'modelId',
+      'vehicleTypeId',
+      'vin',
+      'year',
+    ]);
   });
 
-  it.each(['make', 'model'])(
-    'accepts 50 chars and rejects 51 for %s',
+  it.each(['makeId', 'modelId', 'vehicleTypeId'])(
+    'rejects a non-UUIDv7 %s',
     async (f) => {
+      expect((await run({ ...valid(), [f]: 'abc' })).fields).toContain(f);
       expect(
-        (await run({ ...valid(), [f]: 'a'.repeat(50) })).errors,
-      ).toHaveLength(0);
-      expect((await run({ ...valid(), [f]: 'a'.repeat(51) })).fields).toContain(
-        f,
-      );
+        (await run({ ...valid(), [f]: '550e8400-e29b-41d4-a716-446655440000' }))
+          .fields,
+      ).toContain(f);
+      expect((await run({ ...valid(), [f]: null })).fields).toContain(f);
+      expect((await run({ ...valid(), [f]: 123 })).fields).toContain(f);
     },
   );
 
-  it.each(['make', 'model'])(
-    'rejects empty and whitespace-only %s',
+  it.each(['makeId', 'modelId', 'vehicleTypeId'])(
+    'requires %s when omitted',
     async (f) => {
-      expect((await run({ ...valid(), [f]: '' })).fields).toContain(f);
-      expect((await run({ ...valid(), [f]: '   ' })).fields).toContain(f);
+      const body = valid();
+      delete body[f];
+      expect((await run(body)).fields).toEqual([f]);
     },
   );
+
+  it.each(['make', 'model'])('rejects the legacy %s property', async (f) => {
+    expect((await run({ ...valid(), [f]: 'Ford' })).fields).toContain(f);
+  });
 
   it.each<[string, unknown]>([
     ['16 chars', VIN.slice(0, 16)],

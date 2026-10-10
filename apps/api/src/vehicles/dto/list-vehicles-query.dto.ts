@@ -1,21 +1,8 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { Transform, Type } from 'class-transformer';
-import {
-  IsEnum,
-  IsInt,
-  IsNotEmpty,
-  IsOptional,
-  IsString,
-  Max,
-  MaxLength,
-  Min,
-} from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsEnum, IsInt, IsOptional, IsUUID, Max, Min } from 'class-validator';
 import { ServiceStatus } from '../../generated/prisma/client.js';
-import {
-  IsNotAfterNextYear,
-  MIN_VEHICLE_YEAR,
-  trim,
-} from './vehicle-normalizers.js';
+import { IsNotAfterNextYear, MIN_VEHICLE_YEAR } from './vehicle-normalizers.js';
 
 export class ListVehiclesQueryDto {
   @ApiPropertyOptional()
@@ -34,18 +21,16 @@ export class ListVehiclesQueryDto {
   limit: number = 20;
 
   @IsOptional()
-  @Transform(trim)
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(50)
-  make?: string;
+  @IsUUID('7')
+  makeId?: string;
 
   @IsOptional()
-  @Transform(trim)
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(50)
-  model?: string;
+  @IsUUID('7')
+  modelId?: string;
+
+  @IsOptional()
+  @IsUUID('7')
+  vehicleTypeId?: string;
 
   @IsOptional()
   @Type(() => Number)
