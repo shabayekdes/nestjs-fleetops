@@ -13,6 +13,7 @@ import { apiErrorToFormState } from '@/lib/forms/api-error-to-form';
 import { formText, type FormState } from '@/lib/forms/form-state';
 import { withFlash } from '@/lib/flash';
 import { isUuid } from '@/lib/ids';
+import { listVehicleModels } from '@/lib/master-data/master-data-api';
 import {
   VEHICLE_FIELDS,
   changedVehicleFields,
@@ -152,4 +153,35 @@ export async function deleteVehicle(id: string): Promise<{ error?: string }> {
 
   revalidateVehicles();
   redirect(withFlash('/vehicles', 'vehicle-deleted'));
+}
+
+export type VehicleModelOptionsResult =
+  { options: { id: string; name: string }[] } | { error: string };
+
+/**
+ * Models of one make for the dependent Model dropdowns. Called from Client
+ * Components, so the browser still never talks to the API directly. A retired
+ * make returns no models unless `includeInactive` is true.
+ */
+export async function loadVehicleModelOptions(
+  makeId: string,
+  includeInactive: boolean,
+): Promise<VehicleModelOptionsResult> {
+  if (typeof makeId !== 'string' || !isUuid(makeId)) {
+    return { error: 'Choose a valid make.' };
+  }
+
+  try {
+    const { data } = await listVehicleModels(makeId, {
+      includeInactive: includeInactive === true,
+      mode: 'action',
+    });
+    return { options: data.map(({ id, name }) => ({ id, name })) };
+  } catch (error) {
+    const { formError } = apiErrorToFormState<VehicleField>(error, {
+      fields: [],
+      notFoundMessage: 'This make no longer exists.',
+    });
+    return { error: formError ?? 'The models could not be loaded.' };
+  }
 }

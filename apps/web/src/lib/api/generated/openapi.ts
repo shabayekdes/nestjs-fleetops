@@ -648,10 +648,15 @@ export interface components {
             /** @enum {string} */
             role?: "ADMIN" | "MANAGER" | "DRIVER";
         };
+        VehicleCatalogRefDto: {
+            id: string;
+            name: string;
+        };
         VehicleResponseDto: {
             id: string;
-            make: string;
-            model: string;
+            make: components["schemas"]["VehicleCatalogRefDto"];
+            model: components["schemas"]["VehicleCatalogRefDto"];
+            vehicleType: components["schemas"]["VehicleCatalogRefDto"];
             year: number;
             vin: string;
             licensePlate: string | null;
@@ -673,16 +678,27 @@ export interface components {
             };
         };
         CreateVehicleDto: {
-            make: string;
-            model: string;
+            /** Format: uuid */
+            makeId: string;
+            /** Format: uuid */
+            modelId: string;
+            /** Format: uuid */
+            vehicleTypeId: string;
             /** @description JSON number only; no @Type, so "2023" is rejected. */
             year: number;
             vin: string;
             licensePlate?: string | null;
         };
         UpdateVehicleDto: {
-            make?: string;
-            model?: string;
+            /** Format: uuid */
+            makeId?: string;
+            /**
+             * Format: uuid
+             * @description Required whenever makeId is sent: a model belongs to exactly one make.
+             */
+            modelId?: string;
+            /** Format: uuid */
+            vehicleTypeId?: string;
             year?: number;
             vin?: string;
             licensePlate?: string | null;
@@ -1372,8 +1388,9 @@ export interface operations {
             query?: {
                 page?: number;
                 limit?: number;
-                make?: string;
-                model?: string;
+                makeId?: string;
+                modelId?: string;
+                vehicleTypeId?: string;
                 year?: number;
                 serviceStatus?: "UNKNOWN" | "OK" | "DUE_SOON" | "OVERDUE";
             };

@@ -16,7 +16,7 @@ export function driverOptionLabel(driver: Driver): string {
 
 /** "Make Model (PLATE)", or the VIN when there is no plate. */
 export function vehicleOptionLabel(vehicle: Vehicle): string {
-  return `${vehicle.make} ${vehicle.model} (${vehicle.licensePlate ?? vehicle.vin})`;
+  return `${vehicle.make.name} ${vehicle.model.name} (${vehicle.licensePlate ?? vehicle.vin})`;
 }
 
 export function driverOptions(drivers: Driver[]): AssignOption[] {

@@ -4,19 +4,20 @@ import {
   parsePageAndLimit,
   readSingleParam,
 } from '@/lib/list-params';
+import { isUuid } from '@/lib/ids';
 import { isServiceStatus } from '@/lib/service-status';
 import type { ServiceStatus } from '@/lib/api/types';
 import { buildHref, type RawSearchParams } from '@/lib/search-params';
 
 export { DEFAULT_LIMIT };
-const MAX_TEXT_LENGTH = 50;
 const MIN_YEAR = 1900;
 
 export type VehicleListQuery = {
   page: number;
   limit: number;
-  make?: string;
-  model?: string;
+  makeId?: string;
+  modelId?: string;
+  vehicleTypeId?: string;
   year?: number;
   serviceStatus?: ServiceStatus;
 };
@@ -30,13 +31,6 @@ export type ParsedVehicleListParams = {
 
 export function maxVehicleYear(): number {
   return new Date().getUTCFullYear() + 1;
-}
-
-function parseText(raw: string | undefined): string | undefined | null {
-  if (raw === undefined) return undefined;
-  const value = raw.trim();
-  if (value === '') return undefined;
-  return value.length > MAX_TEXT_LENGTH ? null : value;
 }
 
 /**
@@ -58,10 +52,11 @@ export function parseVehicleListParams(
     return readSingleParam(raw, name, ignored);
   }
 
-  for (const name of ['make', 'model'] as const) {
-    const value = parseText(field(name));
-    if (value === null) ignored.push(name);
-    else if (value !== undefined) query[name] = value;
+  for (const name of ['makeId', 'modelId', 'vehicleTypeId'] as const) {
+    const value = field(name)?.trim();
+    if (value === undefined || value === '') continue;
+    if (isUuid(value)) query[name] = value;
+    else ignored.push(name);
   }
 
   const year = field('year');
@@ -81,8 +76,9 @@ export function parseVehicleListParams(
     query,
     ignored,
     hasFilters:
-      query.make !== undefined ||
-      query.model !== undefined ||
+      query.makeId !== undefined ||
+      query.modelId !== undefined ||
+      query.vehicleTypeId !== undefined ||
       query.year !== undefined ||
       query.serviceStatus !== undefined,
   };
@@ -93,8 +89,9 @@ export function vehicleListParams(
   query: Partial<VehicleListQuery>,
 ): Record<string, string | number | undefined> {
   return {
-    make: query.make,
-    model: query.model,
+    makeId: query.makeId,
+    modelId: query.modelId,
+    vehicleTypeId: query.vehicleTypeId,
     year: query.year,
     serviceStatus: query.serviceStatus,
     limit: query.limit === DEFAULT_LIMIT ? undefined : query.limit,

@@ -3,8 +3,9 @@ import type { UpdateVehicleRequest } from '@/lib/api/types';
 import { maxVehicleYear } from './list-params';
 
 export const VEHICLE_FIELDS = [
-  'make',
-  'model',
+  'makeId',
+  'modelId',
+  'vehicleTypeId',
   'year',
   'vin',
   'licensePlate',
@@ -15,8 +16,9 @@ export type VehicleField = (typeof VEHICLE_FIELDS)[number];
 export type VehicleFormValues = Partial<Record<VehicleField, string>>;
 
 export type VehicleInput = {
-  make: string;
-  model: string;
+  makeId: string;
+  modelId: string;
+  vehicleTypeId: string;
   year: number;
   vin: string;
   licensePlate: string | null;
@@ -31,16 +33,9 @@ const MIN_YEAR = 1900;
 export function createVehicleSchema() {
   const maxYear = maxVehicleYear();
   return z.object({
-    make: z
-      .string()
-      .trim()
-      .min(1, 'Enter a make')
-      .max(50, 'At most 50 characters'),
-    model: z
-      .string()
-      .trim()
-      .min(1, 'Enter a model')
-      .max(50, 'At most 50 characters'),
+    makeId: z.string().trim().pipe(z.uuid('Choose a make')),
+    modelId: z.string().trim().pipe(z.uuid('Choose a model')),
+    vehicleTypeId: z.string().trim().pipe(z.uuid('Choose a vehicle type')),
     year: z
       .string()
       .trim()
@@ -69,15 +64,23 @@ export function createVehicleSchema() {
 /**
  * The fields that differ between the original and the submitted values,
  * compared after normalization (trim, VIN and plate uppercased, year as a
- * number, an empty plate as null). A cleared plate is `null`.
+ * number, an empty plate as null). A cleared plate is `null`. A changed make
+ * always sends the model too.
  */
 export function changedVehicleFields(
   original: VehicleInput,
   next: VehicleInput,
 ): UpdateVehicleRequest {
   const changes: UpdateVehicleRequest = {};
-  if (original.make !== next.make) changes.make = next.make;
-  if (original.model !== next.model) changes.model = next.model;
+  const makeChanged = original.makeId !== next.makeId;
+  if (makeChanged) changes.makeId = next.makeId;
+  // The API requires the model whenever the make changes.
+  if (makeChanged || original.modelId !== next.modelId) {
+    changes.modelId = next.modelId;
+  }
+  if (original.vehicleTypeId !== next.vehicleTypeId) {
+    changes.vehicleTypeId = next.vehicleTypeId;
+  }
   if (original.year !== next.year) changes.year = next.year;
   if (original.vin !== next.vin) changes.vin = next.vin;
   if (original.licensePlate !== next.licensePlate) {

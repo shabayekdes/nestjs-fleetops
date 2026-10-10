@@ -1,4 +1,5 @@
 .next
+.vercel
 coverage
 next-env.d.ts
 src/lib/api/generated

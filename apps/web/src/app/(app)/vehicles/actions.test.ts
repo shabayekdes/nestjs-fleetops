@@ -12,9 +12,18 @@ vi.mock('next/navigation', () => ({
   },
 }));
 
-import { createVehicle, deleteVehicle, updateVehicle } from './actions';
+import {
+  createVehicle,
+  deleteVehicle,
+  loadVehicleModelOptions,
+  updateVehicle,
+} from './actions';
 
 const ID = '0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b';
+const MAKE_ID = '0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a01';
+const MODEL_ID = '0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a02';
+const TYPE_ID = '0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a03';
+const OTHER_ID = '0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a04';
 
 function form(fields: Record<string, string>) {
   const data = new FormData();
@@ -23,8 +32,9 @@ function form(fields: Record<string, string>) {
 }
 
 const good = {
-  make: ' Ford ',
-  model: 'Transit',
+  makeId: ` ${MAKE_ID} `,
+  modelId: MODEL_ID,
+  vehicleTypeId: TYPE_ID,
   year: '2022',
   vin: '1ftbw3xm5pka00001',
   licensePlate: ' ab-123 ',
@@ -55,10 +65,10 @@ describe('createVehicle', () => {
   it('returns field errors and makes no API call on invalid input', async () => {
     const state = await createVehicle(
       { values: {} },
-      form({ ...good, make: '', vin: 'short' }),
+      form({ ...good, makeId: '', vin: 'short' }),
     );
     expect(sessionApiRequest).not.toHaveBeenCalled();
-    expect(state.fieldErrors?.make).toEqual(['Enter a make']);
+    expect(state.fieldErrors?.makeId).toEqual(['Choose a make']);
     expect(state.fieldErrors?.vin).toEqual(['VIN must be 17 characters']);
     expect(state.values.vin).toBe('short');
   });
@@ -72,8 +82,9 @@ describe('createVehicle', () => {
       method: 'POST',
       mode: 'action',
       body: {
-        make: 'Ford',
-        model: 'Transit',
+        makeId: MAKE_ID,
+        modelId: MODEL_ID,
+        vehicleTypeId: TYPE_ID,
         year: 2022,
         vin: '1FTBW3XM5PKA00001',
         licensePlate: 'AB-123',
@@ -104,7 +115,7 @@ describe('createVehicle', () => {
     );
     const state = await createVehicle({ values: {} }, form(good));
     expect(state.fieldErrors).toEqual({ vin: ['bad vin'] });
-    expect(state.values.make).toBe(' Ford ');
+    expect(state.values.makeId).toBe(` ${MAKE_ID} `);
     expect(revalidatePath).not.toHaveBeenCalled();
   });
 
@@ -141,15 +152,17 @@ describe('createVehicle', () => {
 
 describe('updateVehicle', () => {
   const original = {
-    make: 'Ford',
-    model: 'Transit',
+    makeId: MAKE_ID,
+    modelId: MODEL_ID,
+    vehicleTypeId: TYPE_ID,
     year: 2022,
     vin: '1FTBW3XM5PKA00001',
     licensePlate: 'AB-123' as string | null,
   };
   const same = {
-    make: 'Ford',
-    model: 'Transit',
+    makeId: MAKE_ID,
+    modelId: MODEL_ID,
+    vehicleTypeId: TYPE_ID,
     year: '2022',
     vin: '1FTBW3XM5PKA00001',
     licensePlate: 'AB-123',
@@ -197,9 +210,9 @@ describe('updateVehicle', () => {
       ID,
       original,
       { values: {} },
-      form({ ...same, make: '' }),
+      form({ ...same, makeId: '' }),
     );
-    expect(state.fieldErrors?.make).toEqual(['Enter a make']);
+    expect(state.fieldErrors?.makeId).toEqual(['Choose a make']);
     expect(sessionApiRequest).not.toHaveBeenCalled();
   });
 
@@ -211,7 +224,7 @@ describe('updateVehicle', () => {
         { values: {} },
         form({
           ...same,
-          make: ' ford'.replace('f', 'F'),
+          makeId: ` ${MAKE_ID} `,
           vin: same.vin.toLowerCase(),
         }),
       ),
@@ -227,15 +240,44 @@ describe('updateVehicle', () => {
         ID,
         original,
         { values: {} },
-        form({ ...same, model: 'Custom', year: '2023' }),
+        form({ ...same, vehicleTypeId: OTHER_ID, year: '2023' }),
       ),
     ).rejects.toThrow(`REDIRECT:/vehicles/${ID}?notice=vehicle-updated`);
     expect(sessionApiRequest).toHaveBeenCalledWith(`/vehicles/${ID}`, {
       method: 'PATCH',
       mode: 'action',
-      body: { model: 'Custom', year: 2023 },
+      body: { vehicleTypeId: OTHER_ID, year: 2023 },
     });
     expect(revalidatePath).toHaveBeenCalledWith('/vehicles', 'layout');
+  });
+
+  it('sends the model with a changed make', async () => {
+    sessionApiRequest.mockResolvedValue({ id: ID });
+    await expect(
+      updateVehicle(
+        ID,
+        original,
+        { values: {} },
+        form({ ...same, makeId: OTHER_ID }),
+      ),
+    ).rejects.toThrow('REDIRECT:');
+    expect(sessionApiRequest.mock.calls[0]?.[1].body).toEqual({
+      makeId: OTHER_ID,
+      modelId: MODEL_ID,
+    });
+  });
+
+  it('shows a catalog 422 as a form error', async () => {
+    sessionApiRequest.mockRejectedValue(
+      apiError(422, 'Vehicle model is retired'),
+    );
+    const state = await updateVehicle(
+      ID,
+      original,
+      { values: {} },
+      form({ ...same, modelId: OTHER_ID }),
+    );
+    expect(state.formError).toBe('Vehicle model is retired');
   });
 
   it('sends null for a cleared plate', async () => {
@@ -279,10 +321,10 @@ describe('updateVehicle', () => {
       ID,
       original,
       { values: {} },
-      form({ ...same, model: 'Other' }),
+      form({ ...same, modelId: OTHER_ID }),
     );
     expect(state.formError).toBe(expected);
-    expect(state.values.model).toBe('Other');
+    expect(state.values.modelId).toBe(OTHER_ID);
   });
 });
 
@@ -323,4 +365,56 @@ describe('deleteVehicle', () => {
       expect(revalidatePath).not.toHaveBeenCalled();
     },
   );
+});
+
+describe('loadVehicleModelOptions', () => {
+  it('rejects an invalid make id without a call', async () => {
+    expect(await loadVehicleModelOptions('../x', false)).toEqual({
+      error: 'Choose a valid make.',
+    });
+    expect(sessionApiRequest).not.toHaveBeenCalled();
+  });
+
+  it('returns id and name pairs, calling the API in action mode', async () => {
+    sessionApiRequest.mockResolvedValue({
+      data: [{ id: MODEL_ID, name: 'Corolla', slug: 'corolla', active: true }],
+      meta: { page: 1, limit: 100, total: 1 },
+    });
+    expect(await loadVehicleModelOptions(MAKE_ID, true)).toEqual({
+      options: [{ id: MODEL_ID, name: 'Corolla' }],
+    });
+    expect(sessionApiRequest).toHaveBeenCalledWith(
+      `/master-data/vehicle-makes/${MAKE_ID}/models`,
+      { query: { limit: 100, includeInactive: true }, mode: 'action' },
+    );
+  });
+
+  it('requests active models only by default', async () => {
+    sessionApiRequest.mockResolvedValue({ data: [], meta: {} });
+    expect(await loadVehicleModelOptions(MAKE_ID, false)).toEqual({
+      options: [],
+    });
+    expect(sessionApiRequest.mock.calls[0]?.[1].query).toEqual({
+      limit: 100,
+      includeInactive: undefined,
+    });
+  });
+
+  it.each([
+    [404, 'This make no longer exists.'],
+    [403, 'You are not allowed to do this.'],
+    [500, 'The service is unavailable. Please try again shortly.'],
+  ])('returns an error for %i', async (status, expected) => {
+    sessionApiRequest.mockRejectedValue(apiError(status));
+    expect(await loadVehicleModelOptions(MAKE_ID, false)).toEqual({
+      error: expected,
+    });
+  });
+
+  it('does not swallow a session redirect', async () => {
+    sessionApiRequest.mockRejectedValue(new Error('REDIRECT:/login'));
+    await expect(loadVehicleModelOptions(MAKE_ID, false)).rejects.toThrow(
+      'REDIRECT:/login',
+    );
+  });
 });

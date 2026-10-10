@@ -69,7 +69,7 @@ export default async function MaintenancePage({
   const header = (
     <PageHeader
       title="Maintenance"
-      description={`${vehicle.make} ${vehicle.model}`}
+      description={`${vehicle.make.name} ${vehicle.model.name}`}
       actions={
         <Button asChild>
           <Link href={newHref}>Add record</Link>

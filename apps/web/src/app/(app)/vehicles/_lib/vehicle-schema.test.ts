@@ -9,9 +9,15 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+const MAKE_ID = '0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a01';
+const MODEL_ID = '0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a02';
+const TYPE_ID = '0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a03';
+const OTHER_ID = '0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a04';
+
 const valid = {
-  make: 'Ford',
-  model: 'Transit',
+  makeId: MAKE_ID,
+  modelId: MODEL_ID,
+  vehicleTypeId: TYPE_ID,
   year: '2022',
   vin: '1FTBW3XM5PKA00001',
   licensePlate: 'AB-123',
@@ -37,18 +43,26 @@ describe('createVehicleSchema', () => {
   });
 
   it('reports the required-field messages', () => {
-    expect(messages({ make: '  ' }, 'make')).toEqual(['Enter a make']);
-    expect(messages({ model: '' }, 'model')).toEqual(['Enter a model']);
+    expect(messages({ makeId: '  ' }, 'makeId')).toEqual(['Choose a make']);
+    expect(messages({ modelId: '' }, 'modelId')).toEqual(['Choose a model']);
+    expect(messages({ vehicleTypeId: '' }, 'vehicleTypeId')).toEqual([
+      'Choose a vehicle type',
+    ]);
+  });
+
+  it('rejects ids that are not UUIDs', () => {
+    expect(messages({ makeId: 'toyota' }, 'makeId')).toEqual(['Choose a make']);
+    expect(messages({ modelId: '123' }, 'modelId')).toEqual(['Choose a model']);
   });
 
   it('trims and uppercases', () => {
     const result = parse({
-      make: ' Ford ',
+      makeId: ` ${MAKE_ID} `,
       vin: ' 1ftbw3xm5pka00001 ',
       licensePlate: ' ab-123 ',
     });
     expect(result.data).toMatchObject({
-      make: 'Ford',
+      makeId: MAKE_ID,
       vin: '1FTBW3XM5PKA00001',
       licensePlate: 'AB-123',
     });
@@ -92,8 +106,9 @@ describe('createVehicleSchema', () => {
 
 describe('changedVehicleFields', () => {
   const original: VehicleInput = {
-    make: 'Ford',
-    model: 'Transit',
+    makeId: MAKE_ID,
+    modelId: MODEL_ID,
+    vehicleTypeId: TYPE_ID,
     year: 2022,
     vin: '1FTBW3XM5PKA00001',
     licensePlate: 'AB-123',
@@ -104,9 +119,25 @@ describe('changedVehicleFields', () => {
   });
 
   it('returns a single changed field', () => {
-    expect(changedVehicleFields(original, { ...original, model: 'X' })).toEqual(
-      { model: 'X' },
-    );
+    expect(
+      changedVehicleFields(original, { ...original, modelId: OTHER_ID }),
+    ).toEqual({ modelId: OTHER_ID });
+    expect(
+      changedVehicleFields(original, { ...original, vehicleTypeId: OTHER_ID }),
+    ).toEqual({ vehicleTypeId: OTHER_ID });
+  });
+
+  it('always includes the model when the make changed', () => {
+    expect(
+      changedVehicleFields(original, { ...original, makeId: OTHER_ID }),
+    ).toEqual({ makeId: OTHER_ID, modelId: MODEL_ID });
+    expect(
+      changedVehicleFields(original, {
+        ...original,
+        makeId: OTHER_ID,
+        modelId: OTHER_ID,
+      }),
+    ).toEqual({ makeId: OTHER_ID, modelId: OTHER_ID });
   });
 
   it('sends null for a cleared plate and the value for an added one', () => {
@@ -130,15 +161,17 @@ describe('changedVehicleFields', () => {
   it('ignores whitespace and case edits once normalized', () => {
     const schema = createVehicleSchema();
     const before = schema.parse({
-      make: 'Ford',
-      model: 'Transit',
+      makeId: MAKE_ID,
+      modelId: MODEL_ID,
+      vehicleTypeId: TYPE_ID,
       year: '2022',
       vin: '1FTBW3XM5PKA00001',
       licensePlate: 'AB-123',
     });
     const after = schema.parse({
-      make: '  Ford ',
-      model: 'Transit  ',
+      makeId: `  ${MAKE_ID} `,
+      modelId: `${MODEL_ID}  `,
+      vehicleTypeId: TYPE_ID,
       year: ' 2022',
       vin: '1ftbw3xm5pka00001',
       licensePlate: ' ab-123 ',

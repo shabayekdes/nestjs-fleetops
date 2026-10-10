@@ -39,7 +39,11 @@ beforeEach(() => {
   loadVehicle.mockReset();
   loadVehicle.mockResolvedValue({
     kind: 'ok',
-    vehicle: { id: ID, make: 'Ford', model: 'Transit' },
+    vehicle: {
+      id: ID,
+      make: { id: 'make-1', name: 'Ford' },
+      model: { id: 'model-1', name: 'Transit' },
+    },
   });
   formProps.mockReset();
 });

@@ -3,13 +3,16 @@ import type { Page } from '@playwright/test';
 import { SESSION_COOKIE, decryptSession } from '../src/lib/auth/session-crypto';
 import {
   apiToken,
+  catalogRefsViaApi,
   createMaintenanceRecordViaApi,
   createVehicleViaApi,
   deleteMaintenanceRecordViaApi,
   getVehicleViaApi,
-  sweepVehiclesByMake,
+  sweepVehiclesByVinPrefix,
   uniqueSuffix,
   uniqueVin,
+  vinPrefix,
+  type CatalogRefs,
 } from './support/api';
 import { E2E_SESSION_SECRET, WEB_URL } from './support/env';
 import { forgeSession, signIn } from './support/session';
@@ -19,15 +22,19 @@ import { ADMIN, DRIVER, MANAGER } from './support/users';
 const SEED_VIN = '1FTBW3XM5PKA00001';
 const NOT_ALLOWED = 'You are not allowed to do this.';
 
-// Every vehicle a test creates has this make, so the sweep can remove it.
-let make = '';
+// Every vehicle a test creates has a VIN starting with `vinPrefix(suffix)`
+// (`E2E` + a run code), so the sweep can remove it. Vehicles of other runs and
+// the seed share the lists: never assert exact counts.
+let suffix = '';
 let adminToken = '';
+let refs: CatalogRefs;
 let records: { vehicleId: string; recordId: string }[] = [];
 
 test.beforeEach(async ({ request }) => {
-  make = `E2E-${uniqueSuffix()}`;
+  suffix = uniqueSuffix();
   records = [];
   adminToken = await apiToken(request, ADMIN);
+  refs = await catalogRefsViaApi(request, adminToken);
 });
 
 test.afterEach(async ({ request }) => {
@@ -42,7 +49,7 @@ test.afterEach(async ({ request }) => {
     }
   } finally {
     // Runs even if a record delete failed, so vehicles are still removed.
-    await sweepVehiclesByMake(request, adminToken, make);
+    await sweepVehiclesByVinPrefix(request, adminToken, vinPrefix(suffix));
   }
 });
 
@@ -61,18 +68,11 @@ function currentIdFromUrl(page: Page): string {
 async function fillVehicleForm(
   page: Page,
   values: {
-    make?: string;
-    model?: string;
     year?: string;
     vin?: string;
     licensePlate?: string;
   },
 ) {
-  if (values.make !== undefined)
-    await page.getByLabel('Make').fill(values.make);
-  if (values.model !== undefined) {
-    await page.getByLabel('Model').fill(values.model);
-  }
   if (values.year !== undefined)
     await page.getByLabel('Year').fill(values.year);
   if (values.vin !== undefined) await page.getByLabel('VIN').fill(values.vin);
@@ -81,17 +81,55 @@ async function fillVehicleForm(
   }
 }
 
+/** Chooses the seeded Toyota, Corolla and Car in the form's dropdowns. */
+async function chooseCatalog(page: Page) {
+  await page.getByLabel('Make').selectOption({ label: refs.make.name });
+  await expect(page.getByLabel('Model')).toBeEnabled();
+  await page.getByLabel('Model').selectOption({ label: refs.model.name });
+  await page
+    .getByLabel('Vehicle type')
+    .selectOption({ label: refs.vehicleType.name });
+}
+
+test('the model is disabled until a make is chosen and cleared when it changes', async ({
+  page,
+}) => {
+  await login(page, ADMIN);
+  await page.goto('/vehicles/new');
+  const make = page.getByLabel('Make');
+  const model = page.getByLabel('Model');
+  await expect(model).toBeDisabled();
+
+  await make.selectOption({ label: 'Toyota' });
+  await expect(model).toBeEnabled();
+  await expect(model.getByRole('option', { name: 'Corolla' })).toHaveCount(1);
+  await model.selectOption({ label: 'Corolla' });
+  await expect(model).toHaveValue(refs.model.id);
+
+  // Another make: the model is cleared and offers that make's models only.
+  await make.selectOption({ label: 'Ford' });
+  await expect(model).toHaveValue('');
+  await expect(model).toBeEnabled();
+  await expect(model.getByRole('option', { name: 'Transit' })).toHaveCount(1);
+  await expect(model.getByRole('option', { name: 'Corolla' })).toHaveCount(0);
+
+  await make.selectOption({ label: 'Choose a make' });
+  await expect(model).toBeDisabled();
+  await expect(model).toHaveValue('');
+});
+
 test('an admin creates, edits and deletes a vehicle', async ({
   page,
   request,
 }) => {
-  const vin = uniqueVin();
+  // Several round trips to the (remote) test database: allow more time.
+  test.slow();
+  const vin = uniqueVin(suffix);
   const plate = `e2e-${uniqueSuffix().slice(-6)}`.toLowerCase();
   await login(page, ADMIN);
   await page.goto('/vehicles/new');
+  await chooseCatalog(page);
   await fillVehicleForm(page, {
-    make,
-    model: 'Created Model',
     year: '2021',
     vin: vin.toLowerCase(),
     licensePlate: plate,
@@ -106,29 +144,50 @@ test('an admin creates, edits and deletes a vehicle', async ({
   await expect(
     page.getByText(plate.toUpperCase(), { exact: true }),
   ).toBeVisible();
+  await expect(page.locator('dd', { hasText: 'Toyota' })).toBeVisible();
+  await expect(page.locator('dd', { hasText: 'Corolla' })).toBeVisible();
+  await expect(
+    page.locator('dd', { hasText: refs.vehicleType.name }),
+  ).toBeVisible();
   const id = currentIdFromUrl(page);
 
-  // Edit: change the model and clear the plate.
+  // Edit: keep the make, change the model and the type, clear the plate.
   await page.getByRole('link', { name: 'Edit' }).click();
   await expect(page).toHaveURL(`/vehicles/${id}/edit`);
-  await expect(page.getByLabel('Make')).toHaveValue(make);
-  await page.getByLabel('Model').fill('Edited Model');
+  await expect(page.getByLabel('Make')).toHaveValue(refs.make.id);
+  await expect(page.getByLabel('Model')).toHaveValue(refs.model.id);
+  await expect(page.getByLabel('Vehicle type')).toHaveValue(
+    refs.vehicleType.id,
+  );
+  await page.getByLabel('Model').selectOption({ label: 'Camry' });
+  await page.getByLabel('Vehicle type').selectOption({ label: 'Pickup' });
   await page.getByLabel('License plate').fill('');
   await page.getByRole('button', { name: 'Save changes' }).click();
 
   await expect(page).toHaveURL(`/vehicles/${id}?notice=vehicle-updated`);
   await expect(page.getByRole('status')).toContainText('Vehicle updated.');
   await expect(page.getByText('Not registered')).toBeVisible();
-  await expect(page.locator('dd', { hasText: 'Edited Model' })).toBeVisible();
+  await expect(page.locator('dd', { hasText: 'Camry' })).toBeVisible();
+  await expect(page.locator('dd', { hasText: 'Pickup' })).toBeVisible();
 
   const vehicle = await getVehicleViaApi(request, adminToken, id);
   expect(vehicle.licensePlate).toBeNull();
   expect(vehicle).toMatchObject({
-    make,
-    model: 'Edited Model',
+    make: { id: refs.make.id },
+    model: { name: 'Camry' },
+    vehicleType: { name: 'Pickup' },
     year: 2021,
     vin,
   });
+
+  // Edit again: a different make needs a model, and the API accepts the pair.
+  await page.getByRole('link', { name: 'Edit' }).click();
+  await page.getByLabel('Make').selectOption({ label: 'Ford' });
+  await expect(page.getByLabel('Model')).toHaveValue('');
+  await page.getByLabel('Model').selectOption({ label: 'Ranger' });
+  await page.getByRole('button', { name: 'Save changes' }).click();
+  await expect(page).toHaveURL(`/vehicles/${id}?notice=vehicle-updated`);
+  await expect(page.locator('dd', { hasText: 'Ranger' })).toBeVisible();
 
   // Delete through the confirmation dialog.
   await page.getByRole('button', { name: 'Delete' }).click();
@@ -139,24 +198,44 @@ test('an admin creates, edits and deletes a vehicle', async ({
 
   await expect(page).toHaveURL('/vehicles?notice=vehicle-deleted');
   await expect(page.getByRole('status')).toContainText('Vehicle deleted.');
+});
 
-  await page.goto(`/vehicles?make=${encodeURIComponent(make)}`);
-  await expect(page.getByText('No vehicles match these filters')).toBeVisible();
+test('a missing model stops the submit and keeps the chosen make', async ({
+  page,
+}) => {
+  await login(page, ADMIN);
+  await page.goto('/vehicles/new');
+  await page.getByLabel('Make').selectOption({ label: 'Toyota' });
+  await page
+    .getByLabel('Vehicle type')
+    .selectOption({ label: refs.vehicleType.name });
+  await fillVehicleForm(page, {
+    year: '2021',
+    vin: uniqueVin(suffix),
+  });
+  await page.getByRole('button', { name: 'Create vehicle' }).click();
+
+  // The browser's required check stops the submit; the page stays put and
+  // the chosen make is still selected.
+  await expect(page).toHaveURL('/vehicles/new');
+  await expect(page.getByLabel('Make')).toHaveValue(refs.make.id);
+  await expect(page.getByLabel('Model')).toHaveValue('');
 });
 
 test('a duplicate VIN shows the API message on the form', async ({
   page,
   request,
 }) => {
-  const existing = await createVehicleViaApi(request, adminToken, { make });
+  // Several round trips to the (remote) test database: allow more time.
+  test.slow();
+  const existing = await createVehicleViaApi(request, adminToken, {
+    refs,
+    suffix,
+  });
   await login(page, ADMIN);
   await page.goto('/vehicles/new');
-  await fillVehicleForm(page, {
-    make,
-    model: 'Duplicate Model',
-    year: '2020',
-    vin: existing.vin,
-  });
+  await chooseCatalog(page);
+  await fillVehicleForm(page, { year: '2020', vin: existing.vin });
   await page.getByRole('button', { name: 'Create vehicle' }).click();
 
   await expect(
@@ -165,7 +244,12 @@ test('a duplicate VIN shows the API message on the form', async ({
       .filter({ hasText: 'A vehicle with this VIN already exists' }),
   ).toBeVisible();
   await expect(page).toHaveURL('/vehicles/new');
-  await expect(page.getByLabel('Model')).toHaveValue('Duplicate Model');
+  // The chosen catalog values survive the failed submit.
+  await expect(page.getByLabel('Make')).toHaveValue(refs.make.id);
+  await expect(page.getByLabel('Model')).toHaveValue(refs.model.id);
+  await expect(page.getByLabel('Vehicle type')).toHaveValue(
+    refs.vehicleType.id,
+  );
   await expect(page.getByLabel('VIN')).toHaveValue(existing.vin);
 });
 
@@ -173,12 +257,8 @@ test('an API 400 is shown under the VIN field', async ({ page }) => {
   await login(page, ADMIN);
   await page.goto('/vehicles/new');
   // 17 characters, so it passes the browser and Zod checks; the API rejects I.
-  await fillVehicleForm(page, {
-    make,
-    model: 'Bad Vin',
-    year: '2020',
-    vin: 'IIIIIIIIIIIIIIIII',
-  });
+  await chooseCatalog(page);
+  await fillVehicleForm(page, { year: '2020', vin: 'IIIIIIIIIIIIIIIII' });
   await page.getByRole('button', { name: 'Create vehicle' }).click();
 
   const vin = page.getByLabel('VIN');
@@ -192,7 +272,10 @@ test('deleting a vehicle with related records is blocked by a 409', async ({
   page,
   request,
 }) => {
-  const vehicle = await createVehicleViaApi(request, adminToken, { make });
+  const vehicle = await createVehicleViaApi(request, adminToken, {
+    refs,
+    suffix,
+  });
   const record = await createMaintenanceRecordViaApi(
     request,
     adminToken,
@@ -221,7 +304,9 @@ test('a driver can read vehicles but not change them', async ({ page }) => {
   await expect(page).toHaveURL('/vehicles');
 
   // Filter so the seed vehicle does not depend on its position in page 1.
-  await page.goto('/vehicles?make=Ford');
+  await page.getByLabel('Make').selectOption({ label: 'Ford' });
+  await page.getByRole('button', { name: 'Apply filters' }).click();
+  await expect(page).toHaveURL(/makeId=/);
   const seedRow = page.getByRole('row').filter({ hasText: SEED_VIN });
   await expect(seedRow).toBeVisible();
   await expect(page.getByRole('link', { name: 'Add vehicle' })).toHaveCount(0);
@@ -269,8 +354,10 @@ test('a missing or malformed vehicle id shows "Vehicle not found" in the shell',
 });
 
 test('filters and pagination live in the URL', async ({ page, request }) => {
+  // Several round trips to the (remote) test database: allow more time.
+  test.slow();
   for (const year of [2020, 2021, 2021]) {
-    await createVehicleViaApi(request, adminToken, { make, year });
+    await createVehicleViaApi(request, adminToken, { refs, suffix, year });
   }
   await login(page, ADMIN);
 
@@ -278,29 +365,37 @@ test('filters and pagination live in the URL', async ({ page, request }) => {
   const rows = page.locator('tbody tr');
 
   await page.goto('/vehicles?limit=2');
-  await page.getByLabel('Make').fill(make);
+  await page.getByLabel('Make').selectOption({ label: refs.make.name });
+  await expect(page.getByLabel('Model')).toBeEnabled();
+  await page.getByLabel('Model').selectOption({ label: refs.model.name });
   await page.getByRole('button', { name: 'Apply filters' }).click();
-  await expect.poll(() => params().get('make')).toBe(make);
+  await expect.poll(() => params().get('makeId')).toBe(refs.make.id);
+  expect(params().get('modelId')).toBe(refs.model.id);
   expect(params().get('limit')).toBe('2');
+  // At least our three vehicles match, so the first page is full.
   await expect(rows).toHaveCount(2);
-  await expect(page.getByText('Showing 1–2 of 3')).toBeVisible();
+  await expect(page.getByText(/Showing 1–2 of \d+/)).toBeVisible();
+  // The filter selects stay in sync with the URL.
+  await expect(page.getByLabel('Make')).toHaveValue(refs.make.id);
+  await expect(page.getByLabel('Model')).toHaveValue(refs.model.id);
 
   await page.getByRole('link', { name: 'Next' }).click();
   await expect.poll(() => params().get('page')).toBe('2');
-  expect(params().get('make')).toBe(make);
+  expect(params().get('makeId')).toBe(refs.make.id);
   expect(params().get('limit')).toBe('2');
-  await expect(rows).toHaveCount(1);
+  await expect(rows.first()).toBeVisible();
 
   await page.reload();
-  await expect(rows).toHaveCount(1);
+  await expect(rows.first()).toBeVisible();
   expect(params().get('page')).toBe('2');
-  expect(params().get('make')).toBe(make);
+  expect(params().get('makeId')).toBe(refs.make.id);
+  await expect(page.getByLabel('Model')).toHaveValue(refs.model.id);
 
   await page.getByLabel('Year').fill('2021');
   await page.getByRole('button', { name: 'Apply filters' }).click();
   await expect.poll(() => params().get('year')).toBe('2021');
   expect(params().get('page')).toBeNull();
-  await expect(rows).toHaveCount(2);
+  await expect(rows.first()).toContainText('2021');
 
   await page.getByLabel('Year').fill('1999');
   await page.getByRole('button', { name: 'Apply filters' }).click();
@@ -308,10 +403,11 @@ test('filters and pagination live in the URL', async ({ page, request }) => {
 
   await page.getByRole('link', { name: 'Clear filters' }).first().click();
   await expect.poll(() => params().get('year')).toBeNull();
-  expect(params().get('make')).toBeNull();
+  expect(params().get('makeId')).toBeNull();
+  expect(params().get('modelId')).toBeNull();
   expect(params().get('limit')).toBe('2');
 
-  await page.goto('/vehicles?page=abc&year=1800');
+  await page.goto('/vehicles?page=abc&year=1800&makeId=toyota');
   await expect(
     page.getByRole('alert').filter({
       hasText: 'Some filters in the address were not valid and were ignored.',
@@ -319,6 +415,47 @@ test('filters and pagination live in the URL', async ({ page, request }) => {
   ).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Vehicles' })).toBeVisible();
   await expect(page.locator('tbody tr').first()).toBeVisible();
+});
+
+test('the model filter follows the make and the type filter narrows the list', async ({
+  page,
+  request,
+}) => {
+  const vehicle = await createVehicleViaApi(request, adminToken, {
+    refs,
+    suffix,
+  });
+  await login(page, ADMIN);
+  await page.goto('/vehicles');
+  await expect(page.getByLabel('Model')).toBeDisabled();
+
+  await page.getByLabel('Make').selectOption({ label: 'Ford' });
+  await expect(page.getByLabel('Model')).toBeEnabled();
+  await expect(
+    page.getByLabel('Model').getByRole('option', { name: 'Corolla' }),
+  ).toHaveCount(0);
+
+  await page.getByLabel('Make').selectOption({ label: refs.make.name });
+  await page
+    .getByLabel('Vehicle type')
+    .selectOption({ label: refs.vehicleType.name });
+  await page.getByRole('button', { name: 'Apply filters' }).click();
+  await expect
+    .poll(() => new URL(page.url()).searchParams.get('makeId'))
+    .toBe(refs.make.id);
+  await expect(
+    page.getByRole('row').filter({ hasText: vehicle.vin }),
+  ).toBeVisible();
+
+  // A different type excludes the vehicle.
+  await page.getByLabel('Vehicle type').selectOption({ label: 'Bus' });
+  await page.getByRole('button', { name: 'Apply filters' }).click();
+  await expect
+    .poll(() => new URL(page.url()).searchParams.get('vehicleTypeId'))
+    .not.toBe(refs.vehicleType.id);
+  await expect(
+    page.getByRole('row').filter({ hasText: vehicle.vin }),
+  ).toHaveCount(0);
 });
 
 test('submit is disabled once the session has expired', async ({

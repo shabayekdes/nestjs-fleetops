@@ -2,12 +2,14 @@ import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import {
   apiToken,
+  catalogRefsViaApi,
   cleanupE2eFixtures,
   createFuelLogViaApi,
   createMaintenanceRecordViaApi,
   createVehicleViaApi,
   isoDateFromToday,
   uniqueSuffix,
+  type CatalogRefs,
 } from './support/api';
 import { midMonthDate, monthOf } from './support/dates';
 import { signIn } from './support/session';
@@ -17,10 +19,12 @@ const NOT_ALLOWED = 'You are not allowed to do this.';
 
 let suffix = '';
 let adminToken = '';
+let refs: CatalogRefs;
 
 test.beforeEach(async ({ request }) => {
   suffix = uniqueSuffix();
   adminToken = await apiToken(request, ADMIN);
+  refs = await catalogRefsViaApi(request, adminToken);
 });
 
 test.afterEach(async ({ request }) => {
@@ -34,7 +38,7 @@ async function login(page: Page, user: { email: string }) {
 }
 
 function newVehicle(request: Parameters<typeof createVehicleViaApi>[0]) {
-  return createVehicleViaApi(request, adminToken, { make: `E2E-${suffix}` });
+  return createVehicleViaApi(request, adminToken, { refs, suffix });
 }
 
 const monthLabel = (month: string) =>

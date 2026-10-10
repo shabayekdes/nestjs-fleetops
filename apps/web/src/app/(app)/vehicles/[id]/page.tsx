@@ -65,8 +65,9 @@ export default async function VehicleDetailPage({
   const section = sectionRequest ? await sectionRequest : null;
   const flash = flashMessage(singleParam(raw.notice));
   const rows: [string, ReactNode][] = [
-    ['Make', vehicle.make],
-    ['Model', vehicle.model],
+    ['Make', vehicle.make.name],
+    ['Model', vehicle.model.name],
+    ['Type', vehicle.vehicleType.name],
     ['Year', String(vehicle.year)],
     ['VIN', vehicle.vin],
     ['License plate', vehicle.licensePlate ?? 'Not registered'],
@@ -90,7 +91,7 @@ export default async function VehicleDetailPage({
   return (
     <>
       <PageHeader
-        title={`${vehicle.make} ${vehicle.model}`}
+        title={`${vehicle.make.name} ${vehicle.model.name}`}
         actions={
           canManage ? (
             <>
@@ -99,8 +100,8 @@ export default async function VehicleDetailPage({
               </Button>
               <DeleteVehicleButton
                 id={vehicle.id}
-                make={vehicle.make}
-                model={vehicle.model}
+                make={vehicle.make.name}
+                model={vehicle.model.name}
                 vin={vehicle.vin}
               />
             </>

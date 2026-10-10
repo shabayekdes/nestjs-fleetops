@@ -9,6 +9,11 @@ import { Pagination } from '@/components/pagination';
 import { Button } from '@/components/ui/button';
 import { ApiError } from '@/lib/api/errors';
 import type { VehicleList } from '@/lib/api/types';
+import {
+  listVehicleMakes,
+  listVehicleModels,
+  listVehicleTypes,
+} from '@/lib/master-data/master-data-api';
 import { getCurrentUser } from '@/lib/auth/current-user';
 import { flashMessage } from '@/lib/flash';
 import { singleParam } from '@/lib/search-params';
@@ -24,6 +29,21 @@ import { canManageVehicles } from './_lib/permissions';
 import { listVehicles } from './_lib/vehicles-api';
 
 export const metadata: Metadata = { title: 'Vehicles' };
+
+/**
+ * Models for the Model filter of the make in the URL. An unknown make is a
+ * 404 here (the vehicle list itself answers with an empty page): leave the
+ * models out and let the filter load them and show its own message.
+ */
+async function loadFilterModels(makeId: string | undefined) {
+  if (makeId === undefined) return undefined;
+  try {
+    return (await listVehicleModels(makeId, { includeInactive: true })).data;
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) return undefined;
+    throw error;
+  }
+}
 
 export default async function VehiclesPage({
   searchParams,
@@ -46,6 +66,16 @@ export default async function VehiclesPage({
       }
     />
   );
+
+  // Filters offer retired entries too: old vehicles can still carry them.
+  // Started now so they run alongside the list.
+  const catalog = Promise.all([
+    listVehicleMakes({ includeInactive: true }),
+    listVehicleTypes({ includeInactive: true }),
+    loadFilterModels(query.makeId),
+  ]);
+  // Avoids an unhandled rejection when the page returns early below.
+  catalog.catch(() => undefined);
 
   let result: VehicleList;
   try {
@@ -80,6 +110,8 @@ export default async function VehiclesPage({
   }
 
   const { data, meta } = result;
+
+  const [makes, vehicleTypes, initialModels] = await catalog;
   const clearHref = vehicleListHref({ limit: query.limit });
 
   let body;
@@ -153,7 +185,13 @@ export default async function VehiclesPage({
         ) : null}
       </div>
       <div className="mt-4">
-        <VehicleFilters query={query} maxYear={maxVehicleYear()} />
+        <VehicleFilters
+          query={query}
+          maxYear={maxVehicleYear()}
+          makes={makes.data}
+          vehicleTypes={vehicleTypes.data}
+          initialModels={initialModels}
+        />
         {body}
       </div>
     </>

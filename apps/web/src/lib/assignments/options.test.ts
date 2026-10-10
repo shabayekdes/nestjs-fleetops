@@ -30,8 +30,8 @@ describe('option labels', () => {
 
   it('labels a vehicle with the plate, or the VIN without one', () => {
     const vehicle = {
-      make: 'Ford',
-      model: 'Transit',
+      make: { id: 'make-1', name: 'Ford' },
+      model: { id: 'model-1', name: 'Transit' },
       vin: 'VIN17',
       licensePlate: 'AB-1',
     } as Vehicle;

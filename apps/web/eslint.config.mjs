@@ -10,6 +10,7 @@ const eslintConfig = defineConfig([
   { rules: { '@typescript-eslint/no-explicit-any': 'error' } },
   globalIgnores([
     '.next/**',
+    '.vercel/**',
     'out/**',
     'build/**',
     'coverage/**',

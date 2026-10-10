@@ -1,5 +1,11 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 const session = vi.hoisted(() => ({
@@ -9,17 +15,36 @@ vi.mock('@/components/session-deadline', () => ({
   useSessionStatus: () => session.current,
 }));
 
+vi.mock('../actions', () => ({
+  loadVehicleModelOptions: vi.fn(async () => ({
+    options: [{ id: 'model-1', name: 'Corolla' }],
+  })),
+}));
+
 import type { VehicleFormState } from '../actions';
 import { VehicleForm } from './vehicle-form';
+
+const makes = [
+  { id: 'make-1', name: 'Toyota' },
+  { id: 'make-2', name: 'Ford' },
+];
+const vehicleTypes = [
+  { id: 'type-1', name: 'Car' },
+  { id: 'type-2', name: 'Van' },
+];
 
 function setup(
   action: (p: VehicleFormState, f: FormData) => Promise<VehicleFormState>,
   initialValues = {},
+  extra: Partial<Parameters<typeof VehicleForm>[0]> = {},
 ) {
   render(
     <VehicleForm
       action={action}
       initialValues={initialValues}
+      makes={makes}
+      vehicleTypes={vehicleTypes}
+      {...extra}
       maxYear={2027}
       submitLabel="Create vehicle"
       pendingLabel="Creating…"
@@ -35,10 +60,9 @@ function submit() {
 describe('VehicleForm', () => {
   it('sets the native constraints', () => {
     setup(async () => ({ values: {} }));
-    for (const label of ['Make', 'Model', 'Year', 'VIN']) {
+    for (const label of ['Make', 'Model', 'Vehicle type', 'Year', 'VIN']) {
       expect(screen.getByLabelText(label)).toBeRequired();
     }
-    expect(screen.getByLabelText('Make')).toHaveAttribute('maxlength', '50');
     const vin = screen.getByLabelText('VIN');
     expect(vin).toHaveAttribute('minlength', '17');
     expect(vin).toHaveAttribute('maxlength', '17');
@@ -56,8 +80,19 @@ describe('VehicleForm', () => {
   });
 
   it('fills the initial values and links Cancel', () => {
-    setup(async () => ({ values: {} }), { make: 'Ford', licensePlate: 'AB-1' });
-    expect(screen.getByLabelText('Make')).toHaveValue('Ford');
+    setup(
+      async () => ({ values: {} }),
+      {
+        makeId: 'make-2',
+        modelId: 'model-9',
+        vehicleTypeId: 'type-2',
+        licensePlate: 'AB-1',
+      },
+      { initialModels: [{ id: 'model-9', name: 'Transit' }] },
+    );
+    expect(screen.getByLabelText('Make')).toHaveValue('make-2');
+    expect(screen.getByLabelText('Model')).toHaveValue('model-9');
+    expect(screen.getByLabelText('Vehicle type')).toHaveValue('type-2');
     expect(screen.getByLabelText('License plate')).toHaveValue('AB-1');
     expect(screen.getByRole('link', { name: 'Cancel' })).toHaveAttribute(
       'href',
@@ -65,11 +100,39 @@ describe('VehicleForm', () => {
     );
   });
 
+  it('starts with the Model disabled and offers the active catalog', () => {
+    setup(async () => ({ values: {} }));
+    expect(screen.getByLabelText('Model')).toBeDisabled();
+    expect(
+      within(screen.getByLabelText('Vehicle type'))
+        .getAllByRole('option')
+        .map((option) => option.textContent),
+    ).toEqual(['Choose a vehicle type', 'Car', 'Van']);
+  });
+
+  it('keeps a retired current vehicle type selected', () => {
+    setup(
+      async () => ({ values: {} }),
+      { makeId: 'make-1', modelId: 'model-1', vehicleTypeId: 'type-old' },
+      {
+        initialModels: [{ id: 'model-1', name: 'Corolla' }],
+        current: {
+          make: makes[0] as { id: string; name: string },
+          model: { id: 'model-1', name: 'Corolla' },
+          vehicleType: { id: 'type-old', name: 'Wagon' },
+        },
+      },
+    );
+    const select = screen.getByLabelText('Vehicle type');
+    expect(select).toHaveValue('type-old');
+    expect(within(select).getByText('Wagon (retired)')).toBeInTheDocument();
+  });
+
   it('shows field errors with aria wiring and keeps echoed values', async () => {
     const action = vi.fn(async (_p: VehicleFormState, f: FormData) => ({
       values: {
-        make: String(f.get('make')),
-        model: 'M',
+        makeId: String(f.get('makeId')),
+        vehicleTypeId: String(f.get('vehicleTypeId')),
         year: '2020',
         vin: 'IIIIIIIIIIIIIIIII',
       },
@@ -77,7 +140,10 @@ describe('VehicleForm', () => {
     }));
     setup(action);
     fireEvent.change(screen.getByLabelText('Make'), {
-      target: { value: 'Ford' },
+      target: { value: 'make-1' },
+    });
+    fireEvent.change(screen.getByLabelText('Vehicle type'), {
+      target: { value: 'type-2' },
     });
     submit();
 
@@ -85,8 +151,19 @@ describe('VehicleForm', () => {
     await waitFor(() => expect(vin).toHaveAttribute('aria-invalid', 'true'));
     expect(vin).toHaveAccessibleDescription(/VIN is not valid/);
     expect(vin).toHaveValue('IIIIIIIIIIIIIIIII');
-    expect(screen.getByLabelText('Make')).toHaveValue('Ford');
+    expect(screen.getByLabelText('Make')).toHaveValue('make-1');
+    expect(screen.getByLabelText('Vehicle type')).toHaveValue('type-2');
     expect(screen.getByLabelText('Model')).not.toHaveAttribute('aria-invalid');
+  });
+
+  it('shows a model error from the API next to the Model field', async () => {
+    setup(async () => ({
+      values: {},
+      fieldErrors: { modelId: ['Choose a model'] },
+    }));
+    submit();
+    const model = await screen.findByLabelText('Model');
+    await waitFor(() => expect(model).toHaveAttribute('aria-invalid', 'true'));
   });
 
   it('shows a form-level error as an alert', async () => {
