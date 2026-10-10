@@ -3,6 +3,7 @@ import type { Page } from '@playwright/test';
 import { formatDecimal, formatMonth } from '../src/lib/format';
 import {
   apiToken,
+  catalogRefsViaApi,
   cleanupE2eFixtures,
   createDriverViaApi,
   createMaintenanceRecordViaApi,
@@ -13,6 +14,7 @@ import {
   isoDateFromToday,
   myDashboardViaApi,
   uniqueSuffix,
+  type CatalogRefs,
 } from './support/api';
 import { expectUrl } from './support/url';
 import { signIn } from './support/session';
@@ -22,10 +24,12 @@ const EMAIL_DOMAIN = 'acme-logistics.test';
 
 let suffix = '';
 let adminToken = '';
+let refs: CatalogRefs;
 
 test.beforeEach(async ({ request }) => {
   suffix = uniqueSuffix();
   adminToken = await apiToken(request, ADMIN);
+  refs = await catalogRefsViaApi(request, adminToken);
 });
 
 test.afterEach(async ({ request }) => {
@@ -57,7 +61,8 @@ async function seedThisMonthCost(
   request: Parameters<typeof createVehicleViaApi>[0],
 ) {
   const vehicle = await createVehicleViaApi(request, adminToken, {
-    make: `E2E-${suffix}`,
+    refs,
+    suffix,
   });
   await createMaintenanceRecordViaApi(request, adminToken, vehicle.id, {
     performedOn: isoDateFromToday(0),
@@ -147,7 +152,7 @@ test('the dashboard is not served from cache after the fleet changes', async ({
     .first()
     .click();
   await expect(page).toHaveURL('/vehicles');
-  await createVehicleViaApi(request, adminToken, { make: `E2E-${suffix}` });
+  await createVehicleViaApi(request, adminToken, { refs, suffix });
 
   await page
     .getByRole('navigation', { name: 'Main' })

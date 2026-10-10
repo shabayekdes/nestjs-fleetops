@@ -32,8 +32,9 @@ import VehicleDetailPage from './page';
 const ID = '0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b';
 const vehicle = {
   id: ID,
-  make: 'Ford',
-  model: 'Transit',
+  make: { id: 'make-1', name: 'Ford' },
+  model: { id: 'model-1', name: 'Transit' },
+  vehicleType: { id: 'type-1', name: 'Van' },
   year: 2022,
   vin: '1FTBW3XM5PKA00001',
   licensePlate: 'AB-123' as string | null,
@@ -82,6 +83,8 @@ describe('VehicleDetailPage', () => {
     expect(
       screen.getByRole('heading', { name: 'Ford Transit' }),
     ).toBeInTheDocument();
+    expect(screen.getByText('Type')).toBeInTheDocument();
+    expect(screen.getByText('Van')).toBeInTheDocument();
     expect(screen.getByText('1FTBW3XM5PKA00001')).toBeInTheDocument();
     expect(screen.getByText('AB-123')).toBeInTheDocument();
     expect(screen.getByText(/Jun 15, 2026/)).toHaveTextContent('UTC');

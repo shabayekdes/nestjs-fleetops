@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import {
   apiToken,
+  catalogRefsViaApi,
   cleanupE2eFixtures,
   createAssignmentViaApi,
   createDriverViaApi,
@@ -13,6 +14,7 @@ import {
   isoDateFromToday,
   meViaApi,
   uniqueSuffix,
+  type CatalogRefs,
 } from './support/api';
 import { signIn } from './support/session';
 import { expectUrl } from './support/url';
@@ -21,11 +23,12 @@ import { ADMIN, DRIVER, MANAGER } from './support/users';
 const EMAIL_DOMAIN = 'acme-logistics.test';
 
 // Everything a test creates is named from this suffix: driver firstName
-// `E2E-<suffix>`, licenseNumber `E2E-<SUFFIX>-<n>`, vehicle make
-// `E2E-<suffix>`, user email `e2e-<suffix>-<n>@acme-logistics.test`.
+// `E2E-<suffix>`, licenseNumber `E2E-<SUFFIX>-<n>`, vehicle VIN
+// prefix `E2E`, user email `e2e-<suffix>-<n>@acme-logistics.test`.
 let suffix = '';
 let counter = 0;
 let adminToken = '';
+let refs: CatalogRefs;
 
 function nextLicense(): string {
   counter += 1;
@@ -36,6 +39,7 @@ test.beforeEach(async ({ request }) => {
   suffix = uniqueSuffix();
   counter = 0;
   adminToken = await apiToken(request, ADMIN);
+  refs = await catalogRefsViaApi(request, adminToken);
 });
 
 test.afterEach(async ({ request }) => {
@@ -412,7 +416,8 @@ test('a driver with assignment history cannot be deleted', async ({
 }) => {
   const driver = await newDriver(request);
   const vehicle = await createVehicleViaApi(request, adminToken, {
-    make: `E2E-${suffix}`,
+    refs,
+    suffix,
   });
   const assignment = await createAssignmentViaApi(request, adminToken, {
     vehicleId: vehicle.id,

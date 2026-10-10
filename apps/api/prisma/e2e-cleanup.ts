@@ -6,9 +6,9 @@
  * script removes them directly, scoped to the `acme-logistics` organization and
  * to rows whose names carry the E2E prefixes:
  *   - drivers:  licenseNumber starts with "E2E-"
- *   - vehicles: make starts with "E2E-"
+ *   - vehicles: vin starts with "E2E"
  *   - users:    email starts with "e2e-"
- * Seed data (DL-*, Ford/Mercedes-Benz/Volvo, *@acme-logistics.test) never matches.
+ * Seed data (DL-*, VINs starting 1FT/WD3/YV2, *@acme-logistics.test) never matches.
  *
  * Run with `npm run db:test:e2e-cleanup` (forces NODE_ENV=test, loads .env.test).
  */
@@ -18,7 +18,7 @@ import { PrismaClient } from '../src/generated/prisma/client.js';
 
 const ORG_SLUG = 'acme-logistics';
 const DRIVER_PREFIX = 'E2E-';
-const VEHICLE_PREFIX = 'E2E-';
+const VEHICLE_VIN_PREFIX = 'E2E';
 const USER_PREFIX = 'e2e-';
 
 function databaseName(connectionString: string): string {
@@ -64,7 +64,10 @@ async function main(): Promise<void> {
       organizationId,
       licenseNumber: { startsWith: DRIVER_PREFIX },
     };
-    const e2eVehicle = { organizationId, make: { startsWith: VEHICLE_PREFIX } };
+    const e2eVehicle = {
+      organizationId,
+      vin: { startsWith: VEHICLE_VIN_PREFIX },
+    };
 
     const counts = await prisma.$transaction(async (tx) => {
       const assignments = await tx.vehicleAssignment.deleteMany({

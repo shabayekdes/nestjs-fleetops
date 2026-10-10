@@ -9,6 +9,10 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+const MAKE_ID = '0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a01';
+const MODEL_ID = '0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a02';
+const TYPE_ID = '0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a03';
+
 describe('parseVehicleListParams', () => {
   it('uses the defaults', () => {
     expect(parseVehicleListParams({})).toEqual({
@@ -22,15 +26,17 @@ describe('parseVehicleListParams', () => {
     const result = parseVehicleListParams({
       page: '3',
       limit: '50',
-      make: 'Ford',
-      model: 'Transit',
+      makeId: MAKE_ID,
+      modelId: MODEL_ID,
+      vehicleTypeId: TYPE_ID,
       year: '2021',
     });
     expect(result.query).toEqual({
       page: 3,
       limit: 50,
-      make: 'Ford',
-      model: 'Transit',
+      makeId: MAKE_ID,
+      modelId: MODEL_ID,
+      vehicleTypeId: TYPE_ID,
       year: 2021,
     });
     expect(result.hasFilters).toBe(true);
@@ -39,21 +45,22 @@ describe('parseVehicleListParams', () => {
 
   it('trims text and treats empty as absent without reporting it', () => {
     const result = parseVehicleListParams({
-      make: '  Ford  ',
-      model: '   ',
+      makeId: `  ${MAKE_ID}  `,
+      modelId: '   ',
+      vehicleTypeId: '',
       year: '',
     });
-    expect(result.query).toEqual({ page: 1, limit: 20, make: 'Ford' });
+    expect(result.query).toEqual({ page: 1, limit: 20, makeId: MAKE_ID });
     expect(result.ignored).toEqual([]);
   });
 
   it('ignores array values', () => {
     const result = parseVehicleListParams({
       page: ['1', '2'],
-      make: ['a', 'b'],
+      makeId: [MAKE_ID, MODEL_ID],
     });
     expect(result.query).toEqual({ page: 1, limit: 20 });
-    expect(result.ignored).toEqual(['page', 'make']);
+    expect(result.ignored).toEqual(['page', 'makeId']);
   });
 
   it.each(['0', '-1', '1.5', 'abc', '1e3', '1000001'])(
@@ -86,12 +93,25 @@ describe('parseVehicleListParams', () => {
     expect(parseVehicleListParams({ year: '20x1' }).ignored).toEqual(['year']);
   });
 
-  it('ignores a 51-character make but keeps 50', () => {
-    expect(parseVehicleListParams({ make: 'a'.repeat(51) }).ignored).toEqual([
-      'make',
-    ]);
-    expect(parseVehicleListParams({ make: 'a'.repeat(50) }).ignored).toEqual(
-      [],
+  it.each(['makeId', 'modelId', 'vehicleTypeId'])(
+    'drops an invalid %s and reports it',
+    (name) => {
+      const result = parseVehicleListParams({ [name]: 'toyota' });
+      expect(result.query).toEqual({ page: 1, limit: 20 });
+      expect(result.hasFilters).toBe(false);
+      expect(result.ignored).toEqual([name]);
+    },
+  );
+
+  it('ignores the old free-text make and model params silently', () => {
+    const result = parseVehicleListParams({ make: 'Ford', model: 'Transit' });
+    expect(result.query).toEqual({ page: 1, limit: 20 });
+    expect(result.ignored).toEqual([]);
+  });
+
+  it('counts a catalog id as a filter', () => {
+    expect(parseVehicleListParams({ vehicleTypeId: TYPE_ID }).hasFilters).toBe(
+      true,
     );
   });
 
@@ -132,8 +152,17 @@ describe('vehicleListHref', () => {
 
   it('keeps filters and a non-default limit', () => {
     expect(
-      vehicleListHref({ page: 1, limit: 2, make: 'Ford', year: 2021 }),
-    ).toBe('/vehicles?make=Ford&year=2021&limit=2');
+      vehicleListHref({
+        page: 1,
+        limit: 2,
+        makeId: MAKE_ID,
+        modelId: MODEL_ID,
+        vehicleTypeId: TYPE_ID,
+        year: 2021,
+      }),
+    ).toBe(
+      `/vehicles?makeId=${MAKE_ID}&modelId=${MODEL_ID}&vehicleTypeId=${TYPE_ID}&year=2021&limit=2`,
+    );
   });
 
   it('keeps the serviceStatus filter', () => {
@@ -144,7 +173,7 @@ describe('vehicleListHref', () => {
 
   it('applies overrides', () => {
     expect(
-      vehicleListHref({ page: 1, limit: 20, make: 'Ford' }, { page: 3 }),
-    ).toBe('/vehicles?make=Ford&page=3');
+      vehicleListHref({ page: 1, limit: 20, makeId: MAKE_ID }, { page: 3 }),
+    ).toBe(`/vehicles?makeId=${MAKE_ID}&page=3`);
   });
 });

@@ -6,6 +6,17 @@ import { ApiError } from '@/lib/api/errors';
 
 const listVehicles = vi.hoisted(() => vi.fn());
 const getCurrentUser = vi.hoisted(() => vi.fn());
+const listVehicleMakes = vi.hoisted(() => vi.fn());
+const listVehicleModels = vi.hoisted(() => vi.fn());
+const listVehicleTypes = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/master-data/master-data-api', () => ({
+  listVehicleMakes,
+  listVehicleModels,
+  listVehicleTypes,
+}));
+vi.mock('./actions', () => ({
+  loadVehicleModelOptions: vi.fn(async () => ({ options: [] })),
+}));
 vi.mock('./_lib/vehicles-api', () => ({ listVehicles }));
 vi.mock('@/lib/auth/current-user', () => ({ getCurrentUser }));
 vi.mock('@/components/refresh-on-mount', () => ({
@@ -28,11 +39,16 @@ vi.mock('next/form', () => ({
 
 import VehiclesPage from './page';
 
+const MAKE_ID = '0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a01';
+const MODEL_ID = '0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a02';
+const TYPE_ID = '0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a03';
+
 function vehicle(n: number) {
   return {
     id: `id-${n}`,
-    make: `Make${n}`,
-    model: `Model${n}`,
+    make: { id: `make-${n}`, name: `Make${n}` },
+    model: { id: `model-${n}`, name: `Model${n}` },
+    vehicleType: { id: 'type-1', name: 'Van' },
     year: 2020,
     vin: `VIN${n}`,
     licensePlate: n % 2 ? `PLATE${n}` : null,
@@ -76,6 +92,19 @@ function listResult(count: number, total = count, page = 1, limit = 20) {
 beforeEach(() => {
   getCurrentUser.mockResolvedValue({ role: 'ADMIN' });
   listVehicles.mockResolvedValue(listResult(2));
+  listVehicleMakes.mockReset();
+  listVehicleModels.mockReset();
+  listVehicleTypes.mockReset();
+  listVehicleMakes.mockResolvedValue({
+    data: [
+      { id: MAKE_ID, name: 'Toyota' },
+      { id: 'retired-make', name: 'Saab' },
+    ],
+  });
+  listVehicleModels.mockResolvedValue({
+    data: [{ id: MODEL_ID, name: 'Corolla' }],
+  });
+  listVehicleTypes.mockResolvedValue({ data: [{ id: TYPE_ID, name: 'Car' }] });
 });
 
 describe('VehiclesPage', () => {
@@ -118,7 +147,9 @@ describe('VehiclesPage', () => {
     const select = screen.getByLabelText('Service');
     expect(select).toHaveValue('DUE_SOON');
     expect(
-      screen.getAllByRole('option').map((option) => option.textContent),
+      within(select)
+        .getAllByRole('option')
+        .map((option) => option.textContent),
     ).toEqual(['Any', 'Overdue', 'Due soon', 'OK', 'No service date']);
     expect(listVehicles).toHaveBeenCalledWith({
       page: 1,
@@ -131,16 +162,50 @@ describe('VehiclesPage', () => {
     await renderPage({
       page: '2',
       limit: '5',
-      make: ' Ford ',
+      makeId: ` ${MAKE_ID} `,
+      modelId: MODEL_ID,
+      vehicleTypeId: TYPE_ID,
       year: '2021',
       notice: 'x',
     });
     expect(listVehicles).toHaveBeenCalledWith({
       page: 2,
       limit: 5,
-      make: 'Ford',
+      makeId: MAKE_ID,
+      modelId: MODEL_ID,
+      vehicleTypeId: TYPE_ID,
       year: 2021,
     });
+  });
+
+  it('offers catalog filters with retired entries and the URL models', async () => {
+    await renderPage({ makeId: MAKE_ID, modelId: MODEL_ID });
+    expect(listVehicleMakes).toHaveBeenCalledWith({ includeInactive: true });
+    expect(listVehicleTypes).toHaveBeenCalledWith({ includeInactive: true });
+    expect(listVehicleModels).toHaveBeenCalledWith(MAKE_ID, {
+      includeInactive: true,
+    });
+    expect(screen.getByLabelText('Make')).toHaveValue(MAKE_ID);
+    expect(screen.getByLabelText('Model')).toHaveValue(MODEL_ID);
+    expect(screen.getByLabelText('Model')).toBeEnabled();
+    expect(
+      within(screen.getByLabelText('Make'))
+        .getAllByRole('option')
+        .map((option) => option.textContent),
+    ).toEqual(['Any', 'Toyota', 'Saab']);
+    expect(screen.getByLabelText('Vehicle type')).toBeInTheDocument();
+  });
+
+  it('does not load models without a make and disables the Model filter', async () => {
+    await renderPage();
+    expect(listVehicleModels).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('Model')).toBeDisabled();
+  });
+
+  it('lets the filter load the models when the make is unknown', async () => {
+    listVehicleModels.mockRejectedValue(apiError(404));
+    await renderPage({ makeId: MAKE_ID });
+    expect(screen.getByLabelText('Model')).toBeInTheDocument();
   });
 
   it('shows Add vehicle to ADMIN and MANAGER but not DRIVER', async () => {
@@ -178,7 +243,7 @@ describe('VehiclesPage', () => {
 
   it('shows the filtered empty state with a Clear filters link', async () => {
     listVehicles.mockResolvedValue(listResult(0));
-    await renderPage({ make: 'Nope', limit: '5' });
+    await renderPage({ makeId: MAKE_ID, limit: '5' });
     expect(
       screen.getByRole('heading', { name: 'No vehicles match these filters' }),
     ).toBeInTheDocument();
@@ -190,13 +255,13 @@ describe('VehiclesPage', () => {
 
   it('shows the out-of-range page state with a link to the last page', async () => {
     listVehicles.mockResolvedValue(listResult(0, 45, 9));
-    await renderPage({ page: '9', make: 'Ford' });
+    await renderPage({ page: '9', makeId: MAKE_ID });
     expect(
       screen.getByRole('heading', { name: 'No vehicles on this page' }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole('link', { name: 'Go to the last page' }),
-    ).toHaveAttribute('href', '/vehicles?make=Ford&page=3');
+    ).toHaveAttribute('href', `/vehicles?makeId=${MAKE_ID}&page=3`);
   });
 
   it('shows a known flash notice and nothing for an unknown key', async () => {
@@ -225,7 +290,7 @@ describe('VehiclesPage', () => {
 
   it('shows the filter error on a 400', async () => {
     listVehicles.mockRejectedValue(apiError(400));
-    await renderPage({ make: 'x' });
+    await renderPage({ makeId: MAKE_ID });
     expect(
       screen.getByRole('heading', {
         name: 'These filters could not be applied',

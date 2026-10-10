@@ -9,6 +9,8 @@ import {
   NativeSelectOption,
 } from '@/components/ui/native-select';
 import { SERVICE_STATUSES, SERVICE_STATUS_LABELS } from '@/lib/service-status';
+import { MakeModelFields } from './make-model-fields';
+import type { CatalogOption } from '../_lib/catalog-options';
 import {
   DEFAULT_LIMIT,
   vehicleListHref,
@@ -16,21 +18,30 @@ import {
 } from '../_lib/list-params';
 
 /**
- * GET form: submitting navigates to /vehicles?make=…, which drops `page` and
+ * GET form: submitting navigates to /vehicles?makeId=…, which drops `page` and
  * `notice` and keeps a non-default `limit`.
  */
 export function VehicleFilters({
   query,
   maxYear,
+  makes,
+  vehicleTypes,
+  initialModels,
 }: {
   query: VehicleListQuery;
   maxYear: number;
+  /** All makes, retired ones included, so old vehicles can be found. */
+  makes: CatalogOption[];
+  vehicleTypes: CatalogOption[];
+  /** Models of `query.makeId` (retired included); undefined to load them. */
+  initialModels?: CatalogOption[];
 }) {
   return (
     <Form
       key={JSON.stringify([
-        query.make,
-        query.model,
+        query.makeId,
+        query.modelId,
+        query.vehicleTypeId,
         query.year,
         query.serviceStatus,
       ])}
@@ -41,28 +52,30 @@ export function VehicleFilters({
       {query.limit !== DEFAULT_LIMIT ? (
         <input type="hidden" name="limit" value={query.limit} />
       ) : null}
-      <FormField name="make" label="Make">
+      <MakeModelFields
+        makes={makes}
+        initialMakeId={query.makeId ?? ''}
+        initialModelId={query.modelId ?? ''}
+        initialModels={query.makeId ? initialModels : []}
+        includeInactive
+        required={false}
+        makePlaceholder="Any"
+        modelPlaceholder="Any"
+      />
+      <FormField name="vehicleTypeId" label="Vehicle type">
         {(props) => (
-          <Input
+          <NativeSelect
             {...props}
-            name="make"
-            maxLength={50}
-            defaultValue={query.make ?? ''}
-          />
-        )}
-      </FormField>
-      <FormField
-        name="model"
-        label="Model"
-        hint="Exact match, not case-sensitive"
-      >
-        {(props) => (
-          <Input
-            {...props}
-            name="model"
-            maxLength={50}
-            defaultValue={query.model ?? ''}
-          />
+            name="vehicleTypeId"
+            defaultValue={query.vehicleTypeId ?? ''}
+          >
+            <NativeSelectOption value="">Any</NativeSelectOption>
+            {vehicleTypes.map((type) => (
+              <NativeSelectOption key={type.id} value={type.id}>
+                {type.name}
+              </NativeSelectOption>
+            ))}
+          </NativeSelect>
         )}
       </FormField>
       <FormField name="year" label="Year">

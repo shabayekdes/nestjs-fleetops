@@ -3,11 +3,13 @@ import type { Page } from '@playwright/test';
 import { formatMonth } from '../src/lib/format';
 import {
   apiToken,
+  catalogRefsViaApi,
   cleanupE2eFixtures,
   createMaintenanceRecordViaApi,
   createVehicleViaApi,
   isoDateFromToday,
   uniqueSuffix,
+  type CatalogRefs,
 } from './support/api';
 import { midMonthDate, monthOf } from './support/dates';
 import { signIn } from './support/session';
@@ -18,10 +20,12 @@ const NOT_ALLOWED = 'You are not allowed to do this.';
 
 let suffix = '';
 let adminToken = '';
+let refs: CatalogRefs;
 
 test.beforeEach(async ({ request }) => {
   suffix = uniqueSuffix();
   adminToken = await apiToken(request, ADMIN);
+  refs = await catalogRefsViaApi(request, adminToken);
 });
 
 test.afterEach(async ({ request }) => {
@@ -38,7 +42,8 @@ async function seedThisMonthCost(
   request: Parameters<typeof createVehicleViaApi>[0],
 ) {
   const vehicle = await createVehicleViaApi(request, adminToken, {
-    make: `E2E-${suffix}`,
+    refs,
+    suffix,
   });
   await createMaintenanceRecordViaApi(request, adminToken, vehicle.id, {
     performedOn: isoDateFromToday(0),

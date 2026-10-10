@@ -8,13 +8,30 @@ import { SubmitButton } from '@/components/form/submit-button';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import type { FormState } from '@/lib/forms/form-state';
+import {
+  NativeSelect,
+  NativeSelectOption,
+} from '@/components/ui/native-select';
+import { withRetired, type CatalogOption } from '../_lib/catalog-options';
 import type { VehicleField, VehicleFormValues } from '../_lib/vehicle-schema';
+import { MakeModelFields } from './make-model-fields';
 
 type State = FormState<VehicleField>;
 
 type Props = {
   action: (previous: State, formData: FormData) => Promise<State>;
   initialValues: VehicleFormValues;
+  /** Active catalog entries. */
+  makes: CatalogOption[];
+  vehicleTypes: CatalogOption[];
+  /** Active models of `initialValues.makeId`. */
+  initialModels?: CatalogOption[];
+  /** The saved make, model and type of the vehicle (edit), possibly retired. */
+  current?: {
+    make: CatalogOption;
+    model: CatalogOption;
+    vehicleType: CatalogOption;
+  };
   maxYear: number;
   submitLabel: string;
   pendingLabel: string;
@@ -24,6 +41,10 @@ type Props = {
 export function VehicleForm({
   action,
   initialValues,
+  makes,
+  vehicleTypes,
+  initialModels,
+  current,
   maxYear,
   submitLabel,
   pendingLabel,
@@ -41,27 +62,49 @@ export function VehicleForm({
     <form action={formAction} className="max-w-xl space-y-5">
       <FormError message={state.formError} />
 
-      <FormField name="make" label="Make" errors={state.fieldErrors?.make}>
-        {(props) => (
-          <Input
-            {...props}
-            name="make"
-            required
-            maxLength={50}
-            defaultValue={value('make')}
-          />
-        )}
-      </FormField>
+      <MakeModelFields
+        makes={makes}
+        initialMakeId={value('makeId')}
+        initialModelId={value('modelId')}
+        initialModels={
+          value('makeId') === (initialValues.makeId ?? '')
+            ? (initialModels ?? [])
+            : undefined
+        }
+        currentMake={current?.make}
+        currentModel={current?.model}
+        includeInactive={false}
+        required
+        makePlaceholder="Choose a make"
+        modelPlaceholder="Choose a model"
+        makeErrors={state.fieldErrors?.makeId}
+        modelErrors={state.fieldErrors?.modelId}
+      />
 
-      <FormField name="model" label="Model" errors={state.fieldErrors?.model}>
+      <FormField
+        name="vehicleTypeId"
+        label="Vehicle type"
+        errors={state.fieldErrors?.vehicleTypeId}
+      >
         {(props) => (
-          <Input
+          <NativeSelect
             {...props}
-            name="model"
+            name="vehicleTypeId"
+            // Remount when the echoed value changes: React's form reset
+            // would otherwise fall back to the first option.
+            key={value('vehicleTypeId')}
             required
-            maxLength={50}
-            defaultValue={value('model')}
-          />
+            defaultValue={value('vehicleTypeId')}
+          >
+            <NativeSelectOption value="">
+              Choose a vehicle type
+            </NativeSelectOption>
+            {withRetired(vehicleTypes, current?.vehicleType).map((option) => (
+              <NativeSelectOption key={option.id} value={option.id}>
+                {option.label}
+              </NativeSelectOption>
+            ))}
+          </NativeSelect>
         )}
       </FormField>
 

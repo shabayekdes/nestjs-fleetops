@@ -7,6 +7,10 @@ import { App } from 'supertest/types.js';
 import { AppModule } from '../src/app.module.js';
 import { configureApp } from '../src/app.setup.js';
 import { PrismaService } from '../src/database/prisma.service.js';
+import {
+  createTestCatalog,
+  type TestCatalog,
+} from './utils/vehicle-catalog.js';
 import { errorBody } from './utils/error-body.js';
 
 type Body = Record<string, unknown>;
@@ -37,6 +41,7 @@ const zeroMonth = (month: string) => ({
 describe('Cost summary (e2e)', () => {
   let app: INestApplication<App>;
   let prisma: PrismaService;
+  let catalog: TestCatalog;
 
   const suffix = randomUUID().slice(0, 8);
   const password = `Cost-${suffix}-passw0rd!`;
@@ -65,8 +70,9 @@ describe('Cost summary (e2e)', () => {
     prisma.vehicle.create({
       data: {
         organizationId,
-        make: 'Ford',
-        model: 'Transit',
+        makeId: catalog.makeA.id,
+        modelId: catalog.modelA1.id,
+        vehicleTypeId: catalog.type.id,
         year: 2022,
         vin: randomUUID().replace(/-/g, '').toUpperCase().slice(0, 17),
         licensePlate: `C${++seq}-${suffix.toUpperCase()}`,
@@ -142,6 +148,7 @@ describe('Cost summary (e2e)', () => {
     configureApp(app);
     await app.init();
     prisma = app.get(PrismaService);
+    catalog = await createTestCatalog(prisma, suffix);
 
     const slugA = `cost-a-${suffix}`;
     const slugB = `cost-b-${suffix}`;
@@ -180,6 +187,7 @@ describe('Cost summary (e2e)', () => {
         await prisma.user.deleteMany({ where });
         await prisma.organization.deleteMany({ where: { id: { in: orgIds } } });
       }
+      await catalog.cleanup();
     } finally {
       await app.close();
     }

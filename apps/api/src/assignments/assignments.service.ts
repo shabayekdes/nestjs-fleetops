@@ -22,10 +22,10 @@ const ASSIGNMENT_SELECT = {
   vehicle: {
     select: {
       id: true,
-      make: true,
-      model: true,
       vin: true,
       licensePlate: true,
+      vehicleMake: { select: { name: true } },
+      vehicleModel: { select: { name: true } },
     },
   },
   driver: {
@@ -39,6 +39,19 @@ const ASSIGNMENT_SELECT = {
   createdAt: true,
   updatedAt: true,
 } satisfies Prisma.VehicleAssignmentSelect;
+
+type AssignmentRow = Prisma.VehicleAssignmentGetPayload<{
+  select: typeof ASSIGNMENT_SELECT;
+}>;
+
+/** Flattens the catalog relations back to the `make` / `model` name strings. */
+const toAssignmentResponse = ({
+  vehicle: { vehicleMake, vehicleModel, ...vehicle },
+  ...row
+}: AssignmentRow): AssignmentResponseDto => ({
+  ...row,
+  vehicle: { ...vehicle, make: vehicleMake.name, model: vehicleModel.name },
+});
 
 const ACTIVE_VEHICLE_INDEX = 'vehicle_assignments_active_vehicle_key';
 const ACTIVE_DRIVER_INDEX = 'vehicle_assignments_active_driver_key';
@@ -89,7 +102,10 @@ export class AssignmentsService {
       }),
       this.prisma.vehicleAssignment.count({ where }),
     ]);
-    return { data, meta: { page, limit, total } };
+    return {
+      data: data.map(toAssignmentResponse),
+      meta: { page, limit, total },
+    };
   }
 
   async findOne(
@@ -101,7 +117,7 @@ export class AssignmentsService {
       select: ASSIGNMENT_SELECT,
     });
     if (!assignment) throw new NotFoundException('Assignment not found');
-    return assignment;
+    return toAssignmentResponse(assignment);
   }
 
   async create(
@@ -138,7 +154,7 @@ export class AssignmentsService {
         });
         if (driverBusy) throw new ConflictException(DRIVER_BUSY);
 
-        return tx.vehicleAssignment.create({
+        const created = await tx.vehicleAssignment.create({
           data: {
             organizationId,
             vehicleId: vehicle.id,
@@ -147,6 +163,7 @@ export class AssignmentsService {
           },
           select: ASSIGNMENT_SELECT,
         });
+        return toAssignmentResponse(created);
       });
     } catch (error) {
       throw toHttpError(error);

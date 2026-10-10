@@ -7,6 +7,10 @@ import { App } from 'supertest/types.js';
 import { AppModule } from '../src/app.module.js';
 import { configureApp } from '../src/app.setup.js';
 import { PrismaService } from '../src/database/prisma.service.js';
+import {
+  createTestCatalog,
+  type TestCatalog,
+} from './utils/vehicle-catalog.js';
 import { errorBody } from './utils/error-body.js';
 
 type Body = Record<string, unknown>;
@@ -33,6 +37,7 @@ const UUID_V7_RE =
 describe('Users (e2e)', () => {
   let app: INestApplication<App>;
   let prisma: PrismaService;
+  let catalog: TestCatalog;
 
   const suffix = randomUUID().slice(0, 8);
   const password = `Usr-${suffix}-passw0rd!`;
@@ -113,6 +118,7 @@ describe('Users (e2e)', () => {
     configureApp(app);
     await app.init();
     prisma = app.get(PrismaService);
+    catalog = await createTestCatalog(prisma, suffix);
 
     const orgA = await prisma.organization.create({
       data: { name: `Usr A ${suffix}`, slug: slugA },
@@ -155,6 +161,7 @@ describe('Users (e2e)', () => {
         });
         await prisma.organization.deleteMany({ where: { id: { in: orgIds } } });
       }
+      await catalog.cleanup();
     } finally {
       await app.close();
     }
@@ -684,8 +691,9 @@ describe('Users (e2e)', () => {
         .post('/api/v1/vehicles')
         .set('Authorization', `Bearer ${token}`)
         .send({
-          make: 'Ford',
-          model: 'Transit',
+          makeId: catalog.makeA.id,
+          modelId: catalog.modelA1.id,
+          vehicleTypeId: catalog.type.id,
           year: 2024,
           vin: randomUUID().replace(/-/g, '').toUpperCase().slice(0, 17),
         });

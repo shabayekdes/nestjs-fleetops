@@ -19,7 +19,7 @@ describe('ListVehiclesQueryDto', () => {
     expect(errors).toHaveLength(0);
     expect(dto.page).toBe(1);
     expect(dto.limit).toBe(20);
-    expect(dto.make).toBeUndefined();
+    expect(dto.makeId).toBeUndefined();
     expect(dto.year).toBeUndefined();
   });
 
@@ -51,18 +51,22 @@ describe('ListVehiclesQueryDto', () => {
     expect((await run({ page: ['1', '2'] })).fields).toContain('page');
   });
 
-  it('trims make and model', async () => {
-    const { dto, errors } = await run({ make: '  Ford ', model: ' Transit ' });
-    expect(errors).toHaveLength(0);
-    expect(dto.make).toBe('Ford');
-    expect(dto.model).toBe('Transit');
-  });
+  it.each(['makeId', 'modelId', 'vehicleTypeId'])(
+    'accepts a UUIDv7 and rejects other values for %s',
+    async (f) => {
+      expect(
+        (await run({ [f]: '01900000-0000-7000-8000-000000000001' })).errors,
+      ).toHaveLength(0);
+      expect((await run({ [f]: 'abc' })).fields).toContain(f);
+      expect((await run({ [f]: '' })).fields).toContain(f);
+      expect(
+        (await run({ [f]: '550e8400-e29b-41d4-a716-446655440000' })).fields,
+      ).toContain(f);
+    },
+  );
 
-  it.each(['make', 'model'])('rejects empty, blank, 51-char %s', async (f) => {
-    expect((await run({ [f]: '' })).fields).toContain(f);
-    expect((await run({ [f]: '   ' })).fields).toContain(f);
-    expect((await run({ [f]: 'a'.repeat(51) })).fields).toContain(f);
-    expect((await run({ [f]: 'a'.repeat(50) })).errors).toHaveLength(0);
+  it.each(['make', 'model'])('rejects the legacy %s filter', async (f) => {
+    expect((await run({ [f]: 'Ford' })).fields).toContain(f);
   });
 
   it.each(['1899', 'abc', '2024.5', String(maxVehicleYear() + 1)])(

@@ -69,7 +69,7 @@ export default async function FuelPage({
   const header = (
     <PageHeader
       title="Fuel"
-      description={`${vehicle.make} ${vehicle.model}`}
+      description={`${vehicle.make.name} ${vehicle.model.name}`}
       actions={
         <Button asChild>
           <Link href={newHref}>Add fuel log</Link>

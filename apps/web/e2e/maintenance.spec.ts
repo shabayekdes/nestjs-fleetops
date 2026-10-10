@@ -2,12 +2,14 @@ import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import {
   apiToken,
+  catalogRefsViaApi,
   cleanupE2eFixtures,
   createMaintenanceRecordViaApi,
   createVehicleViaApi,
   isoDateFromToday,
   listMaintenanceRecordsViaApi,
   uniqueSuffix,
+  type CatalogRefs,
 } from './support/api';
 import { fmtDate } from './support/dates';
 import { expectUrl } from './support/url';
@@ -17,13 +19,16 @@ import { ADMIN, DRIVER, MANAGER } from './support/users';
 const NOT_ALLOWED = 'You are not allowed to do this.';
 const UNKNOWN_ID = '00000000-0000-4000-8000-000000000000';
 
-// Every vehicle a test creates has the make `E2E-<suffix>`.
+// Every vehicle a test creates has a VIN starting with `E2E` (see
+// `vinPrefix` in support/api.ts).
 let suffix = '';
 let adminToken = '';
+let refs: CatalogRefs;
 
 test.beforeEach(async ({ request }) => {
   suffix = uniqueSuffix();
   adminToken = await apiToken(request, ADMIN);
+  refs = await catalogRefsViaApi(request, adminToken);
 });
 
 test.afterEach(async ({ request }) => {
@@ -37,7 +42,7 @@ async function login(page: Page, user: { email: string }) {
 }
 
 function newVehicle(request: Parameters<typeof createVehicleViaApi>[0]) {
-  return createVehicleViaApi(request, adminToken, { make: `E2E-${suffix}` });
+  return createVehicleViaApi(request, adminToken, { refs, suffix });
 }
 
 async function fillRecordForm(
@@ -210,16 +215,20 @@ test('a record due yesterday lists the vehicle as overdue', async ({
   });
   await login(page, ADMIN);
 
-  const make = `E2E-${suffix}`;
-  await page.goto(`/vehicles?make=${make}&serviceStatus=OVERDUE`);
+  // Other runs' Toyota vehicles share the list: find the row by VIN.
+  const toyota = `makeId=${refs.make.id}`;
+  await page.goto(`/vehicles?${toyota}&serviceStatus=OVERDUE`);
   await expect(page.getByLabel('Service')).toHaveValue('OVERDUE');
-  const row = page.getByRole('row', { name: new RegExp(make) });
+  const row = page.getByRole('row').filter({ hasText: vehicle.vin });
   await expect(row).toBeVisible();
   await expect(row).toContainText('Overdue');
   await expect(row).toContainText(fmtDate(isoDateFromToday(-1)));
 
-  await page.goto(`/vehicles?make=${make}&serviceStatus=OK`);
-  await expect(page.getByText('No vehicles match these filters')).toBeVisible();
+  await page.goto(`/vehicles?${toyota}&serviceStatus=OK`);
+  await expect(page.getByLabel('Service')).toHaveValue('OK');
+  await expect(
+    page.getByRole('row').filter({ hasText: vehicle.vin }),
+  ).toHaveCount(0);
 });
 
 test('a due date before the service date shows the API message', async ({

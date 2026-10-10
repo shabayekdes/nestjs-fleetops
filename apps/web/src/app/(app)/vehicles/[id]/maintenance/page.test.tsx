@@ -38,7 +38,11 @@ vi.mock('next/form', () => ({
 import MaintenancePage from './page';
 
 const ID = '0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b';
-const vehicle = { id: ID, make: 'Ford', model: 'Transit' };
+const vehicle = {
+  id: ID,
+  make: { id: 'make-1', name: 'Ford' },
+  model: { id: 'model-1', name: 'Transit' },
+};
 
 function record(n: number) {
   return {

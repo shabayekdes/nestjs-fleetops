@@ -21,6 +21,7 @@ export function VehiclesTable({ vehicles }: { vehicles: Vehicle[] }) {
         <TableRow>
           <TableHead>Make</TableHead>
           <TableHead>Model</TableHead>
+          <TableHead>Type</TableHead>
           <TableHead>Year</TableHead>
           <TableHead>VIN</TableHead>
           <TableHead>License plate</TableHead>
@@ -35,11 +36,12 @@ export function VehiclesTable({ vehicles }: { vehicles: Vehicle[] }) {
                 href={`/vehicles/${vehicle.id}`}
                 className="font-medium underline-offset-4 hover:underline"
               >
-                {vehicle.make}
+                {vehicle.make.name}
                 <LinkPending className="ml-1 inline" />
               </Link>
             </TableCell>
-            <TableCell>{vehicle.model}</TableCell>
+            <TableCell>{vehicle.model.name}</TableCell>
+            <TableCell>{vehicle.vehicleType.name}</TableCell>
             <TableCell>{vehicle.year}</TableCell>
             <TableCell className="font-mono">{vehicle.vin}</TableCell>
             <TableCell>{vehicle.licensePlate ?? '—'}</TableCell>

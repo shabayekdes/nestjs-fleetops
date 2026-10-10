@@ -7,6 +7,10 @@ import { App } from 'supertest/types.js';
 import { AppModule } from '../src/app.module.js';
 import { configureApp } from '../src/app.setup.js';
 import { PrismaService } from '../src/database/prisma.service.js';
+import {
+  createTestCatalog,
+  type TestCatalog,
+} from './utils/vehicle-catalog.js';
 import { errorBody } from './utils/error-body.js';
 
 type Body = Record<string, unknown>;
@@ -35,6 +39,7 @@ const BAD_UUID = 'Validation failed (uuid v 7 is expected)';
 describe('Drivers (e2e)', () => {
   let app: INestApplication<App>;
   let prisma: PrismaService;
+  let catalog: TestCatalog;
 
   const suffix = randomUUID().slice(0, 8);
   const password = `Drv-${suffix}-passw0rd!`;
@@ -115,6 +120,7 @@ describe('Drivers (e2e)', () => {
     configureApp(app);
     await app.init();
     prisma = app.get(PrismaService);
+    catalog = await createTestCatalog(prisma, suffix);
 
     const slugA = `drv-a-${suffix}`;
     const slugB = `drv-b-${suffix}`;
@@ -155,6 +161,7 @@ describe('Drivers (e2e)', () => {
         await prisma.user.deleteMany({ where });
         await prisma.organization.deleteMany({ where: { id: { in: orgIds } } });
       }
+      await catalog.cleanup();
     } finally {
       await app.close();
     }
@@ -623,8 +630,9 @@ describe('Drivers (e2e)', () => {
       const vehicle = await prisma.vehicle.create({
         data: {
           organizationId: orgAId,
-          make: 'Ford',
-          model: 'Transit',
+          makeId: catalog.makeA.id,
+          modelId: catalog.modelA1.id,
+          vehicleTypeId: catalog.type.id,
           year: 2022,
           vin: randomUUID().replace(/-/g, '').toUpperCase().slice(0, 17),
         },

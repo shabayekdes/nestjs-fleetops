@@ -45,7 +45,7 @@ export default async function NewFuelLogPage({
     <>
       <PageHeader
         title={title}
-        description={`${vehicle.make} ${vehicle.model}`}
+        description={`${vehicle.make.name} ${vehicle.model.name}`}
       />
       <FuelForm
         action={createFuelLog.bind(null, id)}

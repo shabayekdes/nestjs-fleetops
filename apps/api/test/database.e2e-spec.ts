@@ -5,6 +5,10 @@ import { validateEnv } from '../src/config/env.validation.js';
 import { DatabaseModule } from '../src/database/database.module.js';
 import { PrismaService } from '../src/database/prisma.service.js';
 import type { Organization } from '../src/generated/prisma/client.js';
+import {
+  createTestCatalog,
+  type TestCatalog,
+} from './utils/vehicle-catalog.js';
 
 /**
  * Integration tests against the real test database (.env.test).
@@ -14,6 +18,7 @@ import type { Organization } from '../src/generated/prisma/client.js';
 describe('Database (integration)', () => {
   let moduleRef: TestingModule;
   let prisma: PrismaService;
+  let catalog: TestCatalog;
   const createdOrgIds: string[] = [];
 
   const createOrg = async (): Promise<Organization> => {
@@ -41,8 +46,9 @@ describe('Database (integration)', () => {
     organizationId,
     vin,
     licensePlate,
-    make: 'Ford',
-    model: 'Transit',
+    makeId: catalog.makeA.id,
+    modelId: catalog.modelA1.id,
+    vehicleTypeId: catalog.type.id,
     year: 2024,
   });
 
@@ -63,6 +69,7 @@ describe('Database (integration)', () => {
     // init() triggers PrismaService.onModuleInit -> real connection check.
     await moduleRef.init();
     prisma = moduleRef.get(PrismaService);
+    catalog = await createTestCatalog(prisma, randomUUID().slice(0, 8));
   });
 
   afterAll(async () => {
@@ -77,6 +84,7 @@ describe('Database (integration)', () => {
     await prisma.organization.deleteMany({
       where: { id: { in: createdOrgIds } },
     });
+    await catalog.cleanup();
     await moduleRef.close(); // triggers onModuleDestroy -> $disconnect
   });
 
@@ -181,5 +189,68 @@ describe('Database (integration)', () => {
     await expect(
       prisma.user.create({ data: userData(randomUUID(), 'x@example.test') }),
     ).rejects.toMatchObject({ code: 'P2003' });
+  });
+
+  describe('vehicle master data constraints', () => {
+    it('rejects a vehicle row without make_id, model_id and vehicle_type_id (NOT NULL)', async () => {
+      const org = await createOrg();
+      await expect(
+        prisma.$executeRaw`INSERT INTO vehicles (id, organization_id, year, vin, updated_at) VALUES (gen_random_uuid(), ${org.id}::uuid, 2024, ${'1FTBW3XM5PKA40001'}, now())`,
+      ).rejects.toThrow(/null value|not-null|23502/i);
+    });
+
+    it('rejects a model that belongs to another make (composite FK)', async () => {
+      const org = await createOrg();
+      await expect(
+        prisma.vehicle.create({
+          data: {
+            ...vehicleData(org.id, '1FTBW3XM5PKA40002', null),
+            makeId: catalog.makeA.id,
+            modelId: catalog.modelB1.id,
+          },
+        }),
+      ).rejects.toMatchObject({ code: 'P2003' });
+    });
+
+    it('accepts a model of the same make', async () => {
+      const org = await createOrg();
+      await expect(
+        prisma.vehicle.create({
+          data: {
+            ...vehicleData(org.id, '1FTBW3XM5PKA40003', null),
+            makeId: catalog.makeB.id,
+            modelId: catalog.modelB1.id,
+          },
+        }),
+      ).resolves.toBeDefined();
+    });
+
+    it('rejects a non-existent vehicle type', async () => {
+      const org = await createOrg();
+      await expect(
+        prisma.vehicle.create({
+          data: {
+            ...vehicleData(org.id, '1FTBW3XM5PKA40004', null),
+            vehicleTypeId: randomUUID(),
+          },
+        }),
+      ).rejects.toMatchObject({ code: 'P2003' });
+    });
+
+    it('restricts deleting a make, model or type used by a vehicle', async () => {
+      const org = await createOrg();
+      await prisma.vehicle.create({
+        data: vehicleData(org.id, '1FTBW3XM5PKA40005', null),
+      });
+      await expect(
+        prisma.vehicleMake.delete({ where: { id: catalog.makeA.id } }),
+      ).rejects.toMatchObject({ code: 'P2003' });
+      await expect(
+        prisma.vehicleModel.delete({ where: { id: catalog.modelA1.id } }),
+      ).rejects.toMatchObject({ code: 'P2003' });
+      await expect(
+        prisma.vehicleType.delete({ where: { id: catalog.type.id } }),
+      ).rejects.toMatchObject({ code: 'P2003' });
+    });
   });
 });

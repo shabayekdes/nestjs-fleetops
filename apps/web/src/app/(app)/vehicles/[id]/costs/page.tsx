@@ -58,7 +58,7 @@ export default async function CostsPage({
     );
   }
   const { vehicle } = loaded;
-  const name = `${vehicle.make} ${vehicle.model}`;
+  const name = `${vehicle.make.name} ${vehicle.model.name}`;
   const path = `/vehicles/${id}/costs`;
 
   let summary: CostSummary;

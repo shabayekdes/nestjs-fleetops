@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import {
   apiToken,
+  catalogRefsViaApi,
   cleanupE2eFixtures,
   createAssignmentViaApi,
   createDriverViaApi,
@@ -11,6 +12,7 @@ import {
   isoDateFromToday,
   listAssignmentsViaApi,
   uniqueSuffix,
+  type CatalogRefs,
 } from './support/api';
 import { signIn } from './support/session';
 import { ADMIN, DRIVER, MANAGER } from './support/users';
@@ -18,15 +20,17 @@ import { ADMIN, DRIVER, MANAGER } from './support/users';
 const NOT_ALLOWED = 'You are not allowed to do this.';
 
 // Naming: driver firstName `E2E-<suffix>`, licenseNumber `E2E-<SUFFIX>-<n>`,
-// vehicle make `E2E-<suffix>`, so the cleanup can find everything.
+// vehicle VIN prefix `E2E`, so the cleanup can find everything.
 let suffix = '';
 let counter = 0;
 let adminToken = '';
+let refs: CatalogRefs;
 
 test.beforeEach(async ({ request }) => {
   suffix = uniqueSuffix();
   counter = 0;
   adminToken = await apiToken(request, ADMIN);
+  refs = await catalogRefsViaApi(request, adminToken);
 });
 
 test.afterEach(async ({ request }) => {
@@ -52,7 +56,7 @@ function newDriver(
 }
 
 function newVehicle(request: Parameters<typeof createVehicleViaApi>[0]) {
-  return createVehicleViaApi(request, adminToken, { make: `E2E-${suffix}` });
+  return createVehicleViaApi(request, adminToken, { refs, suffix });
 }
 
 const assignButton = (page: Page) =>
@@ -62,6 +66,7 @@ test('a manager assigns, ends and sees the history', async ({
   page,
   request,
 }) => {
+  test.slow();
   const vehicle = await newVehicle(request);
   const driver = await newDriver(request);
   await login(page, MANAGER);
@@ -86,7 +91,9 @@ test('a manager assigns, ends and sees the history', async ({
   // The driver page shows the vehicle as current.
   await page.goto(`/drivers/${driver.id}`);
   await expect(
-    page.getByRole('link', { name: `E2E-${suffix} E2E Model` }),
+    page.getByRole('link', {
+      name: `${refs.make.name} ${refs.model.name}`,
+    }),
   ).toBeVisible();
 
   // The assignments page lists it as current.
@@ -142,7 +149,9 @@ test('a vehicle is assigned from the driver page', async ({
     timeout: 15_000,
   });
   await expect(
-    page.getByRole('link', { name: `E2E-${suffix} E2E Model` }),
+    page.getByRole('link', {
+      name: `${refs.make.name} ${refs.model.name}`,
+    }),
   ).toBeVisible();
   const active = await listAssignmentsViaApi(request, adminToken, {
     driverId: driver.id,
@@ -308,7 +317,10 @@ test('a driver sees no assignment pages or sections', async ({
   }
 
   // The seed Ford Transit page renders without an Assignment section.
-  await page.goto('/vehicles?make=Ford');
+  await page.goto('/vehicles');
+  await page.getByLabel('Make').selectOption({ label: 'Ford' });
+  await page.getByRole('button', { name: 'Apply filters' }).click();
+  await expect(page).toHaveURL(/makeId=/);
   await page
     .getByRole('row')
     .filter({ hasText: '1FTBW3XM5PKA00001' })

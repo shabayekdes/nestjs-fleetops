@@ -163,12 +163,50 @@ describe('DashboardService', () => {
       const assignment = {
         id: 'as-1',
         startedAt: new Date('2026-06-01T08:00:00.000Z'),
-        vehicle: { id: 'v-1', make: 'Ford', model: 'F', licensePlate: null },
+        vehicle: {
+          id: 'v-1',
+          licensePlate: null,
+          vehicleMake: { name: 'Ford' },
+          vehicleModel: { name: 'F' },
+        },
       };
       driverFindFirst.mockResolvedValue(driverRow([assignment]));
       const res = await service.getMe(USER);
-      expect(res.currentAssignment).toEqual(assignment);
+      expect(res.currentAssignment).toEqual({
+        id: 'as-1',
+        startedAt: assignment.startedAt,
+        vehicle: { id: 'v-1', make: 'Ford', model: 'F', licensePlate: null },
+      });
       expect(res.driver).not.toHaveProperty('assignments');
+    });
+
+    it('never leaks vehicleMake/vehicleModel keys in the vehicle summary', async () => {
+      driverFindFirst.mockResolvedValue(
+        driverRow([
+          {
+            id: 'as-1',
+            startedAt: new Date('2026-06-01T08:00:00.000Z'),
+            vehicle: {
+              id: 'v-1',
+              licensePlate: 'P-1',
+              vehicleMake: { name: 'Ford' },
+              vehicleModel: { name: 'F' },
+            },
+          },
+        ]),
+      );
+      const res = await service.getMe(USER);
+      const vehicle = res.currentAssignment?.vehicle as unknown as Record<
+        string,
+        unknown
+      >;
+      expect(Object.keys(vehicle).sort()).toEqual([
+        'id',
+        'licensePlate',
+        'make',
+        'model',
+      ]);
+      expect(vehicle).toMatchObject({ make: 'Ford', model: 'F' });
     });
 
     it('queries by userId and organizationId, active assignments only', async () => {

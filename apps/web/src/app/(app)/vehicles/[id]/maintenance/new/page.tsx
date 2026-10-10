@@ -45,7 +45,7 @@ export default async function NewMaintenanceRecordPage({
     <>
       <PageHeader
         title={title}
-        description={`${vehicle.make} ${vehicle.model}`}
+        description={`${vehicle.make.name} ${vehicle.model.name}`}
       />
       <MaintenanceForm
         action={createMaintenanceRecord.bind(null, id)}

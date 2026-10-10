@@ -13,18 +13,18 @@ Rules for working with phases:
 - Conventions live in `CLAUDE.md`. This file covers scope and history only.
 - Planned phases are a direction, not a spec. Before starting one, confirm its scope with the user, then ask `cto-esmail` for a plan. The order and content of planned phases may change.
 
-| Phase | Name                             | Status      | Commit(s)                                     |
-| ----- | -------------------------------- | ----------- | --------------------------------------------- |
-| 1     | Application foundation           | Done        | `4b1d372`                                     |
-| 2     | PostgreSQL + Prisma              | Done        | `5623cff`                                     |
-| 3     | Authentication + tenant context  | Done        | `0195815`                                     |
-| 4     | Vehicles API                     | Done        | `9e4a426`                                     |
-| 5     | Users + roles                    | Done        | `c80e806`                                     |
-| 6     | Drivers + vehicle assignments    | Done        | `961d586`                                     |
-| 7     | Maintenance + fuel records       | Done        | `f12eeed`                                     |
-| 8     | API docs, logging + error format | Done        | `2395d09`                                     |
-| 9     | Docker, CI + deployment          | Done        | `a0217d0`                                     |
-| 10    | Vehicle master data              | In progress | `964d26c` (makes + models), `e2b019d` (types) |
+| Phase | Name                             | Status | Commit(s)                                                                                      |
+| ----- | -------------------------------- | ------ | ---------------------------------------------------------------------------------------------- |
+| 1     | Application foundation           | Done   | `4b1d372`                                                                                      |
+| 2     | PostgreSQL + Prisma              | Done   | `5623cff`                                                                                      |
+| 3     | Authentication + tenant context  | Done   | `0195815`                                                                                      |
+| 4     | Vehicles API                     | Done   | `9e4a426`                                                                                      |
+| 5     | Users + roles                    | Done   | `c80e806`                                                                                      |
+| 6     | Drivers + vehicle assignments    | Done   | `961d586`                                                                                      |
+| 7     | Maintenance + fuel records       | Done   | `f12eeed`                                                                                      |
+| 8     | API docs, logging + error format | Done   | `2395d09`                                                                                      |
+| 9     | Docker, CI + deployment          | Done   | `a0217d0`                                                                                      |
+| 10    | Vehicle master data              | Done   | `964d26c` (makes + models), `e2b019d` (types), `82b0432` + `24ba80e` (vehicle refactor + FE10) |
 
 ---
 
@@ -393,7 +393,7 @@ API moved to `apps/api/` in preparation for the frontend (`apps/web/`); no behav
 
 ## Phase 10 — Vehicle master data
 
-**Status:** In progress. Parts 1 and 2 done; part 3 planned.
+**Status:** Done. Parts 1, 2 and 3 done; part 3 shipped together with Frontend Phase 10.
 
 **Goal:** vehicles reference a shared catalog of makes, models and types instead of free text, and the web vehicle form picks them from dependent dropdowns.
 
@@ -428,17 +428,30 @@ Exercise: [`exercises/vehicle-types.md`](exercises/vehicle-types.md).
 - `vehicle_types` table (6 seeded types) and `GET /master-data/vehicle-types` and `GET /master-data/vehicle-types/:slug` in `MasterDataModule`, same rules as makes (decision log in the exercise).
 - `vehicles.vehicle_type_id`: nullable, Restrict FK (expand step, like `make_id`/`model_id`). No change to the vehicles API in this part.
 
-### Part 3 — Vehicle refactor (planned)
+### Part 3 — Vehicle refactor (done, `82b0432`)
 
-- **Schema:** make `make_id`, `model_id` and `vehicle_type_id` required (`vehicle_type_id` exists since part 2); add an `(organization_id, vehicle_type_id)` index for the type filter; drop the legacy `make` and `model` columns. The project is not in production, so dev and test data can be re-seeded instead of backfilled; the order of migrations still has to apply cleanly on a fresh database.
-- **Vehicles API:** create and update take `makeId`, `modelId` and `vehicleTypeId`; the model must belong to the make (composite FK, mapped to a 400/409 rather than a 500) and new vehicles may only use active makes, models and types. Responses return the names (shape decided at planning time). List filters move from `make`/`model` strings to ids.
-- **Other readers of make/model:** assignments and `/dashboard/me` vehicle summaries, the seed, `prisma/e2e-cleanup.ts` (it finds test vehicles by a `make` prefix), and every e2e test that creates vehicles.
-- **Web (dependent dropdowns):** the vehicle form selects a make first, then loads that make's models (`GET /master-data/vehicle-makes/:makeId/models`); changing the make clears the model. Vehicle type is its own dropdown. Planned as [Frontend Phase 10](frontend-roadmap.md#frontend-phase-10--vehicle-master-data-forms).
+Implemented by the developer agents from a `cto-esmail` plan, and merged together with [Frontend Phase 10](frontend-roadmap.md#frontend-phase-10--vehicle-master-data-forms) (the web was updated in the same change set, so `main` never had an API the web could not use).
+
+**Built**
+
+- Migration `require_vehicle_master_data`: drops `vehicles.make` / `model`, makes `make_id`, `model_id` and `vehicle_type_id` `NOT NULL`, adds an `(organization_id, vehicle_type_id)` index, and drops the CHECK constraint that the `NOT NULL`s make redundant. No foreign key changes. Dev and test databases were reset and re-seeded instead of backfilled (not in production).
+- Vehicles API: create and update take `makeId`, `modelId` and `vehicleTypeId`; responses return `make`, `model` and `vehicleType` as `{ id, name }` (11 keys); list filters by the three ids.
+- Assignments and `/dashboard/me` keep `make` / `model` as plain strings, now read from the catalog.
+- Seed links its vehicles to the catalog; `prisma/e2e-cleanup.ts` finds test vehicles by the VIN prefix `E2E`. Tests build their own catalog (`test/utils/vehicle-catalog.ts`), because CI does not seed.
+
+**Decisions**
+
+1. Catalog reference errors are **422** (`Vehicle make not found`, `… is retired`, `Vehicle model not found for this make`, `Vehicle type …`), checked make → model → type. Not 404, because on `PATCH /vehicles/:id` 404 already means the vehicle; 422 is the existing FleetOps status for "exists but cannot be used" (expired license). A missing or other-tenant vehicle is still 404 first.
+2. Values are checked only when **newly used**: create checks all three; update checks the make + model pair only if it changes (a new model needs the model and its make active) and the type only if it changes. Existing vehicles keep retired values and can still be edited.
+3. Changing the make requires `modelId` (400 otherwise). A model-only change is checked against the vehicle's current make.
+4. A foreign key error (P2003) on create or update is 422 `Vehicle make, model or type is not valid`, a backstop for races; delete keeps its 409.
+5. Nested `{ id, name }` on the vehicle resource (the edit form needs ids and names); plain strings in summaries (display only, no contract change for those screens).
+6. Old `make` / `model` body fields and filters are rejected with 400 (`forbidNonWhitelisted`); unknown filter ids return an empty list, never 404.
 
 **Out of scope**
 
 - Creating, editing or retiring master data through the API or UI. Planned for the platform admin dashboard in the [product roadmap](product-roadmap.md) (v1.1).
-- A production data migration for the catalog. Needed before the first production deploy, because the seed refuses to run in production.
+- Loading the catalog into production. The seed refuses to run in production, so a production deploy has empty catalogs (vehicle creation returns 422) until a catalog data migration or a one-off load is added. Production exists now, so this gates the merge to `main`.
 
 ---
 

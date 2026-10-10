@@ -46,6 +46,7 @@ const vehicles = [
   {
     make: 'Ford',
     model: 'Transit',
+    type: 'Van',
     year: 2023,
     vin: '1FTBW3XM5PKA00001',
     licensePlate: 'FLT-1001',
@@ -53,6 +54,7 @@ const vehicles = [
   {
     make: 'Mercedes-Benz',
     model: 'Sprinter',
+    type: 'Van',
     year: 2022,
     vin: 'WD3PF4CC5NP000002',
     licensePlate: 'FLT-1002',
@@ -60,6 +62,7 @@ const vehicles = [
   {
     make: 'Volvo',
     model: 'FH16',
+    type: 'Truck',
     year: 2024,
     vin: 'YV2RT40A5RA000003',
     licensePlate: null,
@@ -132,6 +135,11 @@ async function main(): Promise<void> {
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-+|-+$/g, '');
 
+    // Ids of the upserted catalog rows, so the vehicles below can reference them.
+    const makeIds = new Map<string, string>();
+    const modelIds = new Map<string, string>(); // key: makeSlug/modelSlug
+    const typeIds = new Map<string, string>();
+
     for (const entry of vehicleCatalog) {
       const makeSlug = toSlug(entry.make);
       const make = await prisma.vehicleMake.upsert({
@@ -140,23 +148,28 @@ async function main(): Promise<void> {
         create: { name: entry.make, slug: makeSlug },
         select: { id: true },
       });
+      makeIds.set(makeSlug, make.id);
       for (const modelName of entry.models) {
         const slug = toSlug(modelName);
-        await prisma.vehicleModel.upsert({
+        const model = await prisma.vehicleModel.upsert({
           where: { makeId_slug: { makeId: make.id, slug } },
           update: { name: modelName },
           create: { makeId: make.id, name: modelName, slug },
+          select: { id: true },
         });
+        modelIds.set(`${makeSlug}/${slug}`, model.id);
       }
     }
 
     for (const name of vehicleTypes) {
       const slug = toSlug(name);
-      await prisma.vehicleType.upsert({
+      const type = await prisma.vehicleType.upsert({
         where: { slug },
         update: { name },
         create: { name, slug },
+        select: { id: true },
       });
+      typeIds.set(slug, type.id);
     }
 
     const org = await prisma.organization.upsert({
@@ -182,12 +195,29 @@ async function main(): Promise<void> {
     }
 
     for (const vehicle of vehicles) {
+      const makeSlug = toSlug(vehicle.make);
+      const makeId = makeIds.get(makeSlug);
+      const modelId = modelIds.get(`${makeSlug}/${toSlug(vehicle.model)}`);
+      const vehicleTypeId = typeIds.get(toSlug(vehicle.type));
+      if (!makeId || !modelId || !vehicleTypeId) {
+        throw new Error(
+          `Seeded vehicle ${vehicle.vin} references a make, model or type missing from the catalog`,
+        );
+      }
+      const fields = {
+        year: vehicle.year,
+        vin: vehicle.vin,
+        licensePlate: vehicle.licensePlate,
+        makeId,
+        modelId,
+        vehicleTypeId,
+      };
       await prisma.vehicle.upsert({
         where: {
           organizationId_vin: { organizationId: org.id, vin: vehicle.vin },
         },
-        update: vehicle,
-        create: { ...vehicle, organizationId: org.id },
+        update: fields,
+        create: { ...fields, organizationId: org.id },
       });
     }
 

@@ -7,6 +7,10 @@ import { App } from 'supertest/types.js';
 import { AppModule } from '../src/app.module.js';
 import { configureApp } from '../src/app.setup.js';
 import { PrismaService } from '../src/database/prisma.service.js';
+import {
+  createTestCatalog,
+  type TestCatalog,
+} from './utils/vehicle-catalog.js';
 import { errorBody } from './utils/error-body.js';
 
 type Body = Record<string, unknown>;
@@ -42,6 +46,7 @@ async function waitForSafeClock(): Promise<void> {
 describe('Dashboard (e2e)', () => {
   let app: INestApplication<App>;
   let prisma: PrismaService;
+  let catalog: TestCatalog;
 
   const suffix = randomUUID().slice(0, 8);
   const password = `Dash-${suffix}-passw0rd!`;
@@ -66,8 +71,9 @@ describe('Dashboard (e2e)', () => {
     prisma.vehicle.create({
       data: {
         organizationId,
-        make: 'Ford',
-        model: 'Transit',
+        makeId: catalog.makeA.id,
+        modelId: catalog.modelA1.id,
+        vehicleTypeId: catalog.type.id,
         year: 2022,
         vin: randomUUID().replace(/-/g, '').toUpperCase().slice(0, 17),
         licensePlate: `D${++seq}-${suffix.toUpperCase()}`,
@@ -157,6 +163,7 @@ describe('Dashboard (e2e)', () => {
     configureApp(app);
     await app.init();
     prisma = app.get(PrismaService);
+    catalog = await createTestCatalog(prisma, suffix);
 
     const [orgA, orgB, orgC] = await Promise.all(
       (['A', 'B', 'C'] as const).map((k) =>
@@ -219,6 +226,7 @@ describe('Dashboard (e2e)', () => {
         await prisma.user.deleteMany({ where });
         await prisma.organization.deleteMany({ where: { id: { in: orgIds } } });
       }
+      await catalog.cleanup();
     } finally {
       await app.close();
     }
@@ -361,8 +369,8 @@ describe('Dashboard (e2e)', () => {
           startedAt: assignment.startedAt.toISOString(),
           vehicle: {
             id: vehicle.id,
-            make: 'Ford',
-            model: 'Transit',
+            make: catalog.makeA.name,
+            model: catalog.modelA1.name,
             licensePlate: vehicle.licensePlate,
           },
         },

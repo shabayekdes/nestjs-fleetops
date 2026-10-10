@@ -79,8 +79,8 @@ beforeEach(() => {
       data: [
         {
           id: 'v1',
-          make: 'Ford',
-          model: 'Transit',
+          make: { id: 'make-1', name: 'Ford' },
+          model: { id: 'model-1', name: 'Transit' },
           vin: 'VIN1',
           licensePlate: 'AB-1',
         },

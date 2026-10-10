@@ -2,12 +2,14 @@ import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import {
   apiToken,
+  catalogRefsViaApi,
   cleanupE2eFixtures,
   createFuelLogViaApi,
   createVehicleViaApi,
   isoDateFromToday,
   listFuelLogsViaApi,
   uniqueSuffix,
+  type CatalogRefs,
 } from './support/api';
 import { fmtDate } from './support/dates';
 import { expectUrl } from './support/url';
@@ -19,10 +21,12 @@ const UNKNOWN_ID = '00000000-0000-4000-8000-000000000000';
 
 let suffix = '';
 let adminToken = '';
+let refs: CatalogRefs;
 
 test.beforeEach(async ({ request }) => {
   suffix = uniqueSuffix();
   adminToken = await apiToken(request, ADMIN);
+  refs = await catalogRefsViaApi(request, adminToken);
 });
 
 test.afterEach(async ({ request }) => {
@@ -36,7 +40,7 @@ async function login(page: Page, user: { email: string }) {
 }
 
 function newVehicle(request: Parameters<typeof createVehicleViaApi>[0]) {
-  return createVehicleViaApi(request, adminToken, { make: `E2E-${suffix}` });
+  return createVehicleViaApi(request, adminToken, { refs, suffix });
 }
 
 const dataRows = (page: Page) => page.locator('tbody tr');

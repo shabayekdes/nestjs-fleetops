@@ -96,7 +96,12 @@ export class DashboardService {
             id: true,
             startedAt: true,
             vehicle: {
-              select: { id: true, make: true, model: true, licensePlate: true },
+              select: {
+                id: true,
+                licensePlate: true,
+                vehicleMake: { select: { name: true } },
+                vehicleModel: { select: { name: true } },
+              },
             },
           },
         },
@@ -105,13 +110,24 @@ export class DashboardService {
     if (!row) return { driver: null, currentAssignment: null };
 
     const { assignments, ...driver } = row;
+    const assignment = assignments[0];
     return {
       driver: {
         ...driver,
         licenseExpiresOn: toDateOnly(driver.licenseExpiresOn),
         licenseStatus: computeLicenseStatus(driver.licenseExpiresOn),
       },
-      currentAssignment: assignments[0] ?? null,
+      currentAssignment: assignment
+        ? {
+            ...assignment,
+            vehicle: {
+              id: assignment.vehicle.id,
+              make: assignment.vehicle.vehicleMake.name,
+              model: assignment.vehicle.vehicleModel.name,
+              licensePlate: assignment.vehicle.licensePlate,
+            },
+          }
+        : null,
     };
   }
 }

@@ -6,6 +6,11 @@ import { ApiError } from '@/lib/api/errors';
 import type { Vehicle } from '@/lib/api/types';
 import { getCurrentUser } from '@/lib/auth/current-user';
 import { isUuid } from '@/lib/ids';
+import {
+  listVehicleMakes,
+  listVehicleModels,
+  listVehicleTypes,
+} from '@/lib/master-data/master-data-api';
 import { updateVehicle } from '../../actions';
 import { VehicleForm } from '../../_components/vehicle-form';
 import { maxVehicleYear } from '../../_lib/list-params';
@@ -43,12 +48,24 @@ export default async function EditVehiclePage({
   }
 
   const original = {
-    make: vehicle.make,
-    model: vehicle.model,
+    makeId: vehicle.make.id,
+    modelId: vehicle.model.id,
+    vehicleTypeId: vehicle.vehicleType.id,
     year: vehicle.year,
     vin: vehicle.vin,
     licensePlate: vehicle.licensePlate,
   };
+
+  const [makes, vehicleTypes] = await Promise.all([
+    listVehicleMakes(),
+    listVehicleTypes(),
+  ]);
+  // A retired make offers no models: the form appends only the vehicle's own
+  // model, labelled "(retired)".
+  const makeIsActive = makes.data.some(({ id }) => id === vehicle.make.id);
+  const models = makeIsActive
+    ? (await listVehicleModels(vehicle.make.id)).data
+    : [];
 
   return (
     <>
@@ -56,11 +73,20 @@ export default async function EditVehiclePage({
       <VehicleForm
         action={updateVehicle.bind(null, id, original)}
         initialValues={{
-          make: original.make,
-          model: original.model,
+          makeId: original.makeId,
+          modelId: original.modelId,
+          vehicleTypeId: original.vehicleTypeId,
           year: String(original.year),
           vin: original.vin,
           licensePlate: original.licensePlate ?? '',
+        }}
+        makes={makes.data}
+        vehicleTypes={vehicleTypes.data}
+        initialModels={models}
+        current={{
+          make: vehicle.make,
+          model: vehicle.model,
+          vehicleType: vehicle.vehicleType,
         }}
         maxYear={maxVehicleYear()}
         submitLabel="Save changes"

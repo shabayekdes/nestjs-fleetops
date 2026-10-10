@@ -14,10 +14,13 @@ const API = `${API_URL}/api/v1`;
 // Without I, O and Q, as the API requires.
 const VIN_CHARS = 'ABCDEFGHJKLMNPRSTUVWXYZ0123456789';
 
+export type ApiCatalogRef = { id: string; name: string };
+
 export type ApiVehicle = {
   id: string;
-  make: string;
-  model: string;
+  make: ApiCatalogRef;
+  model: ApiCatalogRef;
+  vehicleType: ApiCatalogRef;
   year: number;
   vin: string;
   licensePlate: string | null;
@@ -28,14 +31,38 @@ export function uniqueSuffix(): string {
   return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`.toUpperCase();
 }
 
-/** A random valid 17-character VIN. */
-export function uniqueVin(): string {
-  let vin = '';
-  for (let i = 0; i < 17; i += 1) {
+/**
+ * The VIN prefix of one test run: `E2E` plus a 4-character VIN-safe code
+ * derived from the run's suffix (so cleanup can rebuild it). Every vehicle an
+ * e2e test creates starts with it: the test-only `db:test:e2e-cleanup` script
+ * finds leftovers by the `E2E` VIN prefix.
+ */
+export function vinPrefix(suffix: string): string {
+  let hash = 0;
+  for (const char of suffix) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+  let code = '';
+  for (let i = 0; i < 4; i += 1) {
+    code += VIN_CHARS[hash % VIN_CHARS.length];
+    hash = Math.floor(hash / VIN_CHARS.length);
+  }
+  return `E2E${code}`;
+}
+
+/** A unique valid 17-character VIN: the run's prefix and 10 random characters. */
+export function uniqueVin(suffix: string): string {
+  let vin = vinPrefix(suffix);
+  for (let i = 0; i < 10; i += 1) {
     vin += VIN_CHARS[Math.floor(Math.random() * VIN_CHARS.length)];
   }
   return vin;
 }
+
+/** The seeded catalog entries the e2e tests pick (Toyota, Corolla, Car). */
+export type CatalogRefs = {
+  make: ApiCatalogRef;
+  model: ApiCatalogRef;
+  vehicleType: ApiCatalogRef;
+};
 
 async function expectOk(
   response: Awaited<ReturnType<APIRequestContext['get']>>,
@@ -69,24 +96,92 @@ function auth(token: string) {
   return { Authorization: `Bearer ${token}` };
 }
 
+async function getCatalog<T>(
+  request: APIRequestContext,
+  token: string,
+  path: string,
+  what: string,
+): Promise<T> {
+  const response = await request.get(`${API}${path}`, {
+    headers: auth(token),
+  });
+  await expectOk(response, what);
+  return (await response.json()) as T;
+}
+
+let cachedRefs: Promise<CatalogRefs> | undefined;
+
+/**
+ * Resolves the seeded Toyota, its Corolla and the Car vehicle type. The
+ * catalog is global and read-only, so the answer is cached for the worker.
+ */
+export function catalogRefsViaApi(
+  request: APIRequestContext,
+  token: string,
+): Promise<CatalogRefs> {
+  cachedRefs ??= resolveCatalogRefs(request, token).catch((error: unknown) => {
+    cachedRefs = undefined;
+    throw error;
+  });
+  return cachedRefs;
+}
+
+async function resolveCatalogRefs(
+  request: APIRequestContext,
+  token: string,
+): Promise<CatalogRefs> {
+  const make = await getCatalog<ApiCatalogRef>(
+    request,
+    token,
+    '/master-data/vehicle-makes/toyota',
+    'get make',
+  );
+  const models = await getCatalog<{ data: ApiCatalogRef[] }>(
+    request,
+    token,
+    `/master-data/vehicle-makes/${make.id}/models?search=Corolla`,
+    'list models',
+  );
+  const model = models.data.find((entry) => entry.name === 'Corolla');
+  if (!model) throw new Error('Seeded model "Corolla" not found');
+  const vehicleType = await getCatalog<ApiCatalogRef>(
+    request,
+    token,
+    '/master-data/vehicle-types/car',
+    'get vehicle type',
+  );
+  return {
+    make: { id: make.id, name: make.name },
+    model: { id: model.id, name: model.name },
+    vehicleType: { id: vehicleType.id, name: vehicleType.name },
+  };
+}
+
+/**
+ * Creates a vehicle with the given catalog refs. The VIN starts with the run's
+ * `E2E` prefix (from `suffix`) unless one is given.
+ */
 export async function createVehicleViaApi(
   request: APIRequestContext,
   token: string,
   data: {
-    make: string;
-    model?: string;
+    refs: CatalogRefs;
+    suffix: string;
     year?: number;
     vin?: string;
     licensePlate?: string;
   },
 ): Promise<ApiVehicle> {
+  const { refs, suffix, ...rest } = data;
   const response = await request.post(`${API}/vehicles`, {
     headers: auth(token),
     data: {
-      model: 'E2E Model',
+      makeId: refs.make.id,
+      modelId: refs.model.id,
+      vehicleTypeId: refs.vehicleType.id,
       year: 2020,
-      vin: uniqueVin(),
-      ...data,
+      vin: uniqueVin(suffix),
+      ...rest,
     },
   });
   await expectOk(response, 'create vehicle');
@@ -236,25 +331,42 @@ export async function deleteFuelLogViaApi(
   if (response.status() !== 404) await expectOk(response, 'delete fuel log');
 }
 
-/**
- * Safety net: deletes every vehicle whose make is exactly `make`. Only used
- * with a make that this test run created (`E2E-<suffix>`).
- */
-export async function sweepVehiclesByMake(
+/** Every vehicle whose VIN starts with `prefix`, paging through the list. */
+async function listVehiclesByVinPrefix(
   request: APIRequestContext,
   token: string,
-  make: string,
+  prefix: string,
+): Promise<ApiVehicle[]> {
+  const found: ApiVehicle[] = [];
+  for (let page = 1; ; page += 1) {
+    const response = await request.get(`${API}/vehicles`, {
+      headers: auth(token),
+      params: { page, limit: 100 },
+    });
+    await expectOk(response, 'list vehicles');
+    const body = (await response.json()) as {
+      data: ApiVehicle[];
+      meta: { total: number };
+    };
+    found.push(
+      ...body.data.filter((vehicle) => vehicle.vin.startsWith(prefix)),
+    );
+    if (body.data.length === 0 || page * 100 >= body.meta.total) break;
+  }
+  return found;
+}
+
+/**
+ * Safety net: deletes every vehicle whose VIN starts with `prefix`. Only used
+ * with the prefix of a test run (`vinPrefix(suffix)`).
+ */
+export async function sweepVehiclesByVinPrefix(
+  request: APIRequestContext,
+  token: string,
+  prefix: string,
 ): Promise<void> {
-  const response = await request.get(`${API}/vehicles`, {
-    headers: auth(token),
-    params: { make, limit: 100 },
-  });
-  await expectOk(response, 'list vehicles');
-  const body = (await response.json()) as { data: ApiVehicle[] };
-  for (const vehicle of body.data) {
-    if (vehicle.make.toLowerCase() === make.toLowerCase()) {
-      await deleteVehicleViaApi(request, token, vehicle.id);
-    }
+  for (const vehicle of await listVehiclesByVinPrefix(request, token, prefix)) {
+    await deleteVehicleViaApi(request, token, vehicle.id);
   }
 }
 
@@ -399,7 +511,7 @@ export async function loginStatusViaApi(
 // ---- Drivers and assignments -------------------------------------------
 // Everything an e2e test creates is named so the sweep (and the test-only
 // `db:test:e2e-cleanup` script, see README) can find it: driver firstName
-// `E2E-<suffix>`, licenseNumber `E2E-<SUFFIX>-<n>`, vehicle make `E2E-<suffix>`,
+// `E2E-<suffix>`, licenseNumber `E2E-<SUFFIX>-<n>`, vehicle VIN prefix `E2E`,
 // user email `e2e-<suffix>-<n>@acme-logistics.test`.
 
 export type ApiDriver = {
@@ -415,7 +527,7 @@ export type ApiAssignment = {
   id: string;
   startedAt: string;
   endedAt: string | null;
-  vehicle: { id: string; make: string };
+  vehicle: { id: string; vin: string };
   driver: { id: string; licenseNumber: string };
 };
 
@@ -555,20 +667,13 @@ export async function sweepDriversByLicensePrefix(
   }
 }
 
-/** Like `sweepVehiclesByMake`, but tolerates a vehicle with assignments (409). */
-export async function sweepAssignableVehiclesByMake(
+/** Like `sweepVehiclesByVinPrefix`, but tolerates a vehicle with assignments (409). */
+export async function sweepAssignableVehiclesByVinPrefix(
   request: APIRequestContext,
   token: string,
-  make: string,
+  prefix: string,
 ): Promise<void> {
-  const response = await request.get(`${API}/vehicles`, {
-    headers: auth(token),
-    params: { make, limit: 100 },
-  });
-  await expectOk(response, 'list vehicles');
-  const body = (await response.json()) as { data: ApiVehicle[] };
-  for (const vehicle of body.data) {
-    if (vehicle.make.toLowerCase() !== make.toLowerCase()) continue;
+  for (const vehicle of await listVehiclesByVinPrefix(request, token, prefix)) {
     const deleted = await request.delete(`${API}/vehicles/${vehicle.id}`, {
       headers: auth(token),
     });
@@ -579,23 +684,16 @@ export async function sweepAssignableVehiclesByMake(
 }
 
 /**
- * Deletes every maintenance record and fuel log of the vehicles whose make is
- * exactly `make`, so the vehicles can be deleted afterwards (the API refuses
- * to delete a vehicle that still has records).
+ * Deletes every maintenance record and fuel log of the vehicles whose VIN
+ * starts with `prefix`, so the vehicles can be deleted afterwards (the API
+ * refuses to delete a vehicle that still has records).
  */
-export async function sweepVehicleRecordsByMake(
+export async function sweepVehicleRecordsByVinPrefix(
   request: APIRequestContext,
   token: string,
-  make: string,
+  prefix: string,
 ): Promise<void> {
-  const response = await request.get(`${API}/vehicles`, {
-    headers: auth(token),
-    params: { make, limit: 100 },
-  });
-  await expectOk(response, 'list vehicles');
-  const body = (await response.json()) as { data: ApiVehicle[] };
-  for (const vehicle of body.data) {
-    if (vehicle.make.toLowerCase() !== make.toLowerCase()) continue;
+  for (const vehicle of await listVehiclesByVinPrefix(request, token, prefix)) {
     for (const record of await listMaintenanceRecordsViaApi(
       request,
       token,
@@ -626,14 +724,14 @@ export async function cleanupE2eFixtures(
   suffix: string,
 ): Promise<void> {
   const licensePrefix = `E2E-${suffix}`;
-  const make = `E2E-${suffix}`;
+  const vinsFrom = vinPrefix(suffix);
   try {
     for (const assignment of await listAssignmentsViaApi(request, token, {
       active: true,
     })) {
       if (
         assignment.driver.licenseNumber.startsWith(licensePrefix) ||
-        assignment.vehicle.make === make
+        assignment.vehicle.vin.startsWith(vinsFrom)
       ) {
         await endAssignmentViaApi(request, token, assignment.id);
       }
@@ -650,9 +748,9 @@ export async function cleanupE2eFixtures(
         await sweepDriversByLicensePrefix(request, token, licensePrefix);
       } finally {
         try {
-          await sweepVehicleRecordsByMake(request, token, make);
+          await sweepVehicleRecordsByVinPrefix(request, token, vinsFrom);
         } finally {
-          await sweepAssignableVehiclesByMake(request, token, make);
+          await sweepAssignableVehiclesByVinPrefix(request, token, vinsFrom);
         }
       }
     }

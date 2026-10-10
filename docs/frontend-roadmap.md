@@ -25,7 +25,7 @@ To avoid confusion with the backend roadmap, frontend phases are always called *
 | FE7            | Maintenance + fuel        | Done    | `e2f2bfa`            |
 | FE8            | Dashboard + reporting     | Done    | `04c0178`, `c02f2ff` |
 | FE9            | Production readiness      | Planned | —                    |
-| FE10           | Vehicle master data forms | Planned | —                    |
+| FE10           | Vehicle master data forms | Done    | `24ba80e`            |
 
 ---
 
@@ -578,7 +578,7 @@ For each choice: why it is needed, what it solves, why it fits, and when it is n
 
 ## Frontend Phase 10 — Vehicle master data forms
 
-**Status:** Planned. Starts after Backend [Phase 10](PHASES.md#phase-10--vehicle-master-data) part 3 (vehicle refactor) is done and approved.
+**Status:** Done (built after Backend [Phase 10](PHASES.md#phase-10--vehicle-master-data) part 3, the vehicle refactor).
 
 **Goal:** vehicles are created, edited and filtered with dropdowns from the shared catalog instead of free-text make and model.
 
@@ -595,9 +595,23 @@ For each choice: why it is needed, what it solves, why it fits, and when it is n
 - Vehicle tables, detail pages, assignments and the dashboard show the catalog names returned by the API.
 - Loading, empty ("this make has no models") and error states for each dropdown. The API stays the source of truth for "model belongs to make" (rule 3); the UI only prevents the obvious mistake.
 
+**Built**
+
+- Types: `VehicleCatalogRef`, `VehicleMake(List)`, `VehicleModel(List)` and `VehicleType(List)` in `src/lib/api/types.ts`, from the regenerated OpenAPI types.
+- `src/lib/master-data/master-data-api.ts` (server-only): `listVehicleMakes`, `listVehicleModels(makeId)`, `listVehicleTypes`, each with `includeInactive` and `limit=100` (the catalog is small: 5 makes, 14 models, 6 types).
+- Vehicle form (create and edit): `MakeModelFields` (client component, `vehicles/_components/`) plus a Vehicle type select, all `NativeSelect`. The Model is disabled until a make is chosen; changing the make clears the model and loads its models through the Server Action `loadVehicleModelOptions` (the browser still never calls the API). Loading, empty ("This make has no models") and error (with "Try again") states; a stale answer for a make that is no longer chosen is ignored.
+- Edit: original values are ids. A retired make, model or type is appended as "Name (retired)" so it stays visible and selected; the edit page asks for a retired make's models with `includeInactive`. `changedVehicleFields` always sends `modelId` when `makeId` changed (the API returns 400 otherwise); unchanged ids are not sent.
+- Filters: `makeId`, `modelId` and `vehicleTypeId` in the URL, validated as UUIDs (invalid values are dropped and reported as ignored). The filter selects include retired entries; the Model options are rendered by the server for the URL's make and reloaded through the same action when the make changes. The old `make` and `model` params are ignored.
+- Display: the vehicles table (new Type column), the detail page (Type row, title from names), the costs page and the assignment vehicle options use `.make.name`, `.model.name` and `.vehicleType.name`. Assignment and dashboard summaries still carry plain strings and are unchanged.
+- Catalog 422s (`Vehicle model is retired`, `Vehicle make, model or type is not valid`, ...) are shown as form-level errors by `apiErrorToFormState`.
+- A form reset after a Server Action would put the controlled selects back to their first option, so `MakeModelFields` renders fresh selects after each form `reset` event to re-apply its state.
+- E2E: `catalogRefsViaApi` resolves the seeded Toyota, Corolla and Car; vehicles are named by VIN (`E2E` + run code + random characters, `vinPrefix` and `uniqueVin` in `e2e/support/api.ts`) and swept by VIN prefix, because make, model and type are shared catalog entries. Vehicle lists contain other runs' vehicles, so e2e tests never assert exact counts.
+
 **Out of scope**
 
 - Managing master data (create, edit, retire). Planned for the platform admin dashboard in [`product-roadmap.md`](product-roadmap.md).
+- Searching or paging inside a dropdown (the catalog fits one page of 100).
+- Offering retired entries as new choices: they appear only as the vehicle's own current value (and in the list filters).
 
 ---
 
