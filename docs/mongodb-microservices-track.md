@@ -20,7 +20,7 @@ To avoid confusion with the other roadmaps, stages are always called **Learning 
 | L2    | MongoDB data modeling                | A: MongoDB            | Done    | `518497c` |
 | L3    | Indexing + query performance         | A: MongoDB            | Done    | `ba1960f` |
 | L4    | MongoDB querying                     | A: MongoDB            | Done    | `8139735` |
-| L5    | Aggregation pipeline                 | A: MongoDB            | Done    | (pending) |
+| L5    | Aggregation pipeline                 | A: MongoDB            | Done    | `4e945c3` |
 | L6    | Geospatial features                  | A: MongoDB            | Planned | —         |
 | L7    | NestJS + MongoDB                     | B: Telemetry workload | Planned | —         |
 | L8    | First telemetry prototype            | B: Telemetry workload | Planned | —         |
@@ -378,7 +378,7 @@ Part A is about MongoDB itself. **No FleetOps code changes.** Exercises run agai
 
 ### Learning Stage 5 — Aggregation pipeline
 
-**Status:** Done (pending)
+**Status:** Done (`4e945c3`)
 
 **Goal:** understand why aggregation is useful for telemetry summaries.
 
