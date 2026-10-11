@@ -43,7 +43,8 @@ Each exercise has three parts:
 | L2    | [`l2-data-modeling/`](l2-data-modeling/) | Done   |
 | L3    | [`l3-indexing/`](l3-indexing/)           | Done   |
 | L4    | [`l4-querying/`](l4-querying/)           | Done   |
-| L5–L6 | Added when each stage is approved        | —      |
+| L5    | [`l5-aggregation/`](l5-aggregation/)     | Done   |
+| L6    | Added when the stage is approved         | —      |
 
 ### L1 — MongoDB fundamentals
 
@@ -95,3 +96,15 @@ Exercises use the `learning_l3` database: `docker compose exec mongo mongosh --q
 | [`NOTES.md`](l4-querying/NOTES.md) | Operator pitfalls, index use, the upsert pattern, bulk-write error handling                 |
 
 Exercises use the `learning_l4` database: `docker compose exec mongo mongosh --quiet learning_l4 /learning/l4-querying/01-operators.js`.
+
+### L5 — Aggregation pipeline
+
+| File                                  | Topic                                                                                    |
+| ------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `01-pipeline-basics.js`               | `$match`/`$group`/`$project`/`$set`, accumulators, stage order and index use, `$facet`   |
+| `02-dates-and-time-zones.js`          | Per-day and per-hour grouping in UTC vs `Africa/Cairo`, DST, `$densify` + `$fill`        |
+| `03-distance-fuel-idle.js`            | Window functions: distance, refuels, fuel used, idle episodes, moving averages           |
+| `04-unwind-lookup-summaries.js`       | `$unwind`, `$filter`, `$lookup` placement, `$out` buckets, daily summaries with `$merge` |
+| [`NOTES.md`](l5-aggregation/NOTES.md) | Pipeline rules, SQL comparison, time zones, window functions, stored summaries           |
+
+Exercises use the `learning_l5` database: `docker compose exec mongo mongosh --quiet learning_l5 /learning/l5-aggregation/01-pipeline-basics.js`. Solution 04 needs exercise 04 to have run first.

@@ -20,7 +20,7 @@ To avoid confusion with the other roadmaps, stages are always called **Learning 
 | L2    | MongoDB data modeling                | A: MongoDB            | Done    | `518497c` |
 | L3    | Indexing + query performance         | A: MongoDB            | Done    | `ba1960f` |
 | L4    | MongoDB querying                     | A: MongoDB            | Done    | `8139735` |
-| L5    | Aggregation pipeline                 | A: MongoDB            | Planned | —         |
+| L5    | Aggregation pipeline                 | A: MongoDB            | Done    | (pending) |
 | L6    | Geospatial features                  | A: MongoDB            | Planned | —         |
 | L7    | NestJS + MongoDB                     | B: Telemetry workload | Planned | —         |
 | L8    | First telemetry prototype            | B: Telemetry workload | Planned | —         |
@@ -378,13 +378,56 @@ Part A is about MongoDB itself. **No FleetOps code changes.** Exercises run agai
 
 ### Learning Stage 5 — Aggregation pipeline
 
-**Status:** Planned
+**Status:** Done (pending)
 
 **Goal:** understand why aggregation is useful for telemetry summaries.
 
 **Topics:** `$match`, `$project`, `$group`, `$sort`, `$limit`, `$skip`, `$unwind`, `$lookup`, `$set` / `$addFields`; date operators and time zones; averages, min/max; pipeline order and index use (`$match` first).
 
-**Exercises:** average speed per vehicle per day; distance-related calculations from odometer readings; fuel statistics; readings per vehicle; activity per hour; idle-time analysis (engine on, speed 0).
+**What was learned** (details in [`learning/mongodb/l5-aggregation/NOTES.md`](../learning/mongodb/l5-aggregation/NOTES.md))
+
+- **The tenant `$match` must be the first stage.**
+  - The optimizer moved a `$match` on the group key in front of the `$group`.
+  - It could not move one on an accumulator value, which grouped all 25 920 readings instead of 8 640.
+- **Group first, join later.** `$lookup` runs once per input document: 31 ms after `$group` vs 852 ms on every reading. Tenant joins also match `organizationId`.
+- **Every calendar grouping needs a time zone.**
+  - Three Cairo days of data were four UTC days.
+  - A 07:00–19:00 Cairo shift reads as 04:00–16:00 in UTC.
+  - A fixed `+03:00` offset is wrong after Egypt's DST ends on 29 October; the Olson name `'Africa/Cairo'` handles it.
+- **Some summaries depend on the previous reading** and need window functions (`$setWindowFields`):
+  - fuel used is a sum of drops: about 85 points a day, where max − min gave 75 on refuel days;
+  - refuels and engine-off events are transitions found with `$shift`;
+  - distance without an odometer is the `$integral` of speed over time;
+  - idle episodes come from a gaps-and-islands pattern.
+- **Daily summaries can be stored idempotently.** A `$merge` keyed by organization, vehicle and day can be re-run safely. A 3-day report read 12 summaries instead of 17 280 readings.
+
+**Built**
+
+- Four `mongosh` exercises in `learning/mongodb/l5-aggregation/`:
+  - pipeline basics;
+  - dates and time zones;
+  - distance, fuel and idle time;
+  - `$unwind`, `$lookup` and summaries.
+- Each exercise has worked examples, "your turn" tasks and runnable solutions.
+- A shared seed (`lib/telemetry.js`) of 25 920 readings that behave like driving days: Cairo work shifts, idle stops, an odometer, fuel use with refuels, and diagnostics.
+- `NOTES.md`: pipeline rules, a SQL comparison, time zones, window functions, stored summaries, and what L8 should use.
+
+**Decisions**
+
+1. **Aggregated telemetry for L8:**
+   - A re-runnable `$merge` into a daily summary per vehicle, keyed by organization, vehicle and day in the organization's time zone.
+   - Reports read the summaries; raw readings are read only for short ranges.
+2. **Time zones:** the organization's time zone is data (an Olson name), passed to every date operator.
+3. **Distance and fuel:**
+   - Distance comes from the odometer when present, and from the `$integral` of speed otherwise.
+   - Fuel used comes from drops between consecutive readings.
+4. No change to the FleetOps PostgreSQL schema, and no FleetOps code.
+
+**Deferred**
+
+- `$geoNear` and location-based aggregation (L6).
+- Where summaries live long-term: MongoDB, or PostgreSQL next to the core data (L15).
+- Scheduling the summary job, and late readings after a day was summarized (L8/L12).
 
 ### Learning Stage 6 — Geospatial features
 
