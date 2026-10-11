@@ -66,6 +66,10 @@ describe('MongoConnection', () => {
               key: { organizationId: 1, vehicleId: 1 },
               unique: true,
             },
+            {
+              name: 'org_location_2dsphere',
+              key: { organizationId: 1, location: '2dsphere' },
+            },
           ]),
       });
   };

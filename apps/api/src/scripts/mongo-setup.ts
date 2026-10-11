@@ -2,7 +2,7 @@
  * Creates or reconciles the telemetry collections and indexes (idempotent).
  * Run through `npm run mongo:setup` (dev) or `npm run mongo:test:setup` (test):
  * it needs the built output because env validation relies on decorator metadata.
- * Never drops anything.
+ * Never drops collections or data; drops only indexes listed as retired.
  */
 import 'reflect-metadata';
 import { MongoClient } from 'mongodb';

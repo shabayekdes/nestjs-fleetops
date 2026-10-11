@@ -23,7 +23,7 @@ To avoid confusion with the other roadmaps, stages are always called **Learning 
 | L5    | Aggregation pipeline                 | A: MongoDB            | Done    | `4e945c3` |
 | L6    | Geospatial features                  | A: MongoDB            | Done    | `ff5b7ff` |
 | L7    | NestJS + MongoDB                     | B: Telemetry workload | Done    | `f8f11d8` |
-| L8    | First telemetry prototype            | B: Telemetry workload | Planned | —         |
+| L8    | First telemetry prototype            | B: Telemetry workload | Done    | pending   |
 | L9    | Microservices concepts               | C: Microservices      | Planned | —         |
 | L10   | Extract telemetry                    | C: Microservices      | Planned | —         |
 | L11   | Service-to-service communication     | C: Microservices      | Planned | —         |
@@ -584,7 +584,7 @@ The existing conventions (e.g. "no repositories") are **not** copied automatical
 
 ### Learning Stage 8 — First telemetry prototype
 
-**Status:** Planned
+**Status:** Done (commit pending)
 
 **Goal:** a working telemetry feature that shows what the MongoDB workload looks like in practice.
 
@@ -602,6 +602,89 @@ The existing conventions (e.g. "no repositories") are **not** copied automatical
 **Module boundary (prepares for L10):** the telemetry module does not import other feature modules' internals and does not touch PostgreSQL tables. Its only dependency on the core is one narrow question, "does this vehicle exist in this organization?", behind an interface. Tenant context comes from the existing JWT, as in the core.
 
 **Still a single application.** No microservices yet. The purpose is to understand the workload first.
+
+**Scope decisions (user):** the L8 capabilities above only; ingestion for ADMIN and MANAGER through the JWT; all roles read; geofences deferred; daily averages computed on read; synthetic data; opt-in, one app, no broker, no PostgreSQL schema change, no new dependency.
+
+**What was learned** (verified locally on MongoDB 7.0.43 with `mongodb` 7.7.0)
+
+1. **Query plans** (172 800 readings: 3 organizations x 10 vehicles, one reading every 30 s for 2 days; one vehicle, 24 hours, newest first, limit 100):
+   - The readings page uses `org_vehicle_timestamp` with `$_internalBoundedSort`: 26 keys examined, 24 buckets. The next page examines 16 keys and 14 buckets.
+   - The daily `$group` (time zone Africa/Cairo) examines 26 keys and 24 buckets.
+   - `meta_1_timestamp_1` was never chosen: it indexes the whole `meta` object, so it cannot serve an equality on `meta.organizationId`. Hiding it changes nothing.
+   - Hiding `org_vehicle_timestamp` falls back to a clustered scan of 452 to 752 buckets.
+2. **Cost of `meta_1_timestamp_1`:** about 5 to 12% of insert time (216k readings in batches of 200: 6.3 to 7.0 s with it, 5.9 to 6.2 s without).
+   - Late readings (60 into an hour already written) added exactly one bucket (3 to 4) with and without it, also after a restart.
+   - With it the server attempted a query-based bucket reopen (`numBucketQueriesFailed` 1) and still did not reopen. Without it no query-based reopen is attempted at all.
+3. **Guarded latest status.** Filter `{organizationId, vehicleId, timestamp: {$lt: ts}}` with `upsert: true`:
+   - The first write inserts and a newer one replaces. An older or same-timestamp replay fails with 11000 (the server does not retry because the filter has a range).
+   - An unordered `bulkWrite` reports per-operation `writeErrors` (`[index, 11000]`) and applies the others.
+   - 8 concurrent first upserts for a new vehicle: 3 got 11000 and exactly one document existed. A loser may be the newest reading, so the fix is a retry with a guarded update without upsert (`matchedCount` 0 means stale).
+   - `replaceOne` removes optional fields the newer reading lacks (an exact copy).
+   - The validator runs before the unique check, so a partial `$set` gave 121, not 11000: writes must carry every required field.
+4. **`$geoNear`** on `{organizationId: 1, location: '2dsphere'}` with `query: {organizationId}` uses `org_location_2dsphere` and returns only the caller's vehicle, even when another organization has a vehicle at the identical point. Without `organizationId` in the query the planner fails with 291 (`NoQueryExecutionPlans`).
+5. **Time zones.** `$dateToString` accepts UTC, Africa/Cairo, America/New_York and Etc/GMT+3 and rejects Mars/Base (40485). Mongo and `Intl` both accept a fixed offset such as `+03:00`, which is wrong after a DST change (L5), so the DTO must reject offsets by pattern. 2026-10-30T22:30Z is 31 October in Cairo.
+6. **Body size.** The default Express JSON limit (100 kB) is unchanged. A full reading is about 230 B, so 500 readings would give 413; the batch limit is 200 (about 50 kB).
+
+**Built** (`apps/api/`; no PostgreSQL schema change, no new dependency)
+
+- Seven endpoints under `/api/v1/telemetry`, only when `MONGODB_URI` is set (404 otherwise):
+  - `POST readings` (201) and `POST readings/batch` (200), ADMIN and MANAGER.
+  - `GET vehicles/:vehicleId/readings` (time range, cursor), `GET vehicles/:vehicleId/latest`, `GET vehicles/:vehicleId/daily`, `GET latest` (fleet list, cursor) and `GET latest/near`, all roles.
+- `TelemetryIngestionService` and `TelemetryQueryService` using the typed collections directly, plus pure mappers. `organizationId` comes only from the `AuthUser`, never from the body.
+- The vehicle-existence port `VEHICLE_DIRECTORY` (`vehicle-directory.port.ts`) and its Prisma adapter `PrismaVehicleDirectory` in the vehicles module. `TelemetryModule.register({ imports, vehicleDirectory })` wires it. A boundary test forbids telemetry imports of core feature modules and `database/`.
+- Schema changes through `mongo:setup`: `org_location_2dsphere`, a closed `$jsonSchema` validator on `vehicle_latest_status`, and the retired-index mechanism (`READINGS_RETIRED_INDEXES`, reported as `dropped`).
+- `export-openapi.ts` always documents the telemetry routes; CI checks `openapi.json` with `MONGODB_URI= MONGODB_DB=`. Web types regenerated (no UI).
+
+**Decisions**
+
+- **E1 Documents.** `telemetry_readings`: `timestamp`, `meta {organizationId, vehicleId}` (lowercase UUID strings), `location` as GeoJSON `[lng, lat]` (required), `speedKph`, optional `fuelLevelPercent`, `odometerKm`, `engine {on, rpm?, coolantTempC?}`, and `receivedAt` (server time). Absent optionals are not stored. The API takes `location {latitude, longitude}` and the mapper builds `[lng, lat]`. `vehicle_latest_status` is an exact copy of one reading plus `updatedAt`.
+- **E2 Validation.** DTOs with class-validator; one bad field is a 400 for the whole request.
+  - `timestamp`: strict ISO 8601 with an explicit offset, a real calendar date, at most 5 minutes in the future.
+  - Ranges: latitude, longitude, `speedKph` 0 to 300, fuel 0 to 100, odometer 0 to 10 000 000, rpm integer 0 to 10 000, coolant -50 to 150; batch 1 to 200.
+  - Older than `TELEMETRY_RAW_RETENTION_DAYS` is checked in the service: 422 for a single reading, a per-item rejection in a batch.
+- **E3 Batch.** Always `200` with `{accepted, rejected: [{index, vehicleId, reason}]}`, reason `VEHICLE_NOT_FOUND`, `TOO_OLD` or `STORAGE_REJECTED`; `index` is the request position. **200, not 207:** 207 is WebDAV multistatus (XML), and a plain JSON body plus generated types is simpler for clients. Steps: one directory call for the distinct vehicle IDs, retention check, unordered `insertMany`, map `writeErrors` back to request indexes, update latest. No rejected-readings collection (L12/L13). Infrastructure failures are 503 through `mapMongoError`. Duplicates are stored again (no unique index on a time series), which skews averages slightly.
+- **E4 Latest.** One guarded `replaceOne` per vehicle with the newest stored reading, in one unordered `bulkWrite`. 11000 is retried without upsert for those vehicles only (the race in fact 3). Other failures in this step are logged and do not fail the request: readings are the source of truth, latest is a derived cache. Not atomic with the insert (L14); a repair job is L13.
+- **E5 Vehicle-existence port.** One query per call (`findMany` with `organizationId` and `id in`), no query for an empty list. Reads also call it: an unknown or other-organization vehicle is 404 "Vehicle not found", like the core.
+- **E6 Endpoints.** Readings: `from` and `to` required, `to` after `from`, at most 7 days, limit 1 to 1000 (default 100), newest first, timestamp cursor `before` (the next page starts strictly before the last timestamp; duplicates may skip one reading at a boundary). Fleet list: sorted by `vehicleId`, cursor `after`, limit 1 to 100. Near: radius 1 to 50 000 m (default 5 000), limit 1 to 50, `distanceMeters` rounded to 0.1. Daily: `YYYY-MM-DD` `from` and `to`, `timezone` default `UTC`. The daily pipeline matches a UTC window widened by whole days (no time zone arithmetic in the service), groups by `$dateToString` with the time zone, then keeps only the requested local days. Days without readings are omitted. `distanceKm` is max minus min odometer of the day (resets not handled).
+- **E7 Services.** Ingestion and query services inject the typed collections and the directory; no repository.
+- **E8 Indexes and validator.** `meta_1_timestamp_1` is retired: it is unused (fact 1), costs 5 to 12% of insert time, and showed no late-data difference (fact 2). The cost of dropping it is that no query-based bucket reopen is attempted; re-add it if L13 shows bucket fragmentation. `mongo:setup` drops only indexes listed as retired and reports them as `dropped`; the boot check ignores a retired index that is still present. The rule is now "never drops collections or data". `vehicle_latest_status` gets `org_location_2dsphere` and a closed validator (required measurements, ranges, `engine.on` required). **Existing databases must re-run `mongo:setup`** or the API refuses to boot.
+- **E9 OpenAPI determinism.** The export script sets unreachable placeholder Mongo env values (`||=`, so an empty value is also replaced). The telemetry paths are always in `openapi.json`; the live `/api/docs` shows them only when telemetry is enabled.
+- **E10 Errors.** The 11000 case in latest is handled in E4, bulk errors per item in E3, and the time zone is validated so 40485 never reaches the server.
+- **E11 Web.** No UI; `api:types` regenerated.
+- **CTO-made choices (not asked of the user):**
+  1. The time zone is a query parameter, default `UTC`, because an organization time zone column would need a PostgreSQL change.
+  2. A DRIVER reads the telemetry of every vehicle in the organization (as `GET /vehicles` does); per-role location rules are deferred.
+  3. Deleting a vehicle keeps its Mongo latest status until L11.
+
+**Deviations that changed the API contract** (found during implementation)
+
+- The daily range is an inclusive day count: at most 31 days, so `to - from` is at most 30 days. `to` may equal `from`.
+- A single reading for an unknown vehicle is 404 before the retention check can give 422.
+- Latest responses also carry `updatedAt`; daily and near values are rounded to 1 decimal.
+
+**Bug found by QA:** `@ValidateNested()` skips an `undefined` value, so a reading without `location` passed validation and reached Mongo (validator error 121, a 500). Fixed with `@IsDefined()` on `location`.
+
+**Bug found in review:** `isIsoInstant` accepted impossible dates because `Date.parse` rolls them over (2026-02-30 became 2 March). The day, hour (24), minute (60), second (60) and offset are now checked on the string, leap years included.
+
+**Not done (by design):** geofences, a rejected-readings collection, stored daily summaries, a scheduler, a UI, per-role location rules, an organization time zone, real devices.
+
+**Deferred**
+
+- A rejected-readings collection and a latest-status repair job (L12/L13).
+- Duplicate readings (L13).
+- Geofence events (L12/L13).
+- An organization time zone column.
+- Per-role location access.
+- Vehicle-deleted events (L11). Until then deleted vehicles still appear in the fleet list and in near results, because latest status is not cleaned up.
+- Stored `$merge` summaries and a scheduler (L12).
+- `$integral` or window-function distance and fuel use.
+- Atomicity between readings and latest status (L14).
+- A `MongoBulkWriteError` without `writeErrors` (for example a write concern error) becomes a 500, not a 503 (L13/L14).
+- The `uname -r` result of the CI runner and the CI run of the drift step (after the first CI run; the L7 CI-kernel item stays open).
+
+**Not yet:** a second service, a broker, real devices.
+
+**L9 is next.**
 
 ---
 

@@ -15,6 +15,7 @@ import { MasterDataModule } from './master-data/master-data.module.js';
 import { isTelemetryEnabled } from './telemetry/telemetry-config.js';
 import { TelemetryModule } from './telemetry/telemetry.module.js';
 import { UsersModule } from './users/users.module.js';
+import { PrismaVehicleDirectory } from './vehicles/prisma-vehicle-directory.js';
 import { VehiclesModule } from './vehicles/vehicles.module.js';
 
 @Module({
@@ -37,7 +38,13 @@ import { VehiclesModule } from './vehicles/vehicles.module.js';
     CostSummaryModule,
     DashboardModule,
     MasterDataModule,
-    ConditionalModule.registerWhen(TelemetryModule, isTelemetryEnabled),
+    ConditionalModule.registerWhen(
+      TelemetryModule.register({
+        imports: [VehiclesModule],
+        vehicleDirectory: PrismaVehicleDirectory,
+      }),
+      isTelemetryEnabled,
+    ),
   ],
   controllers: [AppController],
 })

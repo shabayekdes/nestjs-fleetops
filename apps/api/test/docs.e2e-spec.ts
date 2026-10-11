@@ -4,6 +4,7 @@ import request from 'supertest';
 import { App } from 'supertest/types.js';
 import { AppModule } from '../src/app.module.js';
 import { configureApp } from '../src/app.setup.js';
+import { mongoTestEnv } from './utils/mongo-test-env.js';
 
 interface Doc {
   openapi: string;
@@ -44,6 +45,18 @@ describe('API docs (e2e)', () => {
     expect(doc.paths['/api/v1/vehicles'].get.security).toEqual([
       { bearer: [] },
     ]);
+  });
+
+  it('documents telemetry with bearer auth only when Mongo is configured', async () => {
+    const doc = (await request(app.getHttpServer()).get('/api/docs-json'))
+      .body as Doc;
+    if (mongoTestEnv()) {
+      expect(doc.paths['/api/v1/telemetry/readings'].post.security).toEqual([
+        { bearer: [] },
+      ]);
+    } else {
+      expect(doc.paths).not.toHaveProperty('/api/v1/telemetry/readings');
+    }
   });
 
   it('serves the UI', async () => {

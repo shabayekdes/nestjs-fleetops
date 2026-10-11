@@ -1,6 +1,8 @@
 import type { CollectionInfo, IndexDescriptionInfo } from 'mongodb';
 import {
   findSchemaProblems,
+  LATEST_STATUS_VALIDATOR,
+  READINGS_RETIRED_INDEXES,
   TELEMETRY_READINGS,
   telemetryReadingsOptions,
   VEHICLE_LATEST_STATUS,
@@ -28,7 +30,7 @@ const latest = (): CollectionInfo => ({
 
 const idx = (
   name: string,
-  key: Record<string, number>,
+  key: Record<string, 1 | -1 | '2dsphere'>,
   unique?: boolean,
 ): IndexDescriptionInfo => ({ v: 2, name, key, ...(unique ? { unique } : {}) });
 
@@ -41,9 +43,12 @@ const readingsIndex = () =>
 const latestIndex = () =>
   idx('org_vehicle_unique', { organizationId: 1, vehicleId: 1 }, true);
 
+const geoIndex = () =>
+  idx('org_location_2dsphere', { organizationId: 1, location: '2dsphere' });
+
 const goodIndexes = (): Record<string, IndexDescriptionInfo[]> => ({
   [TELEMETRY_READINGS]: [readingsIndex()],
-  [VEHICLE_LATEST_STATUS]: [latestIndex()],
+  [VEHICLE_LATEST_STATUS]: [latestIndex(), geoIndex()],
 });
 
 describe('telemetryReadingsOptions', () => {
@@ -68,7 +73,7 @@ describe('findSchemaProblems', () => {
 
   it('reports a missing readings collection', () => {
     const problems = findSchemaProblems([latest()], {
-      [VEHICLE_LATEST_STATUS]: [latestIndex()],
+      [VEHICLE_LATEST_STATUS]: [latestIndex(), geoIndex()],
     });
     expect(problems).toEqual([`collection ${TELEMETRY_READINGS} is missing`]);
   });
@@ -132,7 +137,7 @@ describe('findSchemaProblems', () => {
   it('reports a missing latest status index', () => {
     const problems = findSchemaProblems([readings(), latest()], {
       ...goodIndexes(),
-      [VEHICLE_LATEST_STATUS]: [],
+      [VEHICLE_LATEST_STATUS]: [geoIndex()],
     });
     expect(problems).toEqual([
       `index ${VEHICLE_LATEST_STATUS}.org_vehicle_unique is missing`,
@@ -172,6 +177,7 @@ describe('findSchemaProblems', () => {
       ...goodIndexes(),
       [VEHICLE_LATEST_STATUS]: [
         idx('org_vehicle_unique', { organizationId: 1, vehicleId: 1 }),
+        geoIndex(),
       ],
     });
     expect(problems).toHaveLength(1);
@@ -190,5 +196,103 @@ describe('findSchemaProblems', () => {
     const drifted = readings();
     (drifted.options as Record<string, unknown>).expireAfterSeconds = 60;
     expect(findSchemaProblems([drifted, latest()], goodIndexes())).toEqual([]);
+  });
+});
+
+describe('L8 schema additions', () => {
+  it('requires the organization 2dsphere index on latest status', () => {
+    const problems = findSchemaProblems([readings(), latest()], {
+      ...goodIndexes(),
+      [VEHICLE_LATEST_STATUS]: [latestIndex()],
+    });
+    expect(problems).toEqual([
+      `index ${VEHICLE_LATEST_STATUS}.org_location_2dsphere is missing`,
+    ]);
+  });
+
+  it('reports a 2dsphere index with a different key', () => {
+    const problems = findSchemaProblems([readings(), latest()], {
+      ...goodIndexes(),
+      [VEHICLE_LATEST_STATUS]: [
+        latestIndex(),
+        idx('org_location_2dsphere', { location: '2dsphere' }),
+      ],
+    });
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toContain('different definition');
+  });
+
+  it('does not treat a present retired index as a problem', () => {
+    expect(READINGS_RETIRED_INDEXES).toEqual(['meta_1_timestamp_1']);
+    const indexes = goodIndexes();
+    for (const name of READINGS_RETIRED_INDEXES) {
+      indexes[TELEMETRY_READINGS].push(idx(name, { meta: 1, timestamp: 1 }));
+    }
+    expect(findSchemaProblems([readings(), latest()], indexes)).toEqual([]);
+  });
+
+  describe('LATEST_STATUS_VALIDATOR', () => {
+    const schema = LATEST_STATUS_VALIDATOR.$jsonSchema as {
+      required: string[];
+      additionalProperties: boolean;
+      properties: Record<string, Record<string, unknown>>;
+    };
+
+    it('is closed and requires the full reading copy', () => {
+      expect(schema.additionalProperties).toBe(false);
+      expect([...schema.required].sort()).toEqual(
+        [
+          'location',
+          'organizationId',
+          'receivedAt',
+          'speedKph',
+          'timestamp',
+          'updatedAt',
+          'vehicleId',
+        ].sort(),
+      );
+      expect(Object.keys(schema.properties).sort()).toEqual(
+        [
+          '_id',
+          'engine',
+          'fuelLevelPercent',
+          'location',
+          'odometerKm',
+          'organizationId',
+          'receivedAt',
+          'speedKph',
+          'timestamp',
+          'updatedAt',
+          'vehicleId',
+        ].sort(),
+      );
+    });
+
+    it('bounds the measurements', () => {
+      expect(schema.properties.speedKph).toMatchObject({
+        minimum: 0,
+        maximum: 300,
+      });
+      expect(schema.properties.fuelLevelPercent).toMatchObject({
+        minimum: 0,
+        maximum: 100,
+      });
+      expect(schema.properties.odometerKm).toMatchObject({ minimum: 0 });
+      const engine = schema.properties.engine as {
+        required: string[];
+        additionalProperties: boolean;
+        properties: Record<string, unknown>;
+      };
+      expect(engine.required).toEqual(['on']);
+      expect(engine.additionalProperties).toBe(false);
+      expect(engine.properties.rpm).toMatchObject({
+        minimum: 0,
+        maximum: 10000,
+      });
+      expect(engine.properties.coolantTempC).toMatchObject({
+        minimum: -50,
+        maximum: 150,
+      });
+    });
   });
 });

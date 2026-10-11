@@ -18,6 +18,7 @@ export const TELEMETRY_READINGS = 'telemetry_readings';
 export const VEHICLE_LATEST_STATUS = 'vehicle_latest_status';
 
 const NAMESPACE_EXISTS = 48;
+const INDEX_NOT_FOUND = 27;
 const INDEX_OPTIONS_CONFLICT = 85;
 const INDEX_KEY_SPECS_CONFLICT = 86;
 
@@ -33,7 +34,7 @@ export class TelemetrySchemaError extends Error {
 
 export interface IndexSpec {
   name: string;
-  key: Record<string, 1 | -1>;
+  key: Record<string, 1 | -1 | '2dsphere'>;
   unique?: boolean;
 }
 
@@ -60,6 +61,13 @@ export function telemetryReadingsOptions(
   };
 }
 
+/**
+ * Indexes the setup script drops when present. meta_1_timestamp_1 is created
+ * automatically by MongoDB on time series collections; it indexes the whole
+ * meta object, so no query here can use it, and it costs 5-12% insert time.
+ */
+export const READINGS_RETIRED_INDEXES: string[] = ['meta_1_timestamp_1'];
+
 // MongoDB 7.0 rejects a validator on time series collections, so readings are
 // validated only for the timestamp type (by the server) and by the app.
 export const READINGS_INDEXES: IndexSpec[] = [
@@ -71,15 +79,29 @@ export const READINGS_INDEXES: IndexSpec[] = [
 
 const uuidString = { bsonType: 'string', pattern: UUID_PATTERN };
 
+const number = (extra: Record<string, unknown> = {}) => ({
+  bsonType: ['double', 'int', 'long'],
+  ...extra,
+});
+
 export const LATEST_STATUS_VALIDATOR: Document = {
   $jsonSchema: {
     bsonType: 'object',
-    required: ['organizationId', 'vehicleId', 'timestamp', 'updatedAt'],
+    additionalProperties: false,
+    required: [
+      'organizationId',
+      'vehicleId',
+      'timestamp',
+      'location',
+      'speedKph',
+      'receivedAt',
+      'updatedAt',
+    ],
     properties: {
+      _id: { bsonType: 'objectId' },
       organizationId: uuidString,
       vehicleId: uuidString,
       timestamp: { bsonType: 'date' },
-      updatedAt: { bsonType: 'date' },
       location: {
         bsonType: 'object',
         required: ['type', 'coordinates'],
@@ -97,6 +119,21 @@ export const LATEST_STATUS_VALIDATOR: Document = {
           },
         },
       },
+      speedKph: number({ minimum: 0, maximum: 300 }),
+      fuelLevelPercent: number({ minimum: 0, maximum: 100 }),
+      odometerKm: number({ minimum: 0 }),
+      engine: {
+        bsonType: 'object',
+        required: ['on'],
+        additionalProperties: false,
+        properties: {
+          on: { bsonType: 'bool' },
+          rpm: number({ minimum: 0, maximum: 10000 }),
+          coolantTempC: number({ minimum: -50, maximum: 150 }),
+        },
+      },
+      receivedAt: { bsonType: 'date' },
+      updatedAt: { bsonType: 'date' },
     },
   },
 };
@@ -112,6 +149,10 @@ export const LATEST_STATUS_INDEXES: IndexSpec[] = [
     name: 'org_vehicle_unique',
     key: { organizationId: 1, vehicleId: 1 },
     unique: true,
+  },
+  {
+    name: 'org_location_2dsphere',
+    key: { organizationId: 1, location: '2dsphere' },
   },
 ];
 
@@ -204,6 +245,7 @@ export interface EnsureReport {
   created: string[];
   updated: string[];
   unchanged: string[];
+  dropped: string[];
 }
 
 const hasCode = (
@@ -237,13 +279,19 @@ async function findCollection(
 
 /**
  * Idempotent and concurrency-safe. Creates what is missing, reconciles
- * retention and the validator with collMod, and never drops anything.
+ * retention and the validator with collMod. Never drops collections or data;
+ * drops only indexes listed as retired.
  */
 export async function ensureTelemetrySchema(
   db: Db,
   { retentionDays }: { retentionDays: number },
 ): Promise<EnsureReport> {
-  const report: EnsureReport = { created: [], updated: [], unchanged: [] };
+  const report: EnsureReport = {
+    created: [],
+    updated: [],
+    unchanged: [],
+    dropped: [],
+  };
 
   const createOrFind = async (
     name: string,
@@ -324,7 +372,23 @@ export async function ensureTelemetrySchema(
   ];
   for (const [collectionName, specs] of wantedIndexes) {
     const collection = db.collection(collectionName);
-    const found = await listIndexes(db, collectionName);
+    let found = await listIndexes(db, collectionName);
+    if (collectionName === TELEMETRY_READINGS) {
+      for (const retired of READINGS_RETIRED_INDEXES) {
+        if (!found.some((i) => i.name === retired)) continue;
+        try {
+          await collection.dropIndex(retired);
+        } catch (error) {
+          // A concurrent setup run may have dropped it already.
+          if (!hasCode(error, INDEX_NOT_FOUND)) throw error;
+          continue;
+        }
+        report.dropped.push(`index ${collectionName}.${retired}`);
+      }
+      found = found.filter(
+        (i) => !READINGS_RETIRED_INDEXES.includes(i.name ?? ''),
+      );
+    }
     for (const spec of specs) {
       const label = `index ${collectionName}.${spec.name}`;
       const current = found.find((i) => i.name === spec.name);

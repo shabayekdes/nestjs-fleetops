@@ -53,6 +53,17 @@ describe('Telemetry disabled (e2e)', () => {
     });
   });
 
+  it('does not expose telemetry routes (GET latest and POST readings return 404)', async () => {
+    const get = await request(app.getHttpServer()).get(
+      '/api/v1/telemetry/latest',
+    );
+    const post = await request(app.getHttpServer())
+      .post('/api/v1/telemetry/readings')
+      .send({});
+    expect(get.status).toBe(404);
+    expect(post.status).toBe(404);
+  });
+
   it('does not register the Mongo connection', () => {
     expect(() => app.get(MongoConnection, { strict: false })).toThrow();
   });

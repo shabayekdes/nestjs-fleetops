@@ -186,17 +186,17 @@ Passwords are stored as Argon2id hashes. Records are upserted on their natural k
 
 ## MongoDB (telemetry, optional)
 
-The telemetry module (L7: infrastructure only, no endpoints yet) is opt-in. Without `MONGODB_URI` the API starts, tests and reports ready without MongoDB, and `/api/v1/health/ready` shows `"telemetry":"disabled"`.
+The telemetry module (L7 infrastructure, L8 ingestion and query endpoints) is opt-in. With telemetry disabled its routes return 404. Without `MONGODB_URI` the API starts, tests and reports ready without MongoDB, and `/api/v1/health/ready` shows `"telemetry":"disabled"`.
 
 ```bash
 docker compose up -d --wait mongo   # from the repo root: MongoDB 7.0 on 127.0.0.1:27018 (profile "telemetry")
 # .env
 # MONGODB_URI="mongodb://127.0.0.1:27018"
 # MONGODB_DB=fleetops_telemetry_dev
-npm run mongo:setup                 # create/reconcile collections and indexes (idempotent, never drops)
+npm run mongo:setup                 # create/reconcile collections and indexes (idempotent; drops only indexes listed as retired)
 ```
 
-MongoDB has no migration system: the schema lives in `src/telemetry/mongo/telemetry-schema.ts` and `npm run mongo:setup` applies it (run it after enabling telemetry and whenever the schema code changes). `npm run mongo:setup` runs `nest build`, so it needs dev dependencies; in a runtime image the step is `node dist/scripts/mongo-setup.js`. No deploy runs it today because telemetry is disabled in production. It creates the `telemetry_readings` time series collection (retention from `TELEMETRY_RAW_RETENTION_DAYS`) and the `vehicle_latest_status` collection with a `$jsonSchema` validator (written from L8).
+MongoDB has no migration system: the schema lives in `src/telemetry/mongo/telemetry-schema.ts` and `npm run mongo:setup` applies it (run it after enabling telemetry and whenever the schema code changes). `npm run mongo:setup` runs `nest build`, so it needs dev dependencies; in a runtime image the step is `node dist/scripts/mongo-setup.js`. No deploy runs it today because telemetry is disabled in production. It creates the `telemetry_readings` time series collection (retention from `TELEMETRY_RAW_RETENTION_DAYS`) and the `vehicle_latest_status` collection with a closed `$jsonSchema` validator plus a `(organizationId, 2dsphere location)` index for proximity queries. It also drops the retired index `meta_1_timestamp_1` that MongoDB creates automatically on time series collections (nothing can use it and it costs 5-12% insert time) and reports it as `dropped`. **After pulling L8, re-run `npm run mongo:setup` (and `npm run mongo:test:setup`) on every existing database: the new index is required and the API refuses to boot without it.**
 
 When `MONGODB_URI` is set, the API fails fast at startup if MongoDB is unreachable or the schema is missing or does not match (the error says to run `npm run mongo:setup`). The boot check is read-only; retention and validator differences do not fail the boot.
 
@@ -252,6 +252,13 @@ All routes are served under the `/api` prefix with URI versioning (default versi
 | GET    | `/api/v1/health`                                      | Application + database health (200 / 503)                                                 |
 | GET    | `/api/v1/health/live`                                 | Liveness: always 200, touches no dependency                                               |
 | GET    | `/api/v1/health/ready`                                | Readiness: database up and migrations applied, plus informational `telemetry` (200 / 503) |
+| POST   | `/api/v1/telemetry/readings`                          | Telemetry enabled, bearer token, ADMIN or MANAGER. Ingest one reading (201)               |
+| POST   | `/api/v1/telemetry/readings/batch`                    | Telemetry enabled, ADMIN or MANAGER. Ingest 1-200 readings (200, per-reading outcome)     |
+| GET    | `/api/v1/telemetry/vehicles/:vehicleId/readings`      | Telemetry enabled, any role. Readings in `from`..`to` (max 7 days), newest first, cursor  |
+| GET    | `/api/v1/telemetry/vehicles/:vehicleId/latest`        | Telemetry enabled, any role. Latest status of a vehicle                                   |
+| GET    | `/api/v1/telemetry/vehicles/:vehicleId/daily`         | Telemetry enabled, any role. Daily summaries (`from`, `to`, `timezone`, max 31 days)      |
+| GET    | `/api/v1/telemetry/latest`                            | Telemetry enabled, any role. Latest status of every vehicle (cursor `after`)              |
+| GET    | `/api/v1/telemetry/latest/near`                       | Telemetry enabled, any role. Vehicles within `radiusMeters` of a point, nearest first     |
 | POST   | `/api/v1/auth/login`                                  | Public. Exchange credentials for an access token                                          |
 | GET    | `/api/v1/auth/me`                                     | Bearer token. Current user profile (with role and organization)                           |
 | PATCH  | `/api/v1/auth/me/password`                            | Bearer token, any role. Change own password (204)                                         |
@@ -508,6 +515,18 @@ curl http://localhost:3000/api/v1/master-data/vehicle-types -H "Authorization: B
 - Vehicle types are a flat list with the same list rules, plus `GET /vehicle-types/:slug` (404 if unknown).
 - `vehicles` has required `make_id`, `model_id` (composite FK, so a model always belongs to the vehicle's make) and `vehicle_type_id` columns; the legacy `make` / `model` strings were dropped. The vehicles API reads and writes them (see Vehicles).
 
+### Telemetry (L8, optional)
+
+Routes exist only when `MONGODB_URI` is set. Readers (any role, including DRIVER) see every vehicle in their organization; ingestion is ADMIN or MANAGER. `organizationId` is never accepted in a body: it comes from the token, and a vehicle of another organization is a 404 like an unknown one.
+
+- Ingestion: `timestamp` is ISO 8601 with an explicit `Z` or `+hh:mm` offset, at most 5 minutes in the future and not older than `TELEMETRY_RAW_RETENTION_DAYS`. Ranges: latitude -90..90, longitude -180..180, `speedKph` 0..300, `fuelLevelPercent` 0..100, `odometerKm` 0..10,000,000, `engine.rpm` integer 0..10,000, `engine.coolantTempC` -50..150. Any invalid field fails the whole request with 400. A single reading older than retention is 422.
+- Batch (`readings`: 1-200 items, kept under the 100 kB JSON body limit): always `200` with `{ "accepted": n, "rejected": [{ "index", "vehicleId", "reason" }] }`. `index` is the position in the request; `reason` is `VEHICLE_NOT_FOUND`, `TOO_OLD` or `STORAGE_REJECTED`. Storage outages are `503`.
+- Duplicates are stored again (time series collections have no unique index), so a replayed reading skews averages slightly.
+- `vehicle_latest_status` is a derived copy of each vehicle's newest reading, updated after the insert with a timestamp guard, so late or replayed readings never overwrite newer state. It is not atomic with the insert; a failed update is logged and does not fail the request. Deleting a vehicle keeps its latest status until a later stage.
+- Readings: `from` and `to` are required (`to` after `from`, at most 7 days), `limit` 1-1000 (default 100). Follow `meta.nextCursor` as `before` until it is `null`. The cursor is a timestamp, so two readings with the same timestamp (duplicates) may skip one at a page boundary.
+- Daily: `from`/`to` are `YYYY-MM-DD` (inclusive, at most 31 days), `timezone` is an IANA name (default `UTC`, e.g. `Africa/Cairo`); fixed offsets such as `+03:00` are rejected. Computed on read. Days with no readings are omitted; `distanceKm` is max minus min odometer of the day (resets are not handled).
+- Near: `latitude`, `longitude`, `radiusMeters` 1-50,000 (default 5,000), `limit` 1-50 (default 10).
+
 ### OpenAPI contract (`openapi.json`)
 
 `apps/api/openapi.json` is the committed OpenAPI document and the contract the web app generates its types from. Regenerate it after any DTO or controller change:
@@ -516,7 +535,7 @@ curl http://localhost:3000/api/v1/master-data/vehicle-types -H "Authorization: B
 npm run openapi:export   # nest build, then writes openapi.json
 ```
 
-The export needs no database: the app is created but never initialised, and placeholder `DATABASE_URL` / `JWT_SECRET` values are used only when those variables are unset. CI re-exports the document and fails if `openapi.json` differs from the committed file.
+The export needs no database: the app is created but never initialised, and placeholder `DATABASE_URL` / `JWT_SECRET` values are used only when those variables are unset. `MONGODB_URI` / `MONGODB_DB` are set to unreachable placeholders when unset or empty, so the telemetry paths are always in the document whatever your `.env` says (CI checks it with `MONGODB_URI= MONGODB_DB=`). The live `/api/docs` shows telemetry routes only when telemetry is enabled. CI re-exports the document and fails if `openapi.json` differs from the committed file.
 
 ### Error format
 

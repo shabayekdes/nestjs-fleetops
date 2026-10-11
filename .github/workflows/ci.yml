@@ -67,7 +67,7 @@ jobs:
       - run: npm run test:e2e
       - run: npm run build
       - name: Check committed OpenAPI document is up to date
-        run: node dist/scripts/export-openapi.js && git diff --exit-code -- openapi.json
+        run: MONGODB_URI= MONGODB_DB= node dist/scripts/export-openapi.js && git diff --exit-code -- openapi.json
 
   web:
     runs-on: ubuntu-latest

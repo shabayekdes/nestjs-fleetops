@@ -495,6 +495,119 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/telemetry/readings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["TelemetryController_ingestOne_v1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/telemetry/readings/batch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Always 200: per-reading outcomes are in the body (accepted, rejected). */
+        post: operations["TelemetryController_ingestBatch_v1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/telemetry/latest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["TelemetryController_listLatest_v1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/telemetry/latest/near": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["TelemetryController_findNear_v1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/telemetry/vehicles/{vehicleId}/readings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["TelemetryController_findReadings_v1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/telemetry/vehicles/{vehicleId}/latest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["TelemetryController_findLatest_v1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/telemetry/vehicles/{vehicleId}/daily": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["TelemetryController_findDaily_v1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1005,6 +1118,144 @@ export interface components {
                 limit: number;
                 total: number;
             };
+        };
+        TelemetryLocationDto: {
+            /** @description Degrees, -90..90. */
+            latitude: number;
+            /** @description Degrees, -180..180. */
+            longitude: number;
+        };
+        TelemetryEngineDto: {
+            on: boolean;
+            rpm?: number;
+            coolantTempC?: number;
+        };
+        CreateTelemetryReadingDto: {
+            /**
+             * Format: uuid
+             * @description UUIDv7 of a vehicle in your organization.
+             */
+            vehicleId: string;
+            /** @description ISO 8601 with an explicit offset, at most 5 minutes in the future. */
+            timestamp: string;
+            location: components["schemas"]["TelemetryLocationDto"];
+            speedKph: number;
+            fuelLevelPercent?: number;
+            odometerKm?: number;
+            engine?: components["schemas"]["TelemetryEngineDto"];
+        };
+        LocationResponseDto: {
+            latitude: number;
+            longitude: number;
+        };
+        EngineResponseDto: {
+            on: boolean;
+            rpm: number | null;
+            coolantTempC: number | null;
+        };
+        TelemetryReadingResponseDto: {
+            vehicleId: string;
+            /** Format: date-time */
+            timestamp: string;
+            location: components["schemas"]["LocationResponseDto"];
+            speedKph: number;
+            fuelLevelPercent: number | null;
+            odometerKm: number | null;
+            engine: components["schemas"]["EngineResponseDto"] | null;
+            /**
+             * Format: date-time
+             * @description Server time when the reading was accepted.
+             */
+            receivedAt: string;
+        };
+        BatchTelemetryReadingsDto: {
+            /** @description 1 to 200 readings. */
+            readings: components["schemas"]["CreateTelemetryReadingDto"][];
+        };
+        RejectedReadingDto: {
+            /** @description Position of the reading in the request. */
+            index: number;
+            vehicleId: string;
+            /** @enum {string} */
+            reason: "VEHICLE_NOT_FOUND" | "TOO_OLD" | "STORAGE_REJECTED";
+        };
+        BatchIngestResponseDto: {
+            accepted: number;
+            rejected: components["schemas"]["RejectedReadingDto"][];
+        };
+        VehicleLatestStatusResponseDto: {
+            vehicleId: string;
+            /** Format: date-time */
+            timestamp: string;
+            location: components["schemas"]["LocationResponseDto"];
+            speedKph: number;
+            fuelLevelPercent: number | null;
+            odometerKm: number | null;
+            engine: components["schemas"]["EngineResponseDto"] | null;
+            /**
+             * Format: date-time
+             * @description Server time when the reading was accepted.
+             */
+            receivedAt: string;
+            /**
+             * Format: date-time
+             * @description When this latest-status document was last written.
+             */
+            updatedAt: string;
+        };
+        CursorMetaDto: {
+            limit: number;
+            /** @description Pass back as the cursor parameter for the next page, null at the end. */
+            nextCursor: string | null;
+        };
+        LatestStatusListResponseDto: {
+            data: components["schemas"]["VehicleLatestStatusResponseDto"][];
+            meta: components["schemas"]["CursorMetaDto"];
+        };
+        NearbyVehicleResponseDto: {
+            vehicleId: string;
+            /** Format: date-time */
+            timestamp: string;
+            location: components["schemas"]["LocationResponseDto"];
+            speedKph: number;
+            fuelLevelPercent: number | null;
+            odometerKm: number | null;
+            engine: components["schemas"]["EngineResponseDto"] | null;
+            /**
+             * Format: date-time
+             * @description Server time when the reading was accepted.
+             */
+            receivedAt: string;
+            /**
+             * Format: date-time
+             * @description When this latest-status document was last written.
+             */
+            updatedAt: string;
+            distanceMeters: number;
+        };
+        NearbyVehiclesResponseDto: {
+            data: components["schemas"]["NearbyVehicleResponseDto"][];
+        };
+        TelemetryReadingListResponseDto: {
+            data: components["schemas"]["TelemetryReadingResponseDto"][];
+            meta: components["schemas"]["CursorMetaDto"];
+        };
+        DailySummaryDto: {
+            /** @description Local day (YYYY-MM-DD) in the requested time zone. */
+            date: string;
+            readings: number;
+            avgSpeedKph: number | null;
+            maxSpeedKph: number | null;
+            avgFuelLevelPercent: number | null;
+            /** @description max(odometerKm) - min(odometerKm) of the day; odometer resets are not handled. */
+            distanceKm: number | null;
+        };
+        DailySummaryListResponseDto: {
+            vehicleId: string;
+            timezone: string;
+            from: string;
+            to: string;
+            data: components["schemas"]["DailySummaryDto"][];
         };
     };
     responses: never;
@@ -2443,6 +2694,241 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["VehicleTypeResponseDto"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    TelemetryController_ingestOne_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateTelemetryReadingDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelemetryReadingResponseDto"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    TelemetryController_ingestBatch_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BatchTelemetryReadingsDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BatchIngestResponseDto"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    TelemetryController_listLatest_v1: {
+        parameters: {
+            query: {
+                /** @description Cursor: only vehicles with a greater id (from nextCursor). */
+                after?: string;
+                limit: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LatestStatusListResponseDto"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    TelemetryController_findNear_v1: {
+        parameters: {
+            query: {
+                latitude: number;
+                longitude: number;
+                /** @description Search radius in meters, 1..50000. */
+                radiusMeters: number;
+                limit: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NearbyVehiclesResponseDto"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    TelemetryController_findReadings_v1: {
+        parameters: {
+            query: {
+                /** @description Inclusive lower bound, ISO 8601 with an explicit offset. */
+                from: string;
+                /** @description Inclusive upper bound, after from and at most 7 days later. */
+                to: string;
+                /** @description Cursor: only readings strictly older than this (from nextCursor). */
+                before?: string;
+                limit: number;
+            };
+            header?: never;
+            path: {
+                vehicleId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelemetryReadingListResponseDto"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    TelemetryController_findLatest_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                vehicleId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VehicleLatestStatusResponseDto"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponseDto"];
+                };
+            };
+        };
+    };
+    TelemetryController_findDaily_v1: {
+        parameters: {
+            query: {
+                /** @description First local day, YYYY-MM-DD. */
+                from: string;
+                /** @description Last local day (inclusive), YYYY-MM-DD, at most 31 days from `from`. */
+                to: string;
+                /** @description IANA time zone used to bucket days. Fixed offsets are rejected. */
+                timezone: string;
+            };
+            header?: never;
+            path: {
+                vehicleId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DailySummaryListResponseDto"];
                 };
             };
             /** @description Error */

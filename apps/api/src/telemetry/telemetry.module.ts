@@ -1,4 +1,9 @@
-import { Module } from '@nestjs/common';
+import {
+  type DynamicModule,
+  type ModuleMetadata,
+  Module,
+  type Type,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { type Db, MongoClient } from 'mongodb';
 import type { EnvironmentVariables } from '../config/env.validation.js';
@@ -19,13 +24,31 @@ import {
   VEHICLE_LATEST_STATUS,
 } from './mongo/telemetry-schema.js';
 import { buildMongoClientOptions } from './telemetry-config.js';
+import { TelemetryController } from './telemetry.controller.js';
+import { TelemetryIngestionService } from './telemetry-ingestion.service.js';
+import { TelemetryQueryService } from './telemetry-query.service.js';
+import {
+  VEHICLE_DIRECTORY,
+  type VehicleDirectory,
+} from './vehicle-directory.port.js';
+
+export interface TelemetryModuleOptions {
+  /** Modules that export the vehicleDirectory provider. */
+  imports: NonNullable<ModuleMetadata['imports']>;
+  /** Provider implementing VehicleDirectory (owned by the core app). */
+  vehicleDirectory: Type<VehicleDirectory>;
+}
 
 /**
- * L7: MongoDB infrastructure only (client, typed collections, schema check,
- * health). Opt-in through MONGODB_URI. Endpoints and ingestion arrive in L8.
+ * Optional telemetry feature (opt-in through MONGODB_URI). L7: MongoDB
+ * infrastructure. L8: ingestion and query endpoints. It reaches vehicles only
+ * through the VEHICLE_DIRECTORY port, supplied by register().
  */
 @Module({
+  controllers: [TelemetryController],
   providers: [
+    TelemetryIngestionService,
+    TelemetryQueryService,
     {
       provide: MONGO_CLIENT,
       inject: [ConfigService],
@@ -80,4 +103,14 @@ import { buildMongoClientOptions } from './telemetry-config.js';
     VEHICLE_LATEST_STATUS_COLLECTION,
   ],
 })
-export class TelemetryModule {}
+export class TelemetryModule {
+  static register(options: TelemetryModuleOptions): DynamicModule {
+    return {
+      module: TelemetryModule,
+      imports: options.imports,
+      providers: [
+        { provide: VEHICLE_DIRECTORY, useExisting: options.vehicleDirectory },
+      ],
+    };
+  }
+}

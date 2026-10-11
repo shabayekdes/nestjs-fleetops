@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import type { ConfigService } from '@nestjs/config';
 import {
   type Db,
   type IndexDescriptionInfo,
@@ -7,10 +8,17 @@ import {
   MongoServerError,
   MongoServerSelectionError,
 } from 'mongodb';
+import type { AuthUser } from '../src/auth/auth.types.js';
+import { TelemetryIngestionService } from '../src/telemetry/telemetry-ingestion.service.js';
+import type {
+  TelemetryReadingDocument,
+  VehicleLatestStatusDocument,
+} from '../src/telemetry/mongo/telemetry-documents.js';
 import { mapMongoError } from '../src/telemetry/mongo/mongo-errors.js';
 import {
   ensureTelemetrySchema,
   READINGS_INDEXES,
+  READINGS_RETIRED_INDEXES,
   TELEMETRY_READINGS,
   TelemetrySchemaError,
   VEHICLE_LATEST_STATUS,
@@ -68,8 +76,12 @@ describeWithMongo('Telemetry schema against MongoDB (integration)', () => {
         `collection ${VEHICLE_LATEST_STATUS}`,
         `index ${TELEMETRY_READINGS}.org_vehicle_timestamp`,
         `index ${VEHICLE_LATEST_STATUS}.org_vehicle_unique`,
+        `index ${VEHICLE_LATEST_STATUS}.org_location_2dsphere`,
       ]),
     );
+    expect(report.dropped).toEqual([
+      `index ${TELEMETRY_READINGS}.meta_1_timestamp_1`,
+    ]);
 
     const readings = await collectionInfo(db, TELEMETRY_READINGS);
     expect(readings?.type).toBe('timeseries');
@@ -102,6 +114,11 @@ describeWithMongo('Telemetry schema against MongoDB (integration)', () => {
     const unique = latestIndexes.find((i) => i.name === 'org_vehicle_unique');
     expect(unique?.key).toEqual({ organizationId: 1, vehicleId: 1 });
     expect(unique?.unique).toBe(true);
+    const geo = latestIndexes.find((i) => i.name === 'org_location_2dsphere');
+    expect(geo?.key).toEqual({ organizationId: 1, location: '2dsphere' });
+    expect(readingIndexes.map((i) => i.name)).not.toContain(
+      'meta_1_timestamp_1',
+    );
   });
 
   it('is idempotent: a second run changes nothing', async () => {
@@ -113,7 +130,8 @@ describeWithMongo('Telemetry schema against MongoDB (integration)', () => {
 
     expect(report.created).toEqual([]);
     expect(report.updated).toEqual([]);
-    expect(report.unchanged).toHaveLength(4);
+    expect(report.dropped).toEqual([]);
+    expect(report.unchanged).toHaveLength(5);
     expect((await indexesOf(db, TELEMETRY_READINGS)).length).toBe(before);
   });
 
@@ -208,6 +226,266 @@ describeWithMongo('Telemetry schema against MongoDB (integration)', () => {
     expect(await verifyTelemetrySchema(db)).toEqual([]);
   });
 
+  it('drops a retired index that comes back, reports it once, and verify ignores it meanwhile', async () => {
+    const db = freshDb('retired');
+    await ensureTelemetrySchema(db, { retentionDays: 30 });
+    const [retired] = READINGS_RETIRED_INDEXES;
+    await db
+      .collection(TELEMETRY_READINGS)
+      .createIndex({ meta: 1, timestamp: 1 }, { name: retired });
+
+    expect(await verifyTelemetrySchema(db)).toEqual([]);
+
+    const report = await ensureTelemetrySchema(db, { retentionDays: 30 });
+    expect(report.dropped).toEqual([`index ${TELEMETRY_READINGS}.${retired}`]);
+    expect(
+      (await indexesOf(db, TELEMETRY_READINGS)).map((i) => i.name),
+    ).not.toContain(retired);
+    expect(
+      (await ensureTelemetrySchema(db, { retentionDays: 30 })).dropped,
+    ).toEqual([]);
+  });
+
+  it('survives concurrent runs while the retired index exists (IndexNotFound ignored)', async () => {
+    const db = freshDb('retiredrace');
+    await db.createCollection(TELEMETRY_READINGS, {
+      timeseries: {
+        timeField: 'timestamp',
+        metaField: 'meta',
+        granularity: 'seconds',
+      },
+    });
+
+    const runs = await Promise.allSettled([
+      ensureTelemetrySchema(db, { retentionDays: 30 }),
+      ensureTelemetrySchema(db, { retentionDays: 30 }),
+      ensureTelemetrySchema(db, { retentionDays: 30 }),
+    ]);
+
+    expect(runs.map((r) => r.status)).toEqual([
+      'fulfilled',
+      'fulfilled',
+      'fulfilled',
+    ]);
+    expect(await verifyTelemetrySchema(db)).toEqual([]);
+  });
+
+  it('boot check fails on a database missing the 2dsphere index (pre-L8 setup)', async () => {
+    const db = freshDb('prel8');
+    await ensureTelemetrySchema(db, { retentionDays: 30 });
+    await db
+      .collection(VEHICLE_LATEST_STATUS)
+      .dropIndex('org_location_2dsphere');
+
+    expect(await verifyTelemetrySchema(db)).toEqual([
+      `index ${VEHICLE_LATEST_STATUS}.org_location_2dsphere is missing`,
+    ]);
+    await ensureTelemetrySchema(db, { retentionDays: 30 });
+    expect(await verifyTelemetrySchema(db)).toEqual([]);
+  });
+
+  describe('query plans (explain pins)', () => {
+    let db: Db;
+    const org = randomUUID();
+    const vehicle = randomUUID();
+    const planText = (plan: unknown) => JSON.stringify(plan);
+
+    beforeAll(async () => {
+      db = freshDb('explain');
+      await ensureTelemetrySchema(db, { retentionDays: 30 });
+      const base = Date.now() - 3_600_000;
+      const docs = Array.from({ length: 300 }, (_, i) => ({
+        timestamp: new Date(base + i * 10_000),
+        meta: { organizationId: org, vehicleId: vehicle },
+        location: { type: 'Point', coordinates: [31, 30] },
+        speedKph: 10,
+        receivedAt: new Date(),
+      }));
+      await db.collection(TELEMETRY_READINGS).insertMany(docs);
+      await db.collection(VEHICLE_LATEST_STATUS).insertOne({
+        organizationId: org,
+        vehicleId: vehicle,
+        timestamp: new Date(),
+        location: { type: 'Point', coordinates: [31, 30] },
+        speedKph: 10,
+        receivedAt: new Date(),
+        updatedAt: new Date(),
+      });
+    });
+
+    it('the readings page uses org_vehicle_timestamp', async () => {
+      const plan = await db
+        .collection(TELEMETRY_READINGS)
+        .find({
+          'meta.organizationId': org,
+          'meta.vehicleId': vehicle,
+          timestamp: { $gte: new Date(0), $lte: new Date() },
+        })
+        .sort({ timestamp: -1 })
+        .limit(100)
+        .explain('queryPlanner');
+      expect(planText(plan)).toContain('org_vehicle_timestamp');
+    });
+
+    it('the daily aggregation uses org_vehicle_timestamp', async () => {
+      const plan = await db
+        .collection(TELEMETRY_READINGS)
+        .aggregate([
+          {
+            $match: {
+              'meta.organizationId': org,
+              'meta.vehicleId': vehicle,
+              timestamp: { $gte: new Date(0), $lt: new Date() },
+            },
+          },
+          {
+            $group: {
+              _id: {
+                $dateToString: {
+                  format: '%Y-%m-%d',
+                  date: '$timestamp',
+                  timezone: 'Africa/Cairo',
+                },
+              },
+              n: { $sum: 1 },
+            },
+          },
+        ])
+        .explain('queryPlanner');
+      expect(planText(plan)).toContain('org_vehicle_timestamp');
+    });
+
+    const geoNear = (query?: Record<string, unknown>) => ({
+      $geoNear: {
+        near: { type: 'Point', coordinates: [31, 30] },
+        key: 'location',
+        distanceField: 'distanceMeters',
+        maxDistance: 1000,
+        spherical: true,
+        ...(query ? { query } : {}),
+      },
+    });
+
+    it('$geoNear scoped by organizationId uses org_location_2dsphere', async () => {
+      const plan = await db
+        .collection(VEHICLE_LATEST_STATUS)
+        .aggregate([geoNear({ organizationId: org })])
+        .explain('queryPlanner');
+      expect(planText(plan)).toContain('org_location_2dsphere');
+    });
+
+    it('$geoNear without organizationId fails with 291 (no usable plan)', async () => {
+      await expect(
+        db.collection(VEHICLE_LATEST_STATUS).aggregate([geoNear()]).toArray(),
+      ).rejects.toMatchObject({ code: 291 });
+    });
+  });
+
+  describe('latest status maintained by the ingestion service (real Mongo)', () => {
+    let db: Db;
+    let service: TelemetryIngestionService;
+    const org = randomUUID();
+    const user = { organizationId: org } as unknown as AuthUser;
+    const known = new Set<string>();
+
+    const dto = (vehicleId: string, timestamp: Date, speedKph = 10) => ({
+      vehicleId,
+      timestamp: timestamp.toISOString(),
+      location: { latitude: 30, longitude: 31 },
+      speedKph,
+    });
+    const latestOf = (vehicleId: string) =>
+      db
+        .collection<VehicleLatestStatusDocument>(VEHICLE_LATEST_STATUS)
+        .find({ organizationId: org, vehicleId })
+        .toArray();
+
+    beforeAll(async () => {
+      db = freshDb('ingest');
+      await ensureTelemetrySchema(db, { retentionDays: 30 });
+      service = new TelemetryIngestionService(
+        db.collection<TelemetryReadingDocument>(TELEMETRY_READINGS),
+        db.collection<VehicleLatestStatusDocument>(VEHICLE_LATEST_STATUS),
+        {
+          existingVehicleIds: (_org, ids) =>
+            Promise.resolve(new Set(ids.filter((id) => known.has(id)))),
+        },
+        { get: () => 30 } as unknown as ConfigService<never, true>,
+      );
+    });
+
+    it('keeps the max timestamp after 50 single ingests in random order', async () => {
+      const vehicle = randomUUID();
+      known.add(vehicle);
+      const base = Date.now() - 600_000;
+      const stamps = Array.from({ length: 50 }, (_, i) => base + i * 1000);
+      for (let i = stamps.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [stamps[i], stamps[j]] = [stamps[j], stamps[i]];
+      }
+      for (const t of stamps) {
+        await service.ingestOne(user, dto(vehicle, new Date(t)));
+      }
+
+      const docs = await latestOf(vehicle);
+      expect(docs).toHaveLength(1);
+      expect(docs[0].timestamp.getTime()).toBe(Math.max(...stamps));
+    });
+
+    it('10 concurrent first ingests create one latest doc with the max timestamp', async () => {
+      const vehicle = randomUUID();
+      known.add(vehicle);
+      const base = Date.now() - 600_000;
+      const stamps = Array.from({ length: 10 }, (_, i) => base + i * 1000);
+
+      await Promise.all(
+        stamps.map((t) => service.ingestOne(user, dto(vehicle, new Date(t)))),
+      );
+
+      const docs = await latestOf(vehicle);
+      expect(docs).toHaveLength(1);
+      expect(docs[0].timestamp.getTime()).toBe(Math.max(...stamps));
+    });
+
+    it('replaying the same or an older reading changes nothing', async () => {
+      const vehicle = randomUUID();
+      known.add(vehicle);
+      const newest = new Date(Date.now() - 60_000);
+      await service.ingestOne(user, dto(vehicle, newest, 80));
+      const before = (await latestOf(vehicle))[0];
+
+      await service.ingestOne(user, dto(vehicle, newest, 99));
+      await service.ingestOne(
+        user,
+        dto(vehicle, new Date(newest.getTime() - 5000), 1),
+      );
+
+      const after = await latestOf(vehicle);
+      expect(after).toHaveLength(1);
+      expect(after[0]).toEqual(before);
+      expect(after[0].speedKph).toBe(80);
+    });
+
+    it('a batch updates latest per vehicle and a newer reading replaces optional fields', async () => {
+      const [v1, v2] = [randomUUID(), randomUUID()];
+      known.add(v1).add(v2);
+      const t = Date.now() - 120_000;
+      const out = await service.ingestBatch(user, {
+        readings: [
+          { ...dto(v1, new Date(t)), fuelLevelPercent: 50 },
+          dto(v1, new Date(t + 1000)),
+          dto(v2, new Date(t)),
+        ],
+      });
+      expect(out).toEqual({ accepted: 3, rejected: [] });
+
+      const [doc] = await latestOf(v1);
+      expect(doc.timestamp.getTime()).toBe(t + 1000);
+      expect(doc).not.toHaveProperty('fuelLevelPercent');
+      expect(await latestOf(v2)).toHaveLength(1);
+    });
+  });
+
   describe('server behavior the design relies on', () => {
     let db: Db;
     const meta = () => ({
@@ -264,6 +542,9 @@ describeWithMongo('Telemetry schema against MongoDB (integration)', () => {
       organizationId: randomUUID(),
       vehicleId: randomUUID(),
       timestamp: new Date(),
+      location: { type: 'Point', coordinates: [31.2, 30.0] },
+      speedKph: 50,
+      receivedAt: new Date(),
       updatedAt: new Date(),
       ...over,
     });
@@ -275,13 +556,62 @@ describeWithMongo('Telemetry schema against MongoDB (integration)', () => {
 
     const latest = () => db.collection(VEHICLE_LATEST_STATUS);
 
-    it('inserts a valid document, with and without a location', async () => {
+    it('inserts a valid document', async () => {
       await expect(latest().insertOne(doc())).resolves.toMatchObject({
         acknowledged: true,
       });
+    });
+
+    it('rejects a missing location with 121', async () => {
+      const { location: _omit, ...rest } = doc();
+      void _omit;
+      await expect(latest().insertOne(rest)).rejects.toMatchObject({
+        code: 121,
+      });
+    });
+
+    it('rejects an extra top-level field with 121', async () => {
+      await expect(
+        latest().insertOne(doc({ surprise: true })),
+      ).rejects.toMatchObject({ code: 121 });
+    });
+
+    it('rejects an engine without "on" with 121', async () => {
+      await expect(
+        latest().insertOne(doc({ engine: { rpm: 1000 } })),
+      ).rejects.toMatchObject({ code: 121 });
+    });
+
+    it('rejects speedKph 301 and negative speed with 121', async () => {
+      await expect(
+        latest().insertOne(doc({ speedKph: 301 })),
+      ).rejects.toMatchObject({ code: 121 });
+      await expect(
+        latest().insertOne(doc({ speedKph: -1 })),
+      ).rejects.toMatchObject({ code: 121 });
+    });
+
+    it('rejects out-of-range optional measurements with 121', async () => {
+      for (const over of [
+        { fuelLevelPercent: 101 },
+        { odometerKm: -1 },
+        { engine: { on: true, rpm: 10_001 } },
+        { engine: { on: true, coolantTempC: 151 } },
+      ]) {
+        await expect(latest().insertOne(doc(over))).rejects.toMatchObject({
+          code: 121,
+        });
+      }
+    });
+
+    it('accepts a full valid document with engine metrics', async () => {
       await expect(
         latest().insertOne(
-          doc({ location: { type: 'Point', coordinates: [31.2, 30.0] } }),
+          doc({
+            fuelLevelPercent: 50,
+            odometerKm: 1000.5,
+            engine: { on: true, rpm: 2000, coolantTempC: 90 },
+          }),
         ),
       ).resolves.toMatchObject({ acknowledged: true });
     });
@@ -350,6 +680,9 @@ describeWithMongo('Telemetry schema against MongoDB (integration)', () => {
         organizationId: randomUUID(),
         vehicleId: randomUUID(),
         timestamp: new Date(),
+        location: { type: 'Point', coordinates: [31.2, 30.0] },
+        speedKph: 50,
+        receivedAt: new Date(),
         updatedAt: new Date(),
       };
       const coll = db.collection(VEHICLE_LATEST_STATUS);

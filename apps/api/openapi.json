@@ -2386,6 +2386,438 @@
           "vehicle-types"
         ]
       }
+    },
+    "/api/v1/telemetry/readings": {
+      "post": {
+        "operationId": "TelemetryController_ingestOne_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTelemetryReadingDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelemetryReadingResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "telemetry"
+        ]
+      }
+    },
+    "/api/v1/telemetry/readings/batch": {
+      "post": {
+        "operationId": "TelemetryController_ingestBatch_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchTelemetryReadingsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchIngestResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Always 200: per-reading outcomes are in the body (accepted, rejected).",
+        "tags": [
+          "telemetry"
+        ]
+      }
+    },
+    "/api/v1/telemetry/latest": {
+      "get": {
+        "operationId": "TelemetryController_listLatest_v1",
+        "parameters": [
+          {
+            "name": "after",
+            "required": false,
+            "in": "query",
+            "description": "Cursor: only vehicles with a greater id (from nextCursor).",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LatestStatusListResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "telemetry"
+        ]
+      }
+    },
+    "/api/v1/telemetry/latest/near": {
+      "get": {
+        "operationId": "TelemetryController_findNear_v1",
+        "parameters": [
+          {
+            "name": "latitude",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "minimum": -90,
+              "maximum": 90,
+              "type": "number"
+            }
+          },
+          {
+            "name": "longitude",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "minimum": -180,
+              "maximum": 180,
+              "type": "number"
+            }
+          },
+          {
+            "name": "radiusMeters",
+            "required": true,
+            "in": "query",
+            "description": "Search radius in meters, 1..50000.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 50000,
+              "default": 5000,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 50,
+              "default": 10,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NearbyVehiclesResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "telemetry"
+        ]
+      }
+    },
+    "/api/v1/telemetry/vehicles/{vehicleId}/readings": {
+      "get": {
+        "operationId": "TelemetryController_findReadings_v1",
+        "parameters": [
+          {
+            "name": "vehicleId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "description": "Inclusive lower bound, ISO 8601 with an explicit offset.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "description": "Inclusive upper bound, after from and at most 7 days later.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "before",
+            "required": false,
+            "in": "query",
+            "description": "Cursor: only readings strictly older than this (from nextCursor).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 1000,
+              "default": 100,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelemetryReadingListResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "telemetry"
+        ]
+      }
+    },
+    "/api/v1/telemetry/vehicles/{vehicleId}/latest": {
+      "get": {
+        "operationId": "TelemetryController_findLatest_v1",
+        "parameters": [
+          {
+            "name": "vehicleId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VehicleLatestStatusResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "telemetry"
+        ]
+      }
+    },
+    "/api/v1/telemetry/vehicles/{vehicleId}/daily": {
+      "get": {
+        "operationId": "TelemetryController_findDaily_v1",
+        "parameters": [
+          {
+            "name": "vehicleId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "description": "First local day, YYYY-MM-DD.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "description": "Last local day (inclusive), YYYY-MM-DD, at most 31 days from `from`.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "timezone",
+            "required": true,
+            "in": "query",
+            "description": "IANA time zone used to bucket days. Fixed offsets are rejected.",
+            "schema": {
+              "default": "UTC",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DailySummaryListResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "telemetry"
+        ]
+      }
     }
   },
   "info": {
@@ -4109,6 +4541,484 @@
         "required": [
           "data",
           "meta"
+        ]
+      },
+      "TelemetryLocationDto": {
+        "type": "object",
+        "properties": {
+          "latitude": {
+            "type": "number",
+            "description": "Degrees, -90..90.",
+            "minimum": -90,
+            "maximum": 90
+          },
+          "longitude": {
+            "type": "number",
+            "description": "Degrees, -180..180.",
+            "minimum": -180,
+            "maximum": 180
+          }
+        },
+        "required": [
+          "latitude",
+          "longitude"
+        ]
+      },
+      "TelemetryEngineDto": {
+        "type": "object",
+        "properties": {
+          "on": {
+            "type": "boolean"
+          },
+          "rpm": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "coolantTempC": {
+            "type": "number",
+            "minimum": -50,
+            "maximum": 150
+          }
+        },
+        "required": [
+          "on"
+        ]
+      },
+      "CreateTelemetryReadingDto": {
+        "type": "object",
+        "properties": {
+          "vehicleId": {
+            "type": "string",
+            "description": "UUIDv7 of a vehicle in your organization.",
+            "format": "uuid"
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "ISO 8601 with an explicit offset, at most 5 minutes in the future."
+          },
+          "location": {
+            "$ref": "#/components/schemas/TelemetryLocationDto"
+          },
+          "speedKph": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 300
+          },
+          "fuelLevelPercent": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "odometerKm": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 10000000
+          },
+          "engine": {
+            "$ref": "#/components/schemas/TelemetryEngineDto"
+          }
+        },
+        "required": [
+          "vehicleId",
+          "timestamp",
+          "location",
+          "speedKph"
+        ]
+      },
+      "LocationResponseDto": {
+        "type": "object",
+        "properties": {
+          "latitude": {
+            "type": "number"
+          },
+          "longitude": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "latitude",
+          "longitude"
+        ]
+      },
+      "EngineResponseDto": {
+        "type": "object",
+        "properties": {
+          "on": {
+            "type": "boolean"
+          },
+          "rpm": {
+            "type": "number",
+            "nullable": true
+          },
+          "coolantTempC": {
+            "type": "number",
+            "nullable": true
+          }
+        },
+        "required": [
+          "on",
+          "rpm",
+          "coolantTempC"
+        ]
+      },
+      "TelemetryReadingResponseDto": {
+        "type": "object",
+        "properties": {
+          "vehicleId": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "location": {
+            "$ref": "#/components/schemas/LocationResponseDto"
+          },
+          "speedKph": {
+            "type": "number"
+          },
+          "fuelLevelPercent": {
+            "type": "number",
+            "nullable": true
+          },
+          "odometerKm": {
+            "type": "number",
+            "nullable": true
+          },
+          "engine": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EngineResponseDto"
+              }
+            ]
+          },
+          "receivedAt": {
+            "format": "date-time",
+            "type": "string",
+            "description": "Server time when the reading was accepted."
+          }
+        },
+        "required": [
+          "vehicleId",
+          "timestamp",
+          "location",
+          "speedKph",
+          "fuelLevelPercent",
+          "odometerKm",
+          "engine",
+          "receivedAt"
+        ]
+      },
+      "BatchTelemetryReadingsDto": {
+        "type": "object",
+        "properties": {
+          "readings": {
+            "description": "1 to 200 readings.",
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CreateTelemetryReadingDto"
+            }
+          }
+        },
+        "required": [
+          "readings"
+        ]
+      },
+      "RejectedReadingDto": {
+        "type": "object",
+        "properties": {
+          "index": {
+            "type": "number",
+            "description": "Position of the reading in the request."
+          },
+          "vehicleId": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "VEHICLE_NOT_FOUND",
+              "TOO_OLD",
+              "STORAGE_REJECTED"
+            ]
+          }
+        },
+        "required": [
+          "index",
+          "vehicleId",
+          "reason"
+        ]
+      },
+      "BatchIngestResponseDto": {
+        "type": "object",
+        "properties": {
+          "accepted": {
+            "type": "number"
+          },
+          "rejected": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RejectedReadingDto"
+            }
+          }
+        },
+        "required": [
+          "accepted",
+          "rejected"
+        ]
+      },
+      "VehicleLatestStatusResponseDto": {
+        "type": "object",
+        "properties": {
+          "vehicleId": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "location": {
+            "$ref": "#/components/schemas/LocationResponseDto"
+          },
+          "speedKph": {
+            "type": "number"
+          },
+          "fuelLevelPercent": {
+            "type": "number",
+            "nullable": true
+          },
+          "odometerKm": {
+            "type": "number",
+            "nullable": true
+          },
+          "engine": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EngineResponseDto"
+              }
+            ]
+          },
+          "receivedAt": {
+            "format": "date-time",
+            "type": "string",
+            "description": "Server time when the reading was accepted."
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string",
+            "description": "When this latest-status document was last written."
+          }
+        },
+        "required": [
+          "vehicleId",
+          "timestamp",
+          "location",
+          "speedKph",
+          "fuelLevelPercent",
+          "odometerKm",
+          "engine",
+          "receivedAt",
+          "updatedAt"
+        ]
+      },
+      "CursorMetaDto": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "number"
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true,
+            "description": "Pass back as the cursor parameter for the next page, null at the end."
+          }
+        },
+        "required": [
+          "limit",
+          "nextCursor"
+        ]
+      },
+      "LatestStatusListResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VehicleLatestStatusResponseDto"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/CursorMetaDto"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      },
+      "NearbyVehicleResponseDto": {
+        "type": "object",
+        "properties": {
+          "vehicleId": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "location": {
+            "$ref": "#/components/schemas/LocationResponseDto"
+          },
+          "speedKph": {
+            "type": "number"
+          },
+          "fuelLevelPercent": {
+            "type": "number",
+            "nullable": true
+          },
+          "odometerKm": {
+            "type": "number",
+            "nullable": true
+          },
+          "engine": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EngineResponseDto"
+              }
+            ]
+          },
+          "receivedAt": {
+            "format": "date-time",
+            "type": "string",
+            "description": "Server time when the reading was accepted."
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string",
+            "description": "When this latest-status document was last written."
+          },
+          "distanceMeters": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "vehicleId",
+          "timestamp",
+          "location",
+          "speedKph",
+          "fuelLevelPercent",
+          "odometerKm",
+          "engine",
+          "receivedAt",
+          "updatedAt",
+          "distanceMeters"
+        ]
+      },
+      "NearbyVehiclesResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NearbyVehicleResponseDto"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "TelemetryReadingListResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TelemetryReadingResponseDto"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/CursorMetaDto"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      },
+      "DailySummaryDto": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "description": "Local day (YYYY-MM-DD) in the requested time zone."
+          },
+          "readings": {
+            "type": "number"
+          },
+          "avgSpeedKph": {
+            "type": "number",
+            "nullable": true
+          },
+          "maxSpeedKph": {
+            "type": "number",
+            "nullable": true
+          },
+          "avgFuelLevelPercent": {
+            "type": "number",
+            "nullable": true
+          },
+          "distanceKm": {
+            "type": "number",
+            "nullable": true,
+            "description": "max(odometerKm) - min(odometerKm) of the day; odometer resets are not handled."
+          }
+        },
+        "required": [
+          "date",
+          "readings",
+          "avgSpeedKph",
+          "maxSpeedKph",
+          "avgFuelLevelPercent",
+          "distanceKm"
+        ]
+      },
+      "DailySummaryListResponseDto": {
+        "type": "object",
+        "properties": {
+          "vehicleId": {
+            "type": "string"
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DailySummaryDto"
+            }
+          }
+        },
+        "required": [
+          "vehicleId",
+          "timezone",
+          "from",
+          "to",
+          "data"
         ]
       }
     }
