@@ -41,7 +41,8 @@ Each exercise has three parts:
 | ----- | ---------------------------------------- | ------ |
 | L1    | [`l1-fundamentals/`](l1-fundamentals/)   | Done   |
 | L2    | [`l2-data-modeling/`](l2-data-modeling/) | Done   |
-| L3–L6 | Added when each stage is approved        | —      |
+| L3    | [`l3-indexing/`](l3-indexing/)           | Done   |
+| L4–L6 | Added when each stage is approved        | —      |
 
 ### L1 — MongoDB fundamentals
 
@@ -67,3 +68,17 @@ Each exercise has three parts:
 | [`NOTES.md`](l2-data-modeling/NOTES.md)    | Decision rules, patterns, measurements, what the model does not protect       |
 
 Exercises use the `learning_l2` database: `docker compose exec mongo mongosh --quiet learning_l2 /learning/l2-data-modeling/01-organization-and-vehicles.js`. Solution 04 needs exercise 04 to have run first.
+
+### L3 — Indexing and query performance
+
+| File                               | Topic                                                                            |
+| ---------------------------------- | -------------------------------------------------------------------------------- |
+| `01-explain-basics.js`             | `explain()`, COLLSCAN vs IXSCAN, selectivity, the planner's race                 |
+| `02-compound-indexes-esr.js`       | Compound indexes, equality–sort–range, prefixes, sort direction, covered queries |
+| `03-unique-partial-ttl.js`         | Tenant-scoped unique, partial unique (one active assignment), TTL expiry         |
+| `04-multikey-and-geo-index.js`     | Multikey indexes, parallel arrays, creating a `2dsphere` index                   |
+| `05-write-overhead.js`             | Insert and update cost per index, index sizes, unused indexes                    |
+| `06-time-series.js`                | Time series collections vs flat documents: storage, explain, limits in 7.0       |
+| [`NOTES.md`](l3-indexing/NOTES.md) | Reading explain, index design rules, measurements, the telemetry-shape decision  |
+
+Exercises use the `learning_l3` database: `docker compose exec mongo mongosh --quiet learning_l3 /learning/l3-indexing/01-explain-basics.js`. Each exercise loads 144 000 synthetic readings (a few seconds). Solution 06 needs exercise 06 to have run first.

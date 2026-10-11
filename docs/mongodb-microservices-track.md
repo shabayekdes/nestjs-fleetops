@@ -18,7 +18,7 @@ To avoid confusion with the other roadmaps, stages are always called **Learning 
 | ----- | ------------------------------------ | --------------------- | ------- | --------- |
 | L1    | MongoDB fundamentals                 | A: MongoDB            | Done    | `fe09f1b` |
 | L2    | MongoDB data modeling                | A: MongoDB            | Done    | `518497c` |
-| L3    | Indexing + query performance         | A: MongoDB            | Planned | —         |
+| L3    | Indexing + query performance         | A: MongoDB            | Done    | (pending) |
 | L4    | MongoDB querying                     | A: MongoDB            | Planned | —         |
 | L5    | Aggregation pipeline                 | A: MongoDB            | Planned | —         |
 | L6    | Geospatial features                  | A: MongoDB            | Planned | —         |
@@ -278,15 +278,54 @@ Part A is about MongoDB itself. **No FleetOps code changes.** Exercises run agai
 
 ### Learning Stage 3 — Indexing + query performance
 
-**Status:** Planned
+**Status:** Done (pending)
 
 **Goal:** design indexes from access patterns and verify them with `explain()`.
 
 **Topics:** single-field, compound, unique, TTL, multikey and geospatial indexes; `explain()` (`queryPlanner`, `executionStats`, `IXSCAN` vs `COLLSCAN`, keys vs documents examined); selectivity; the equality–sort–range rule for compound indexes; write overhead and index trade-offs; time series collections as an alternative to plain collections for telemetry.
 
-**Exercises:** a synthetic telemetry collection (`organizationId`, `vehicleId`, `timestamp`, `location`, `speed`, `fuelLevel`) with enough documents for differences to show. Measure queries before and after indexes such as `{ organizationId: 1, vehicleId: 1, timestamp: -1 }`.
-
 **Key question:** why does a telemetry workload (append-heavy, time-range reads) need different indexes from transactional FleetOps data?
+
+**What was learned** (details in [`learning/mongodb/l3-indexing/NOTES.md`](../learning/mongodb/l3-indexing/NOTES.md))
+
+- `explain('executionStats')` gives three numbers: keys examined, documents examined and returned. The ideal plan has all three equal.
+- Field order is the whole design of a compound index. Equality–sort–range with `organizationId` first served "one vehicle, one day" with 100 keys for 100 readings. Putting the range before the equality field took 2 989 keys.
+- ESR is a rule of thumb. With no limit, the planner rightly preferred a tight range plus an in-memory sort. With a limit, E-S-R stopped early and won.
+- A low-selectivity index (`engineOn`) was slower than a collection scan: 117 ms vs 62 ms.
+- A partial unique index enforces "one active assignment per vehicle" (`endedAt: null`), which L2 left unprotected. A unique index needs a partial filter when the field is optional, because a missing field indexes as `null`.
+- TTL ignores values that are not dates, so they never expire. A 2dsphere index validates GeoJSON format and range, but not swapped coordinates.
+- Six indexes made inserts 2.2× slower, and the indexes (9 MB) outgrew the compressed data (6 MB).
+- Answer to the key question: telemetry is write-dominated, read by series and time range, append-only and expiring. It gets the fewest indexes that serve its access patterns, and `{ organizationId, vehicleId, timestamp: -1 }` is the one that matters.
+
+**Built**
+
+- Six `mongosh` exercises in `learning/mongodb/l3-indexing/`:
+  - explain basics;
+  - compound indexes and ESR;
+  - unique, partial and TTL indexes;
+  - multikey and `2dsphere` indexes;
+  - write overhead;
+  - time series collections.
+- Each exercise has worked examples, "your turn" tasks and runnable solutions.
+- A shared seed of 144 000 synthetic readings (`lib/telemetry.js`) for 3 tenants and 50 vehicles, plus `explain()` helpers.
+- `NOTES.md`: reading explain, index design rules, the measurements, the key question and the telemetry-shape decision.
+
+**Decisions**
+
+1. **Telemetry shape, the question left open in L2:**
+   - Raw readings go in a **time series collection** with `metaField: { organizationId, vehicleId }`, an index on `{ 'meta.organizationId': 1, 'meta.vehicleId': 1, timestamp: -1 }`, and retention by `expireAfterSeconds`.
+   - The latest position stays a **separate latest-status document** (L2). In a time series collection, "latest reading" reads every bucket of the vehicle.
+   - This is re-checked at L7, before the collection is created in code, because a collection cannot be converted later.
+2. Every tenant index starts with `organizationId` (or `meta.organizationId`).
+3. Hand-built buckets (L2 exercise 04) are not used. A time series collection gives the same storage benefit without the write logic.
+4. No change to the FleetOps PostgreSQL schema, and no FleetOps code.
+
+**Deferred**
+
+- Geo queries (`$near`, `$geoWithin`) on the `2dsphere` index (L6).
+- Schema validation, so wrong types (string or number timestamps) are rejected (L7).
+- Duplicate readings: time series collections have no unique index (L13).
+- Index builds on a live replica set, working-set sizing and sharding keys (L14).
 
 ### Learning Stage 4 — MongoDB querying
 
