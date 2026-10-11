@@ -2,7 +2,7 @@
 
 This file plans a **learning track**: a guided way to learn MongoDB, NoSQL data modeling and microservices architecture using FleetOps telemetry as the example. It is **not** a continuation of the backend phases. The backend roadmap ([`PHASES.md`](PHASES.md)) stays focused on the production FleetOps core and ends at Phase 10 (Vehicle master data).
 
-Nothing in this file is built yet. Every stage is a plan, started only with the user's approval.
+The MongoDB half (Parts A and B, L1–L8) is done; see "Parts A and B — wrap-up". L9–L15 are still plans, and each starts only with the user's approval.
 
 Related documents:
 
@@ -14,23 +14,23 @@ Related documents:
 
 To avoid confusion with the other roadmaps, stages are always called **Learning Stage N** (L1–L15). "Phase N" means a backend phase, and "FE N" a frontend phase.
 
-| Stage | Name                                 | Part                  | Status  | Commit(s) |
-| ----- | ------------------------------------ | --------------------- | ------- | --------- |
-| L1    | MongoDB fundamentals                 | A: MongoDB            | Done    | `fe09f1b` |
-| L2    | MongoDB data modeling                | A: MongoDB            | Done    | `518497c` |
-| L3    | Indexing + query performance         | A: MongoDB            | Done    | `ba1960f` |
-| L4    | MongoDB querying                     | A: MongoDB            | Done    | `8139735` |
-| L5    | Aggregation pipeline                 | A: MongoDB            | Done    | `4e945c3` |
-| L6    | Geospatial features                  | A: MongoDB            | Done    | `ff5b7ff` |
-| L7    | NestJS + MongoDB                     | B: Telemetry workload | Done    | `f8f11d8` |
-| L8    | First telemetry prototype            | B: Telemetry workload | Done    | `99d8912` |
-| L9    | Microservices concepts               | C: Microservices      | Planned | —         |
-| L10   | Extract telemetry                    | C: Microservices      | Planned | —         |
-| L11   | Service-to-service communication     | C: Microservices      | Planned | —         |
-| L12   | Telemetry ingestion vs processing    | C: Microservices      | Planned | —         |
-| L13   | Distributed systems problems         | D: Production         | Planned | —         |
-| L14   | MongoDB production concepts          | D: Production         | Planned | —         |
-| L15   | PostgreSQL vs MongoDB decision (ADR) | D: Production         | Planned | —         |
+| Stage | Name                                 | Part                  | Status  | Commit(s)            |
+| ----- | ------------------------------------ | --------------------- | ------- | -------------------- |
+| L1    | MongoDB fundamentals                 | A: MongoDB            | Done    | `fe09f1b`            |
+| L2    | MongoDB data modeling                | A: MongoDB            | Done    | `518497c`            |
+| L3    | Indexing + query performance         | A: MongoDB            | Done    | `ba1960f`            |
+| L4    | MongoDB querying                     | A: MongoDB            | Done    | `8139735`            |
+| L5    | Aggregation pipeline                 | A: MongoDB            | Done    | `4e945c3`            |
+| L6    | Geospatial features                  | A: MongoDB            | Done    | `ff5b7ff`            |
+| L7    | NestJS + MongoDB                     | B: Telemetry workload | Done    | `f8f11d8`            |
+| L8    | First telemetry prototype            | B: Telemetry workload | Done    | `99d8912`, `057cc15` |
+| L9    | Microservices concepts               | C: Microservices      | Planned | —                    |
+| L10   | Extract telemetry                    | C: Microservices      | Planned | —                    |
+| L11   | Service-to-service communication     | C: Microservices      | Planned | —                    |
+| L12   | Telemetry ingestion vs processing    | C: Microservices      | Planned | —                    |
+| L13   | Distributed systems problems         | D: Production         | Planned | —                    |
+| L14   | MongoDB production concepts          | D: Production         | Planned | —                    |
+| L15   | PostgreSQL vs MongoDB decision (ADR) | D: Production         | Planned | —                    |
 
 ---
 
@@ -584,7 +584,7 @@ The existing conventions (e.g. "no repositories") are **not** copied automatical
 
 ### Learning Stage 8 — First telemetry prototype
 
-**Status:** Done (`99d8912`)
+**Status:** Done (`99d8912`; development seed `057cc15`)
 
 **Goal:** a working telemetry feature that shows what the MongoDB workload looks like in practice.
 
@@ -634,6 +634,7 @@ The existing conventions (e.g. "no repositories") are **not** copied automatical
 - The vehicle-existence port `VEHICLE_DIRECTORY` (`vehicle-directory.port.ts`) and its Prisma adapter `PrismaVehicleDirectory` in the vehicles module. `TelemetryModule.register({ imports, vehicleDirectory })` wires it. A boundary test forbids telemetry imports of core feature modules and `database/`.
 - Schema changes through `mongo:setup`: `org_location_2dsphere`, a closed `$jsonSchema` validator on `vehicle_latest_status`, and the retired-index mechanism (`READINGS_RETIRED_INDEXES`, reported as `dropped`).
 - `export-openapi.ts` always documents the telemetry routes; CI checks `openapi.json` with `MONGODB_URI= MONGODB_DB=`. Web types regenerated (no UI).
+- Follow-up (`057cc15`): `npm run mongo:seed`, a development-only, idempotent seed of deterministic synthetic readings (Cairo routes, work shifts, parked nights) for the vehicles of the seeded `acme-logistics` organization. It reads those vehicles from PostgreSQL read-only, replaces only their readings and latest status, and refuses to run in production or test, with telemetry disabled, or before `mongo:setup`. The pure generator has unit tests.
 
 **Decisions**
 
@@ -685,6 +686,31 @@ The existing conventions (e.g. "no repositories") are **not** copied automatical
 **Not yet:** a second service, a broker, real devices.
 
 **L9 is next.**
+
+---
+
+## Parts A and B — wrap-up
+
+The MongoDB half of the track is complete. Part C starts only with the user's approval of L9.
+
+**What it produced**
+
+- Knowledge (L1–L6, `learning/mongodb/`): the document model, embedding vs referencing, time series collections, compound index order (equality, sort, range) and `explain()`, operators and type traps, the aggregation pipeline with time zones, and tenant-scoped `2dsphere` queries.
+- A working, opt-in telemetry module in `apps/api/` (L7–L8): the official `mongodb` driver without an ODM, typed collections, schema applied by `mongo:setup` (never drops data), seven endpoints under `/api/v1/telemetry`, a readiness field that never changes `status`, and a development seed (`mongo:seed`).
+- A module boundary ready for extraction: telemetry touches no PostgreSQL table and asks the core only "does this vehicle exist in this organization?" through `VEHICLE_DIRECTORY`, enforced by a boundary test.
+
+**Main lessons**
+
+- Model for the queries: readings in a time series collection, latest status as a separate, validated cache document.
+- The planner only helps when the index matches the query shape; `organizationId` belongs in every index and every query (L3, L8 fact 4).
+- Derived data (latest status) is not atomic with its source, so it needs guarded writes now and a repair path later (L8 E4).
+
+**Open items carried into Part C and D** (details in L7 and L8 "Deferred")
+
+- Vehicle-deleted events, so deleted vehicles leave latest status and near results (L11).
+- Rejected readings, a latest-status repair job, duplicates and stored summaries (L12/L13).
+- Atomicity between readings and latest status, and write concern errors mapped as 500 (L14).
+- The CI-kernel checks left open in L7 and L8.
 
 ---
 
