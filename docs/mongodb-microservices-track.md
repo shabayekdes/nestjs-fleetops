@@ -22,7 +22,7 @@ To avoid confusion with the other roadmaps, stages are always called **Learning 
 | L4    | MongoDB querying                     | A: MongoDB            | Done    | `8139735` |
 | L5    | Aggregation pipeline                 | A: MongoDB            | Done    | `4e945c3` |
 | L6    | Geospatial features                  | A: MongoDB            | Done    | `ff5b7ff` |
-| L7    | NestJS + MongoDB                     | B: Telemetry workload | Done    | pending   |
+| L7    | NestJS + MongoDB                     | B: Telemetry workload | Done    | `f8f11d8` |
 | L8    | First telemetry prototype            | B: Telemetry workload | Planned | —         |
 | L9    | Microservices concepts               | C: Microservices      | Planned | —         |
 | L10   | Extract telemetry                    | C: Microservices      | Planned | —         |
@@ -493,7 +493,7 @@ Part A is about MongoDB itself. **No FleetOps code changes.** Exercises run agai
 
 ### Learning Stage 7 — NestJS + MongoDB
 
-**Status:** Done (commit pending)
+**Status:** Done (`f8f11d8`)
 
 **Goal:** learn how MongoDB fits into a NestJS application, and how that differs from the Prisma setup.
 
