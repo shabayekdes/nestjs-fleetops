@@ -52,7 +52,23 @@ services:
       migrate:
         condition: service_completed_successfully
 
+  # Optional telemetry store (L7). Start with: docker compose up -d --wait mongo
+  # 7.0 on purpose: 8.x+ crashes on Linux kernel 6.19+ (SERVER-121912).
+  mongo:
+    image: mongo:7.0.43
+    profiles: ['telemetry']
+    ports:
+      - '127.0.0.1:${MONGO_PORT:-27018}:27017'
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ['CMD', 'mongosh', '--quiet', '--eval', 'db.runCommand({ping:1})']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   # web: Next.js app (apps/web) is added here in FE9 (production readiness).
 
 volumes:
   postgres-data: {}
+  mongo-data: {}

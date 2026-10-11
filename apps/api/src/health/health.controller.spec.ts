@@ -75,11 +75,20 @@ describe('HealthController', () => {
     ): ReadinessResponseDto => ({
       ...health({}),
       migrations: 'applied',
+      telemetry: 'disabled',
       ...overrides,
     });
 
     it('passes the body through without a status call when ok', async () => {
       const body = ready({});
+      readiness.mockResolvedValue(body);
+
+      await expect(controller.ready(res)).resolves.toEqual(body);
+      expect(status).not.toHaveBeenCalled();
+    });
+
+    it('does not set 503 when only telemetry is down', async () => {
+      const body = ready({ telemetry: 'down' });
       readiness.mockResolvedValue(body);
 
       await expect(controller.ready(res)).resolves.toEqual(body);

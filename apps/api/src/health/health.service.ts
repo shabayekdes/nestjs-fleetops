@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import { readdir } from 'node:fs/promises';
 import { PrismaService } from '../database/prisma.service.js';
 import {
@@ -7,7 +8,12 @@ import {
   LivenessResponseDto,
   type MigrationsStatus,
   ReadinessResponseDto,
+  type TelemetryStatus,
 } from './health-response.dto.js';
+import {
+  TELEMETRY_HEALTH,
+  type TelemetryHealthCheck,
+} from './telemetry-health.js';
 
 /** DI token for the directory holding the migrations this build ships. */
 export const MIGRATIONS_DIR = 'MIGRATIONS_DIR';
@@ -19,6 +25,7 @@ export class HealthService {
   constructor(
     private readonly prisma: PrismaService,
     @Inject(MIGRATIONS_DIR) private readonly migrationsDir: string,
+    private readonly moduleRef: ModuleRef,
   ) {}
 
   async check(): Promise<HealthResponseDto> {
@@ -42,7 +49,10 @@ export class HealthService {
   }
 
   async readiness(): Promise<ReadinessResponseDto> {
-    const database = await this.checkDatabase();
+    const [database, telemetry] = await Promise.all([
+      this.checkDatabase(),
+      this.checkTelemetry(),
+    ]);
     const migrations =
       database === 'up' ? await this.checkMigrations() : 'unknown';
 
@@ -52,6 +62,7 @@ export class HealthService {
       timestamp: new Date().toISOString(),
       database,
       migrations,
+      telemetry,
     };
   }
 
@@ -61,6 +72,27 @@ export class HealthService {
       return 'up';
     } catch (error) {
       this.logger.error('Database health check failed', error);
+      return 'down';
+    }
+  }
+
+  /** Informational only: never affects readiness status. */
+  private async checkTelemetry(): Promise<TelemetryStatus> {
+    let check: TelemetryHealthCheck;
+    try {
+      check = this.moduleRef.get<TelemetryHealthCheck>(TELEMETRY_HEALTH, {
+        strict: false,
+      });
+    } catch {
+      return 'disabled';
+    }
+    try {
+      await check.ping();
+      return 'up';
+    } catch (error) {
+      this.logger.warn(
+        `Telemetry health check failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
       return 'down';
     }
   }

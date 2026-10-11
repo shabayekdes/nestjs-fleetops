@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { mapPrismaError } from '../../database/prisma-errors.js';
+import { mapMongoError } from '../../telemetry/mongo/mongo-errors.js';
 import type {
   ErrorResponseDto,
   ValidationErrorDetailDto,
@@ -59,6 +60,9 @@ function fromUnknown(exception: unknown): Resolved {
 
   const prisma = mapPrismaError(exception);
   if (prisma) return fromHttpException(prisma);
+
+  const mongo = mapMongoError(exception);
+  if (mongo) return fromHttpException(mongo);
 
   // body-parser style errors (for example 413) carry status and expose.
   if (

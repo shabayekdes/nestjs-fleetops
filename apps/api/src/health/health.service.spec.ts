@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PrismaService } from '../database/prisma.service.js';
 import { HealthService, MIGRATIONS_DIR } from './health.service.js';
+import { TELEMETRY_HEALTH } from './telemetry-health.js';
 
 describe('HealthService', () => {
   const queryRaw = jest.fn<(...args: unknown[]) => Promise<unknown>>();
@@ -14,13 +15,18 @@ describe('HealthService', () => {
   let warnSpy: jest.SpiedFunction<Logger['warn']>;
   let errorSpy: jest.SpiedFunction<Logger['error']>;
 
-  const build = async (migrationsDir: string) => {
+  const ping = jest.fn<() => Promise<void>>();
+
+  const build = async (migrationsDir: string, withTelemetry = false) => {
     // PrismaService is replaced in the DI container: no database needed.
     const moduleRef = await Test.createTestingModule({
       providers: [
         HealthService,
         { provide: MIGRATIONS_DIR, useValue: migrationsDir },
         { provide: PrismaService, useValue: { $queryRaw: queryRaw } },
+        ...(withTelemetry
+          ? [{ provide: TELEMETRY_HEALTH, useValue: { ping } }]
+          : []),
       ],
     }).compile();
     return moduleRef.get(HealthService);
@@ -34,6 +40,7 @@ describe('HealthService', () => {
 
   beforeEach(async () => {
     queryRaw.mockReset();
+    ping.mockReset();
     warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => {});
     errorSpy = jest
       .spyOn(Logger.prototype, 'error')
@@ -194,6 +201,76 @@ describe('HealthService', () => {
         migrations: 'unknown',
       });
       expect(queryRaw).toHaveBeenCalledTimes(1);
+    });
+  });
+  describe('telemetry', () => {
+    const dbUp = () => queryRaw.mockResolvedValueOnce([{ '?column?': 1 }]);
+
+    it('is disabled when no telemetry provider exists', async () => {
+      await shipped('001_a');
+      dbUp();
+      queryRaw.mockResolvedValueOnce(rows('001_a'));
+
+      await expect(service.readiness()).resolves.toMatchObject({
+        status: 'ok',
+        telemetry: 'disabled',
+      });
+    });
+
+    it('is up when the ping succeeds', async () => {
+      const withTelemetry = await build(dir, true);
+      await shipped('001_a');
+      ping.mockResolvedValue(undefined);
+      dbUp();
+      queryRaw.mockResolvedValueOnce(rows('001_a'));
+
+      await expect(withTelemetry.readiness()).resolves.toMatchObject({
+        status: 'ok',
+        telemetry: 'up',
+      });
+      expect(ping).toHaveBeenCalledTimes(1);
+    });
+
+    it('is down but keeps status ok when the ping rejects, and warns', async () => {
+      const withTelemetry = await build(dir, true);
+      await shipped('001_a');
+      ping.mockRejectedValue(new Error('mongo gone'));
+      dbUp();
+      queryRaw.mockResolvedValueOnce(rows('001_a'));
+
+      await expect(withTelemetry.readiness()).resolves.toMatchObject({
+        status: 'ok',
+        database: 'up',
+        migrations: 'applied',
+        telemetry: 'down',
+      });
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+      expect(String(warnSpy.mock.calls[0][0])).toContain('mongo gone');
+    });
+
+    it('still pings when Postgres is down and reports error status', async () => {
+      const withTelemetry = await build(dir, true);
+      await shipped('001_a');
+      ping.mockResolvedValue(undefined);
+      queryRaw.mockRejectedValueOnce(new Error('connection refused'));
+
+      await expect(withTelemetry.readiness()).resolves.toMatchObject({
+        status: 'error',
+        database: 'down',
+        migrations: 'unknown',
+        telemetry: 'up',
+      });
+      expect(ping).toHaveBeenCalledTimes(1);
+    });
+
+    it('check() has no telemetry key and never pings', async () => {
+      const withTelemetry = await build(dir, true);
+      queryRaw.mockResolvedValue([{ '?column?': 1 }]);
+
+      const result = await withTelemetry.check();
+
+      expect(result).not.toHaveProperty('telemetry');
+      expect(ping).not.toHaveBeenCalled();
     });
   });
 });

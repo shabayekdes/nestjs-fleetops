@@ -22,7 +22,7 @@ To avoid confusion with the other roadmaps, stages are always called **Learning 
 | L4    | MongoDB querying                     | A: MongoDB            | Done    | `8139735` |
 | L5    | Aggregation pipeline                 | A: MongoDB            | Done    | `4e945c3` |
 | L6    | Geospatial features                  | A: MongoDB            | Done    | `ff5b7ff` |
-| L7    | NestJS + MongoDB                     | B: Telemetry workload | Planned | —         |
+| L7    | NestJS + MongoDB                     | B: Telemetry workload | Done    | pending   |
 | L8    | First telemetry prototype            | B: Telemetry workload | Planned | —         |
 | L9    | Microservices concepts               | C: Microservices      | Planned | —         |
 | L10   | Extract telemetry                    | C: Microservices      | Planned | —         |
@@ -493,7 +493,7 @@ Part A is about MongoDB itself. **No FleetOps code changes.** Exercises run agai
 
 ### Learning Stage 7 — NestJS + MongoDB
 
-**Status:** Planned
+**Status:** Done (commit pending)
 
 **Goal:** learn how MongoDB fits into a NestJS application, and how that differs from the Prisma setup.
 
@@ -501,20 +501,86 @@ Part A is about MongoDB itself. **No FleetOps code changes.** Exercises run agai
 
 **Compare and document:**
 
-| Topic               | PostgreSQL + Prisma (core)                          | MongoDB + driver/ODM (telemetry) |
-| ------------------- | --------------------------------------------------- | -------------------------------- |
-| Schema              | `schema.prisma` + migrations                        | To document                      |
-| Types               | Generated client                                    | To document                      |
-| Constraints         | Foreign keys, unique, check (in DB)                 | To document                      |
-| Transactions        | Interactive transactions                            | To document                      |
-| Data access pattern | `PrismaService` used directly in services           | To document                      |
-| Tests               | Real database from `.env.test`, unique data per run | To document                      |
+| Topic               | PostgreSQL + Prisma (core)                          | MongoDB + driver/ODM (telemetry)                                                                                                                  |
+| ------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Schema              | `schema.prisma` + migrations                        | Schema-as-code in `telemetry-schema.ts`, applied by an idempotent `mongo:setup`. No migration history. Time series options are fixed at creation. |
+| Types               | Generated client                                    | Hand-written document types on `Collection<T>`. Nothing at runtime guarantees stored documents match.                                             |
+| Constraints         | Foreign keys, unique, check (in DB)                 | Unique indexes and `$jsonSchema`, neither available on time series (7.0). No foreign keys: the app checks that a vehicle exists (L8).             |
+| Transactions        | Interactive transactions                            | Single-document atomicity only. Multi-document transactions need a replica set (L14) and are not used.                                            |
+| Data access pattern | `PrismaService` used directly in services           | Typed collections injected and used directly in services. No repository.                                                                          |
+| Tests               | Real database from `.env.test`, unique data per run | Real MongoDB from `.env.test` or the CI env, a uniquely named database per run, dropped afterwards. Skipped locally when unset, required in CI.   |
 
 The existing conventions (e.g. "no repositories") are **not** copied automatically. Each one is re-evaluated for MongoDB, and any difference is written down with a reason.
 
-**Open decision (made at L7, with approval):** where the telemetry code lives during L7–L8. Recommended: a `TelemetryModule` inside `apps/api/` that is **opt-in** (disabled unless its env vars are set), so the core still starts, tests and reports ready without MongoDB. This makes the L10 extraction a real lesson (module → service). The alternative is a separate learning application from the start, which skips that lesson.
+**Open decision (resolved):** the telemetry code lives in an opt-in `TelemetryModule` inside `apps/api/`, which keeps the L10 extraction a real lesson (module to service).
+
+**What was learned** (verified locally on MongoDB 7.0.43 with `mongodb` 7.7.0)
+
+- **7.0 time series limits:**
+  - A `$jsonSchema` validator is rejected on a time series collection (create fails; `collMod` fails with code 72), and so is a unique index (code 72).
+  - The server does reject a non-date `timestamp` (code 2). An unordered `insertMany` with one bad reading inserts the rest and throws `MongoBulkWriteError`.
+  - Inserting into a missing collection silently creates a plain collection, not a time series.
+  - Creating the same collection again with identical options succeeds; different options, or an existing plain collection, fail with 48.
+  - `collMod` can change `expireAfterSeconds`. 7.0 auto-creates `meta_1_timestamp_1`.
+  - `createIndex` with the same name and spec is a no-op; the same keys under another name fail with 85.
+- **Driver behavior:**
+  - If the first connection fails, the client stays closed for good (`MongoTopologyClosedError` afterwards). After a successful first connect, outages recover.
+  - `timeoutMS` did not bound server selection; only `serverSelectionTimeoutMS` did.
+  - Error classes: duplicate key is `MongoServerError` 11000, validator failure is 121, an unreachable server is `MongoServerSelectionError`.
+- **Platform:** the `mongodb` 7.7 driver supports server 4.4 to 9.0 and Node 20.19 or newer, and is CommonJS with bundled types, so named ESM imports work. `ConditionalModule.registerWhen` in `@nestjs/config` 12 gives an opt-in module. `process.loadEnvFile` never overrides variables that are already set.
+- The local kernel (7.0.0-38) is 6.19 or newer, so MongoDB stays on 7.0.43 (see the L1 notes).
+
+**Built** (`apps/api/`; no PostgreSQL schema change and no endpoints)
+
+- `TelemetryModule` (`src/telemetry/`), registered only when `MONGODB_URI` is set. Without it the API starts, tests and reports ready as before.
+- `MongoConnection`: owns the client, connects on boot, pings, checks the schema (read-only), and closes on shutdown. It fails fast if MongoDB is down or the schema is missing.
+- Typed collections `telemetry_readings` (time series) and `vehicle_latest_status` (plain collection with a `$jsonSchema` validator and a unique index, written from L8).
+- `telemetry-schema.ts` and `npm run mongo:setup` / `mongo:test:setup`: idempotent, concurrency-safe, never drops anything.
+- `mapMongoError` in the global exception filter: duplicate key to 409, unreachable or timed out to 503.
+- Readiness gains an informational `telemetry` field (`up`, `down`, `disabled`) that never changes `status`.
+- Five env vars validated in `env.validation.ts`, a `mongo` service in `docker-compose.yml` (profile `telemetry`, port 27018) and a MongoDB 7.0.43 service in CI.
+- CI prints `uname -r` ("Runner kernel" step) for the SERVER-121912 check. The result is recorded here after the first CI run.
+
+**Decisions**
+
+1. **Driver, not an ODM (decision record).** The official `mongodb` driver is used instead of Mongoose.
+   - The L5 and L6 pipelines map directly onto `aggregate<T>()`. Mongoose adds nothing to aggregations (results are not hydrated and are loosely typed, which conflicts with the no-`any` rule).
+   - It would duplicate validation and, with `autoCreate` and `autoIndex`, conflict with decision 4. Per-document casting also adds cost on bulk inserts.
+   - It adds a second upgrade layer (Mongoose pins its own `mongodb` version).
+   - Cost: about 150 lines of our own providers, schema-as-code and error mapping. Validation is ours to write.
+2. **No repositories.** A typed `Collection<T>` is injected and used directly in services, always filtered by `organizationId`. The one new file type, `telemetry-schema.ts`, exists because MongoDB has no migration system. It is not a repository.
+3. **Shape.**
+   - `telemetry_readings` is a time series: `timeField` `timestamp`, `metaField` `meta` (`organizationId`, `vehicleId`), granularity `seconds`, `expireAfterSeconds` from `TELEMETRY_RAW_RETENTION_DAYS` (default 30, a learning default).
+   - Its index is `org_vehicle_timestamp`; the automatic `meta_1_timestamp_1` is kept until it is measured in L8.
+   - The latest status is a separate plain collection, so it can have a validator and a unique index.
+   - IDs are lowercase UUID strings, not BSON UUIDs.
+4. **Schema management is an explicit step, not app startup.** `mongo:setup` creates and reconciles (retention and validator through `collMod`). The app only checks at boot and names `npm run mongo:setup` in the error. Retention and validator drift do not fail the boot.
+5. **Lifecycle.**
+   - The client is built in a factory with no I/O (so `openapi:export` still works), then connected in `onModuleInit`.
+   - Any boot error closes the client and is rethrown. The URI is never logged.
+   - Server selection times out after 2000 ms by default, which keeps `/health/ready` under the Docker `HEALTHCHECK` limit of 5 s.
+6. **Opt-in.** `MONGODB_URI` unset or blank means no telemetry module at all. The module is not global and imports no core feature module.
+7. **Readiness.** The health service finds the check through `ModuleRef` per call, so the health module never imports telemetry. A Mongo outage never turns the API unready.
+8. **Errors.** Duplicate key (a single write) gives 409. Server selection, network, operation timeout and `MaxTimeMSExpired` (50) give 503. Bulk write errors and validator failures (121) stay 500.
+9. **Infrastructure.**
+   - MongoDB 7.0.43 behind a compose profile on port 27018 (a learning container may use 27017).
+   - Only the CI `api` job gets MongoDB; `web-e2e`, `docker` and the deploy workflow are unchanged, and the compose `api` service gets no `MONGODB_URI`.
+   - Production keeps telemetry disabled.
+
+**Not done (by design):** endpoints, ingestion, a geo index, writes to `vehicle_latest_status`, an ODM, authentication on the local MongoDB, a replica set.
+
+**Deferred**
+
+- Endpoints, ingestion, the `2dsphere` index and `vehicle_latest_status` writes (L8).
+- Measure and then drop the automatic `meta_1_timestamp_1` (L8).
+- L8 telemetry controllers would make `openapi:export` depend on the environment. L8 must keep it deterministic (the CI check compares `openapi.json`).
+- Reconnect after a failed first connect, and duplicate readings (L13).
+- Replica set, transactions and live index builds (L14).
+- The `uname -r` result of the CI runner (after the first CI run).
 
 **Not yet:** a second service, a broker, real devices.
+
+**L8 is next.**
 
 ### Learning Stage 8 — First telemetry prototype
 

@@ -10,6 +10,7 @@ import { AppModule } from '../src/app.module.js';
 import { configureApp } from '../src/app.setup.js';
 import { PrismaService } from '../src/database/prisma.service.js';
 import { MIGRATIONS_DIR } from '../src/health/health.service.js';
+import { mongoTestEnv } from './utils/mongo-test-env.js';
 
 describe('FleetOps API (e2e)', () => {
   let app: INestApplication<App>;
@@ -82,6 +83,7 @@ describe('FleetOps API (e2e)', () => {
         'migrations',
         'service',
         'status',
+        'telemetry',
         'timestamp',
       ]);
       expect(body).toMatchObject({
@@ -89,6 +91,8 @@ describe('FleetOps API (e2e)', () => {
         service: 'fleetops-api',
         database: 'up',
         migrations: 'applied',
+        // Telemetry is opt-in: 'up' when MONGODB_URI is set, else 'disabled'.
+        telemetry: mongoTestEnv() ? 'up' : 'disabled',
       });
       expect(response.headers['x-request-id']).toEqual(expect.any(String));
     });
@@ -157,6 +161,8 @@ describe('GET /api/v1/health with the database down (e2e)', () => {
       service: 'fleetops-api',
       database: 'down',
       migrations: 'unknown',
+      // Telemetry is independent of Postgres.
+      telemetry: mongoTestEnv() ? 'up' : 'disabled',
     });
     expect(response.body).not.toHaveProperty('requestId');
     expect(response.body).not.toHaveProperty('error');
@@ -208,6 +214,7 @@ describe('GET /api/v1/health/ready with a pending migration (e2e)', () => {
       status: 'error',
       database: 'up',
       migrations: 'pending',
+      telemetry: mongoTestEnv() ? 'up' : 'disabled',
     });
     expect(JSON.stringify(response.body)).not.toContain(PENDING);
   });

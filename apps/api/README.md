@@ -22,7 +22,8 @@ The project is developed incrementally. Current state: application foundation (b
 - Node.js >= 22 (developed on Node 24)
 - npm >= 10
 - PostgreSQL 14+ (developed against PostgreSQL 18), local or hosted (e.g. Neon)
-- Docker with Compose v2 (optional): local PostgreSQL and the container image
+- MongoDB 7.0 (optional): only for the telemetry module. Use 7.0: 8.x and later crash on Linux kernel 6.19+ (SERVER-121912)
+- Docker with Compose v2 (optional): local PostgreSQL, MongoDB and the container image
 
 ## Installation
 
@@ -37,18 +38,23 @@ cp .env.test.example .env.test # only needed for e2e/integration tests
 
 Configuration is read from environment variables. Values are validated at startup and the application refuses to start if they are invalid. Real environment variables always override values from the `.env` files.
 
-| Variable               | Description                                                                          | Default       |
-| ---------------------- | ------------------------------------------------------------------------------------ | ------------- |
-| `NODE_ENV`             | `development`, `production`, or `test`                                               | `development` |
-| `PORT`                 | HTTP port the API listens on (1–65535)                                               | `3000`        |
-| `DATABASE_URL`         | PostgreSQL connection string (**required**)                                          | —             |
-| `JWT_SECRET`           | HS256 signing secret, at least 32 chars (**required**). `openssl rand -base64 48`    | —             |
-| `JWT_EXPIRES_IN`       | Access token lifetime in seconds (60–86400)                                          | `900`         |
-| `LOG_LEVEL`            | `fatal`, `error`, `warn`, `log`, `debug` or `verbose`                                | `log`         |
-| `THROTTLE_TTL_SECONDS` | Rate-limit window in seconds (1–3600)                                                | `60`          |
-| `THROTTLE_LIMIT`       | Attempts per window: per account+IP on login, per user on password change (1–10000)  | `5`           |
-| `THROTTLE_IP_LIMIT`    | Attempts per window per IP on both routes (1–10000)                                  | `30`          |
-| `TRUST_PROXY`          | Trusted reverse-proxy hops in front of the API (0–10). `0` ignores `X-Forwarded-For` | `0`           |
+| Variable                              | Description                                                                           | Default       |
+| ------------------------------------- | ------------------------------------------------------------------------------------- | ------------- |
+| `NODE_ENV`                            | `development`, `production`, or `test`                                                | `development` |
+| `PORT`                                | HTTP port the API listens on (1–65535)                                                | `3000`        |
+| `DATABASE_URL`                        | PostgreSQL connection string (**required**)                                           | —             |
+| `JWT_SECRET`                          | HS256 signing secret, at least 32 chars (**required**). `openssl rand -base64 48`     | —             |
+| `JWT_EXPIRES_IN`                      | Access token lifetime in seconds (60–86400)                                           | `900`         |
+| `LOG_LEVEL`                           | `fatal`, `error`, `warn`, `log`, `debug` or `verbose`                                 | `log`         |
+| `THROTTLE_TTL_SECONDS`                | Rate-limit window in seconds (1–3600)                                                 | `60`          |
+| `THROTTLE_LIMIT`                      | Attempts per window: per account+IP on login, per user on password change (1–10000)   | `5`           |
+| `THROTTLE_IP_LIMIT`                   | Attempts per window per IP on both routes (1–10000)                                   | `30`          |
+| `TRUST_PROXY`                         | Trusted reverse-proxy hops in front of the API (0–10). `0` ignores `X-Forwarded-For`  | `0`           |
+| `MONGODB_URI`                         | MongoDB connection string. Unset or empty disables the telemetry module (optional)    | —             |
+| `MONGODB_DB`                          | Telemetry database name. Required when `MONGODB_URI` is set (`[A-Za-z0-9_-]`, max 54) | —             |
+| `MONGODB_MAX_POOL_SIZE`               | MongoDB connection pool size (1–100)                                                  | `10`          |
+| `MONGODB_SERVER_SELECTION_TIMEOUT_MS` | How long to wait for MongoDB before failing (500–30000)                               | `2000`        |
+| `TELEMETRY_RAW_RETENTION_DAYS`        | Days raw readings are kept (1–3650). Learning default, not a retention policy         | `30`          |
 
 Existing `.env` and `.env.test` files created before authentication was added must be updated with a `JWT_SECRET`, otherwise the app will not start.
 
@@ -178,6 +184,24 @@ Maintenance and fuel data (created only if the vehicle has none of that kind yet
 
 Passwords are stored as Argon2id hashes. Records are upserted on their natural keys (`slug`, `organizationId + email`, `organizationId + vin`), so re-running the seed never duplicates data.
 
+## MongoDB (telemetry, optional)
+
+The telemetry module (L7: infrastructure only, no endpoints yet) is opt-in. Without `MONGODB_URI` the API starts, tests and reports ready without MongoDB, and `/api/v1/health/ready` shows `"telemetry":"disabled"`.
+
+```bash
+docker compose up -d --wait mongo   # from the repo root: MongoDB 7.0 on 127.0.0.1:27018 (profile "telemetry")
+# .env
+# MONGODB_URI="mongodb://127.0.0.1:27018"
+# MONGODB_DB=fleetops_telemetry_dev
+npm run mongo:setup                 # create/reconcile collections and indexes (idempotent, never drops)
+```
+
+MongoDB has no migration system: the schema lives in `src/telemetry/mongo/telemetry-schema.ts` and `npm run mongo:setup` applies it (run it after enabling telemetry and whenever the schema code changes). `npm run mongo:setup` runs `nest build`, so it needs dev dependencies; in a runtime image the step is `node dist/scripts/mongo-setup.js`. No deploy runs it today because telemetry is disabled in production. It creates the `telemetry_readings` time series collection (retention from `TELEMETRY_RAW_RETENTION_DAYS`) and the `vehicle_latest_status` collection with a `$jsonSchema` validator (written from L8).
+
+When `MONGODB_URI` is set, the API fails fast at startup if MongoDB is unreachable or the schema is missing or does not match (the error says to run `npm run mongo:setup`). The boot check is read-only; retention and validator differences do not fail the boot.
+
+Mongo tests: add `MONGODB_URI` and `MONGODB_DB` (the name must end with `_test`) to `.env.test`, then run `npm run mongo:test:setup` once. Leave them unset to skip Mongo tests locally; CI requires them.
+
 ## Running the Application
 
 PostgreSQL must be reachable at startup: the app runs a `SELECT 1` during bootstrap and exits if the database is unavailable.
@@ -222,53 +246,53 @@ npm run format      # Prettier
 
 All routes are served under the `/api` prefix with URI versioning (default version `v1`).
 
-| Method | Path                                                  | Description                                                                      |
-| ------ | ----------------------------------------------------- | -------------------------------------------------------------------------------- |
-| GET    | `/api/v1`                                             | Confirms the API is running                                                      |
-| GET    | `/api/v1/health`                                      | Application + database health (200 / 503)                                        |
-| GET    | `/api/v1/health/live`                                 | Liveness: always 200, touches no dependency                                      |
-| GET    | `/api/v1/health/ready`                                | Readiness: database up and migrations applied (200 / 503)                        |
-| POST   | `/api/v1/auth/login`                                  | Public. Exchange credentials for an access token                                 |
-| GET    | `/api/v1/auth/me`                                     | Bearer token. Current user profile (with role and organization)                  |
-| PATCH  | `/api/v1/auth/me/password`                            | Bearer token, any role. Change own password (204)                                |
-| GET    | `/api/v1/users`                                       | Bearer token, ADMIN. List users (paginated, role filter)                         |
-| POST   | `/api/v1/users`                                       | Bearer token, ADMIN. Create a user                                               |
-| GET    | `/api/v1/users/:id`                                   | Bearer token, ADMIN. Get a user                                                  |
-| PATCH  | `/api/v1/users/:id`                                   | Bearer token, ADMIN. Partially update a user                                     |
-| DELETE | `/api/v1/users/:id`                                   | Bearer token, ADMIN. Delete a user (204)                                         |
-| GET    | `/api/v1/vehicles`                                    | Bearer token. List vehicles (paginated, filters)                                 |
-| POST   | `/api/v1/vehicles`                                    | Bearer token, ADMIN or MANAGER. Create a vehicle                                 |
-| GET    | `/api/v1/vehicles/:id`                                | Bearer token. Get a vehicle                                                      |
-| PATCH  | `/api/v1/vehicles/:id`                                | Bearer token, ADMIN or MANAGER. Partially update a vehicle                       |
-| DELETE | `/api/v1/vehicles/:id`                                | Bearer token, ADMIN or MANAGER. Delete a vehicle (204)                           |
-| GET    | `/api/v1/drivers`                                     | Bearer token, ADMIN or MANAGER. List drivers (paginated, `licenseStatus` filter) |
-| POST   | `/api/v1/drivers`                                     | Bearer token, ADMIN or MANAGER. Create a driver                                  |
-| GET    | `/api/v1/drivers/:id`                                 | Bearer token, ADMIN or MANAGER. Get a driver                                     |
-| PATCH  | `/api/v1/drivers/:id`                                 | Bearer token, ADMIN or MANAGER. Partially update a driver                        |
-| DELETE | `/api/v1/drivers/:id`                                 | Bearer token, ADMIN or MANAGER. Delete a driver (204)                            |
-| GET    | `/api/v1/assignments`                                 | Bearer token, ADMIN or MANAGER. List assignments (filters)                       |
-| POST   | `/api/v1/assignments`                                 | Bearer token, ADMIN or MANAGER. Assign a driver to a vehicle                     |
-| GET    | `/api/v1/assignments/:id`                             | Bearer token, ADMIN or MANAGER. Get an assignment                                |
-| POST   | `/api/v1/assignments/:id/end`                         | Bearer token, ADMIN or MANAGER. End an assignment (200)                          |
-| GET    | `/api/v1/vehicles/:vehicleId/maintenance-records`     | Bearer token, ADMIN or MANAGER. List maintenance records (paginated, filters)    |
-| POST   | `/api/v1/vehicles/:vehicleId/maintenance-records`     | Bearer token, ADMIN or MANAGER. Create a maintenance record                      |
-| GET    | `/api/v1/vehicles/:vehicleId/maintenance-records/:id` | Bearer token, ADMIN or MANAGER. Get a maintenance record                         |
-| PATCH  | `/api/v1/vehicles/:vehicleId/maintenance-records/:id` | Bearer token, ADMIN or MANAGER. Partially update a maintenance record            |
-| DELETE | `/api/v1/vehicles/:vehicleId/maintenance-records/:id` | Bearer token, ADMIN or MANAGER. Delete a maintenance record (204)                |
-| GET    | `/api/v1/vehicles/:vehicleId/fuel-logs`               | Bearer token, ADMIN or MANAGER. List fuel logs (paginated, date range)           |
-| POST   | `/api/v1/vehicles/:vehicleId/fuel-logs`               | Bearer token, ADMIN or MANAGER. Create a fuel log                                |
-| GET    | `/api/v1/vehicles/:vehicleId/fuel-logs/:id`           | Bearer token, ADMIN or MANAGER. Get a fuel log                                   |
-| PATCH  | `/api/v1/vehicles/:vehicleId/fuel-logs/:id`           | Bearer token, ADMIN or MANAGER. Partially update a fuel log                      |
-| DELETE | `/api/v1/vehicles/:vehicleId/fuel-logs/:id`           | Bearer token, ADMIN or MANAGER. Delete a fuel log (204)                          |
-| GET    | `/api/v1/vehicles/:vehicleId/cost-summary`            | Bearer token, ADMIN or MANAGER. Monthly maintenance and fuel costs               |
-| GET    | `/api/v1/cost-summary`                                | Bearer token, ADMIN or MANAGER. Fleet-wide monthly maintenance and fuel costs    |
-| GET    | `/api/v1/dashboard/fleet`                             | Bearer token, ADMIN or MANAGER. Fleet counts: vehicles, drivers, assignments     |
-| GET    | `/api/v1/dashboard/me`                                | Bearer token, any role. Own driver profile and active assignment                 |
-| GET    | `/api/v1/master-data/vehicle-makes`                   | Bearer token, any role. Global vehicle makes catalog (paginated)                 |
-| GET    | `/api/v1/master-data/vehicle-makes/:slug`             | Bearer token, any role. One make by slug, including retired ones                 |
-| GET    | `/api/v1/master-data/vehicle-makes/:makeId/models`    | Bearer token, any role. Models of one make (paginated)                           |
-| GET    | `/api/v1/master-data/vehicle-types`                   | Bearer token, any role. Global vehicle types catalog (paginated)                 |
-| GET    | `/api/v1/master-data/vehicle-types/:slug`             | Bearer token, any role. One vehicle type by slug, including retired ones         |
+| Method | Path                                                  | Description                                                                               |
+| ------ | ----------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| GET    | `/api/v1`                                             | Confirms the API is running                                                               |
+| GET    | `/api/v1/health`                                      | Application + database health (200 / 503)                                                 |
+| GET    | `/api/v1/health/live`                                 | Liveness: always 200, touches no dependency                                               |
+| GET    | `/api/v1/health/ready`                                | Readiness: database up and migrations applied, plus informational `telemetry` (200 / 503) |
+| POST   | `/api/v1/auth/login`                                  | Public. Exchange credentials for an access token                                          |
+| GET    | `/api/v1/auth/me`                                     | Bearer token. Current user profile (with role and organization)                           |
+| PATCH  | `/api/v1/auth/me/password`                            | Bearer token, any role. Change own password (204)                                         |
+| GET    | `/api/v1/users`                                       | Bearer token, ADMIN. List users (paginated, role filter)                                  |
+| POST   | `/api/v1/users`                                       | Bearer token, ADMIN. Create a user                                                        |
+| GET    | `/api/v1/users/:id`                                   | Bearer token, ADMIN. Get a user                                                           |
+| PATCH  | `/api/v1/users/:id`                                   | Bearer token, ADMIN. Partially update a user                                              |
+| DELETE | `/api/v1/users/:id`                                   | Bearer token, ADMIN. Delete a user (204)                                                  |
+| GET    | `/api/v1/vehicles`                                    | Bearer token. List vehicles (paginated, filters)                                          |
+| POST   | `/api/v1/vehicles`                                    | Bearer token, ADMIN or MANAGER. Create a vehicle                                          |
+| GET    | `/api/v1/vehicles/:id`                                | Bearer token. Get a vehicle                                                               |
+| PATCH  | `/api/v1/vehicles/:id`                                | Bearer token, ADMIN or MANAGER. Partially update a vehicle                                |
+| DELETE | `/api/v1/vehicles/:id`                                | Bearer token, ADMIN or MANAGER. Delete a vehicle (204)                                    |
+| GET    | `/api/v1/drivers`                                     | Bearer token, ADMIN or MANAGER. List drivers (paginated, `licenseStatus` filter)          |
+| POST   | `/api/v1/drivers`                                     | Bearer token, ADMIN or MANAGER. Create a driver                                           |
+| GET    | `/api/v1/drivers/:id`                                 | Bearer token, ADMIN or MANAGER. Get a driver                                              |
+| PATCH  | `/api/v1/drivers/:id`                                 | Bearer token, ADMIN or MANAGER. Partially update a driver                                 |
+| DELETE | `/api/v1/drivers/:id`                                 | Bearer token, ADMIN or MANAGER. Delete a driver (204)                                     |
+| GET    | `/api/v1/assignments`                                 | Bearer token, ADMIN or MANAGER. List assignments (filters)                                |
+| POST   | `/api/v1/assignments`                                 | Bearer token, ADMIN or MANAGER. Assign a driver to a vehicle                              |
+| GET    | `/api/v1/assignments/:id`                             | Bearer token, ADMIN or MANAGER. Get an assignment                                         |
+| POST   | `/api/v1/assignments/:id/end`                         | Bearer token, ADMIN or MANAGER. End an assignment (200)                                   |
+| GET    | `/api/v1/vehicles/:vehicleId/maintenance-records`     | Bearer token, ADMIN or MANAGER. List maintenance records (paginated, filters)             |
+| POST   | `/api/v1/vehicles/:vehicleId/maintenance-records`     | Bearer token, ADMIN or MANAGER. Create a maintenance record                               |
+| GET    | `/api/v1/vehicles/:vehicleId/maintenance-records/:id` | Bearer token, ADMIN or MANAGER. Get a maintenance record                                  |
+| PATCH  | `/api/v1/vehicles/:vehicleId/maintenance-records/:id` | Bearer token, ADMIN or MANAGER. Partially update a maintenance record                     |
+| DELETE | `/api/v1/vehicles/:vehicleId/maintenance-records/:id` | Bearer token, ADMIN or MANAGER. Delete a maintenance record (204)                         |
+| GET    | `/api/v1/vehicles/:vehicleId/fuel-logs`               | Bearer token, ADMIN or MANAGER. List fuel logs (paginated, date range)                    |
+| POST   | `/api/v1/vehicles/:vehicleId/fuel-logs`               | Bearer token, ADMIN or MANAGER. Create a fuel log                                         |
+| GET    | `/api/v1/vehicles/:vehicleId/fuel-logs/:id`           | Bearer token, ADMIN or MANAGER. Get a fuel log                                            |
+| PATCH  | `/api/v1/vehicles/:vehicleId/fuel-logs/:id`           | Bearer token, ADMIN or MANAGER. Partially update a fuel log                               |
+| DELETE | `/api/v1/vehicles/:vehicleId/fuel-logs/:id`           | Bearer token, ADMIN or MANAGER. Delete a fuel log (204)                                   |
+| GET    | `/api/v1/vehicles/:vehicleId/cost-summary`            | Bearer token, ADMIN or MANAGER. Monthly maintenance and fuel costs                        |
+| GET    | `/api/v1/cost-summary`                                | Bearer token, ADMIN or MANAGER. Fleet-wide monthly maintenance and fuel costs             |
+| GET    | `/api/v1/dashboard/fleet`                             | Bearer token, ADMIN or MANAGER. Fleet counts: vehicles, drivers, assignments              |
+| GET    | `/api/v1/dashboard/me`                                | Bearer token, any role. Own driver profile and active assignment                          |
+| GET    | `/api/v1/master-data/vehicle-makes`                   | Bearer token, any role. Global vehicle makes catalog (paginated)                          |
+| GET    | `/api/v1/master-data/vehicle-makes/:slug`             | Bearer token, any role. One make by slug, including retired ones                          |
+| GET    | `/api/v1/master-data/vehicle-makes/:makeId/models`    | Bearer token, any role. Models of one make (paginated)                                    |
+| GET    | `/api/v1/master-data/vehicle-types`                   | Bearer token, any role. Global vehicle types catalog (paginated)                          |
+| GET    | `/api/v1/master-data/vehicle-types/:slug`             | Bearer token, any role. One vehicle type by slug, including retired ones                  |
 
 Every endpoint except `/api/v1` and `/api/v1/health*` requires an `Authorization: Bearer <token>` header.
 
@@ -518,7 +542,7 @@ Every response has an `X-Request-Id` header (an incoming value is kept only if i
 ### Health probes
 
 - `GET /api/v1/health/live` always returns `200 {"status":"ok","service","timestamp"}`. Use it for liveness probes: a database outage must not restart the process.
-- `GET /api/v1/health/ready` returns `{"status","service","timestamp","database":"up|down","migrations":"applied|pending|unknown"}`: `200` only when the database is up and every migration shipped in this build is applied (newer unknown rows are ignored, so old instances stay ready during a rolling deploy), otherwise `503` with the same body. Migration names are only logged. Use it for readiness probes. It reads `prisma/migrations` relative to the working directory, so run the app from the project root (`/app` in the image); otherwise `migrations` is `unknown` and the instance is never ready.
+- `GET /api/v1/health/ready` returns `{"status","service","timestamp","database":"up|down","migrations":"applied|pending|unknown","telemetry":"up|down|disabled"}`: `200` only when the database is up and every migration shipped in this build is applied (newer unknown rows are ignored, so old instances stay ready during a rolling deploy), otherwise `503` with the same body. `telemetry` is informational and never changes the status or the HTTP code. Migration names are only logged. Use it for readiness probes. It reads `prisma/migrations` relative to the working directory, so run the app from the project root (`/app` in the image); otherwise `migrations` is `unknown` and the instance is never ready.
 
 ### Rate limiting
 

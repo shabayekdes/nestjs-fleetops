@@ -2564,6 +2564,15 @@
               "pending"
             ],
             "type": "string"
+          },
+          "telemetry": {
+            "description": "Telemetry MongoDB connectivity. Informational: never changes `status`.\n`disabled` when MONGODB_URI is unset.",
+            "enum": [
+              "up",
+              "down",
+              "disabled"
+            ],
+            "type": "string"
           }
         },
         "required": [
@@ -2571,7 +2580,8 @@
           "service",
           "timestamp",
           "database",
-          "migrations"
+          "migrations",
+          "telemetry"
         ]
       },
       "LoginDto": {

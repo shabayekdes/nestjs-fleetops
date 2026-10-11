@@ -1,4 +1,5 @@
 export type DependencyStatus = 'up' | 'down';
+export type TelemetryStatus = DependencyStatus | 'disabled';
 export type MigrationsStatus = 'applied' | 'pending' | 'unknown';
 
 /** Liveness probe result. Touches no dependency. */
@@ -32,4 +33,10 @@ export class HealthResponseDto {
 export class ReadinessResponseDto extends HealthResponseDto {
   /** Whether every migration shipped in this build is applied. */
   migrations: MigrationsStatus;
+
+  /**
+   * Telemetry MongoDB connectivity. Informational: never changes `status`.
+   * `disabled` when MONGODB_URI is unset.
+   */
+  telemetry: TelemetryStatus;
 }

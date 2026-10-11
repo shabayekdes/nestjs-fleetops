@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConditionalModule, ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller.js';
 import { AssignmentsModule } from './assignments/assignments.module.js';
@@ -12,6 +12,8 @@ import { FuelLogsModule } from './fuel-logs/fuel-logs.module.js';
 import { HealthModule } from './health/health.module.js';
 import { MaintenanceModule } from './maintenance/maintenance.module.js';
 import { MasterDataModule } from './master-data/master-data.module.js';
+import { isTelemetryEnabled } from './telemetry/telemetry-config.js';
+import { TelemetryModule } from './telemetry/telemetry.module.js';
 import { UsersModule } from './users/users.module.js';
 import { VehiclesModule } from './vehicles/vehicles.module.js';
 
@@ -35,6 +37,7 @@ import { VehiclesModule } from './vehicles/vehicles.module.js';
     CostSummaryModule,
     DashboardModule,
     MasterDataModule,
+    ConditionalModule.registerWhen(TelemetryModule, isTelemetryEnabled),
   ],
   controllers: [AppController],
 })

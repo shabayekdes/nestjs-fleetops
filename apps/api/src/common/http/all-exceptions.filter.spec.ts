@@ -7,6 +7,11 @@ import {
   type ArgumentsHost,
 } from '@nestjs/common';
 import { jest } from '@jest/globals';
+import {
+  MongoBulkWriteError,
+  MongoServerError,
+  MongoServerSelectionError,
+} from 'mongodb';
 import { Prisma } from '../../generated/prisma/client.js';
 import { AllExceptionsFilter } from './all-exceptions.filter.js';
 
@@ -191,5 +196,44 @@ describe('AllExceptionsFilter', () => {
   it('uses an empty requestId when the header is missing', () => {
     const { body } = run(new NotFoundException(), { headers: {} });
     expect(body?.requestId).toBe('');
+  });
+  describe('MongoDB errors', () => {
+    it('maps a duplicate key error to the standard 409 body', () => {
+      const { status, body } = run(
+        new MongoServerError({ message: 'E11000 secret', code: 11000 }),
+      );
+      expect(status).toBe(409);
+      expect(body).toMatchObject({
+        statusCode: 409,
+        error: 'Conflict',
+        message: 'Resource already exists',
+        requestId: 'req-1',
+        path: '/api/v1/things',
+      });
+      expect(JSON.stringify(body)).not.toContain('secret');
+    });
+
+    it('maps a server selection error to 503 and logs it', () => {
+      const { status, body } = run(
+        Object.create(MongoServerSelectionError.prototype) as unknown,
+      );
+      expect(status).toBe(503);
+      expect(body).toMatchObject({
+        statusCode: 503,
+        error: 'Service Unavailable',
+        message: 'Telemetry storage is unavailable',
+      });
+      expect(errorSpy).toHaveBeenCalled();
+    });
+
+    it('keeps a bulk write error at 500', () => {
+      const bulk = new MongoBulkWriteError(
+        { message: 'dup', code: 11000 },
+        {} as ConstructorParameters<typeof MongoBulkWriteError>[1],
+      );
+      const { status, body } = run(bulk);
+      expect(status).toBe(500);
+      expect(body?.message).toBe('Internal server error');
+    });
   });
 });

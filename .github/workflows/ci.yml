@@ -30,12 +30,23 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
+      mongo:
+        image: mongo:7.0.43
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.runCommand({ping:1})'"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     defaults:
       run:
         working-directory: apps/api
     env:
       # Real env vars override .env.test for ConfigModule and prisma.config.ts.
       DATABASE_URL: postgresql://fleetops:fleetops@localhost:5432/fleetops_test?schema=public
+      MONGODB_URI: mongodb://localhost:27017
+      MONGODB_DB: fleetops_telemetry_test
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -43,6 +54,8 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
           cache-dependency-path: apps/api/package-lock.json
+      - name: Runner kernel (MongoDB SERVER-121912 check)
+        run: uname -r
       - run: npm ci
       - name: Create .env.test from the example
         run: cp .env.test.example .env.test
@@ -50,6 +63,7 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run db:test:migrate
+      - run: npm run mongo:test:setup
       - run: npm run test:e2e
       - run: npm run build
       - name: Check committed OpenAPI document is up to date

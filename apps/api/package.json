@@ -30,6 +30,8 @@
     "db:reset": "prisma migrate reset && prisma db seed",
     "db:studio": "prisma studio",
     "db:test:migrate": "NODE_ENV=test prisma migrate deploy",
+    "mongo:setup": "nest build && node dist/scripts/mongo-setup.js",
+    "mongo:test:setup": "nest build && NODE_ENV=test node dist/scripts/mongo-setup.js",
     "db:test:e2e-cleanup": "NODE_ENV=test tsx prisma/e2e-cleanup.ts"
   },
   "dependencies": {
@@ -46,6 +48,7 @@
     "@prisma/client": "^7.10.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
+    "mongodb": "^7.7.0",
     "pg": "^8.23.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1"

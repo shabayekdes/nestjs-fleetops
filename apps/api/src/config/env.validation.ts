@@ -1,15 +1,17 @@
 import type { LogLevel } from '@nestjs/common';
-import { plainToInstance } from 'class-transformer';
+import { plainToInstance, Transform } from 'class-transformer';
 import {
   IsEnum,
   IsIn,
   IsInt,
+  IsOptional,
   IsString,
   Matches,
   Max,
   Min,
   MinLength,
   validateSync,
+  ValidateIf,
 } from 'class-validator';
 
 export enum Environment {
@@ -72,6 +74,48 @@ export class EnvironmentVariables {
   @Min(0)
   @Max(10)
   TRUST_PROXY: number = 0;
+
+  /**
+   * MongoDB connection string for the optional telemetry module. Unset or
+   * empty disables telemetry.
+   */
+  @Transform(({ value }: { value: unknown }) =>
+    value === '' ? undefined : value,
+  )
+  @IsOptional()
+  @Matches(/^mongodb(\+srv)?:\/\/.+/, {
+    message:
+      'MONGODB_URI must be a mongodb:// or mongodb+srv:// connection string',
+  })
+  MONGODB_URI?: string;
+
+  /** Telemetry database name. Required when MONGODB_URI is set. */
+  @Transform(({ value }: { value: unknown }) =>
+    value === '' ? undefined : value,
+  )
+  @ValidateIf((env: EnvironmentVariables) => env.MONGODB_URI !== undefined)
+  @Matches(/^[A-Za-z0-9_-]{1,54}$/, {
+    message:
+      'MONGODB_DB is required when MONGODB_URI is set (1-54 letters, digits, _ or -)',
+  })
+  MONGODB_DB?: string;
+
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  MONGODB_MAX_POOL_SIZE: number = 10;
+
+  /** Keeps /health/ready under the Docker HEALTHCHECK timeout. */
+  @IsInt()
+  @Min(500)
+  @Max(30000)
+  MONGODB_SERVER_SELECTION_TIMEOUT_MS: number = 2000;
+
+  /** Learning default, not a retention policy (L14). */
+  @IsInt()
+  @Min(1)
+  @Max(3650)
+  TELEMETRY_RAW_RETENTION_DAYS: number = 30;
 }
 
 /**

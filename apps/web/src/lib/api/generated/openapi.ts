@@ -568,6 +568,12 @@ export interface components {
              * @enum {string}
              */
             migrations: "unknown" | "applied" | "pending";
+            /**
+             * @description Telemetry MongoDB connectivity. Informational: never changes `status`.
+             *     `disabled` when MONGODB_URI is unset.
+             * @enum {string}
+             */
+            telemetry: "up" | "down" | "disabled";
         };
         LoginDto: {
             organizationSlug: string;

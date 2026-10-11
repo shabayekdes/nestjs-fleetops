@@ -133,3 +133,90 @@ describe('validateEnv', () => {
     expect(() => validateEnv({ ...base, PORT: 'abc' })).toThrow(/PORT/);
   });
 });
+
+const validate = (extra: Record<string, unknown> = {}) =>
+  validateEnv({ ...base, ...extra });
+
+describe('validateEnv (MongoDB telemetry settings)', () => {
+  it('is valid without Mongo variables and applies defaults', () => {
+    const env = validate();
+    expect(env.MONGODB_URI).toBeUndefined();
+    expect(env.MONGODB_DB).toBeUndefined();
+    expect(env.MONGODB_MAX_POOL_SIZE).toBe(10);
+    expect(env.MONGODB_SERVER_SELECTION_TIMEOUT_MS).toBe(2000);
+    expect(env.TELEMETRY_RAW_RETENTION_DAYS).toBe(30);
+  });
+
+  it('treats empty MONGODB_URI and MONGODB_DB as unset', () => {
+    const env = validate({ MONGODB_URI: '', MONGODB_DB: '' });
+    expect(env.MONGODB_URI).toBeUndefined();
+    expect(env.MONGODB_DB).toBeUndefined();
+  });
+
+  it('requires MONGODB_DB when MONGODB_URI is set', () => {
+    expect(() =>
+      validate({ MONGODB_URI: 'mongodb://127.0.0.1:27017' }),
+    ).toThrow(/MONGODB_DB/);
+    expect(() =>
+      validate({ MONGODB_URI: 'mongodb://127.0.0.1:27017', MONGODB_DB: '' }),
+    ).toThrow(/MONGODB_DB/);
+  });
+
+  it('rejects a non-mongodb URI', () => {
+    expect(() =>
+      validate({ MONGODB_URI: 'postgres://x/y', MONGODB_DB: 'telemetry' }),
+    ).toThrow(/property MONGODB_URI has failed/);
+  });
+
+  it('accepts mongodb and mongodb+srv URIs', () => {
+    expect(
+      validate({ MONGODB_URI: 'mongodb://h:27017', MONGODB_DB: 'telemetry' })
+        .MONGODB_URI,
+    ).toBe('mongodb://h:27017');
+    expect(
+      validate({
+        MONGODB_URI: 'mongodb+srv://u:p@cluster.example.net/?retryWrites=true',
+        MONGODB_DB: 'telemetry',
+      }).MONGODB_URI,
+    ).toMatch(/^mongodb\+srv:/);
+  });
+
+  it.each(['a.b', 'a/b', 'a b', 'a'.repeat(55)])(
+    'rejects MONGODB_DB %j',
+    (name) => {
+      expect(() =>
+        validate({ MONGODB_URI: 'mongodb://h:27017', MONGODB_DB: name }),
+      ).toThrow(/MONGODB_DB/);
+    },
+  );
+
+  it('accepts a 54 character MONGODB_DB with _ and -', () => {
+    const name = `a_-${'b'.repeat(51)}`;
+    expect(
+      validate({ MONGODB_URI: 'mongodb://h:27017', MONGODB_DB: name })
+        .MONGODB_DB,
+    ).toBe(name);
+  });
+
+  it.each([
+    ['MONGODB_MAX_POOL_SIZE', 0],
+    ['MONGODB_MAX_POOL_SIZE', 101],
+    ['MONGODB_SERVER_SELECTION_TIMEOUT_MS', 499],
+    ['MONGODB_SERVER_SELECTION_TIMEOUT_MS', 30001],
+    ['TELEMETRY_RAW_RETENTION_DAYS', 0],
+    ['TELEMETRY_RAW_RETENTION_DAYS', 3651],
+  ])('rejects %s=%d', (key, value) => {
+    expect(() => validate({ [key]: value })).toThrow(new RegExp(key));
+  });
+
+  it('converts numeric strings', () => {
+    const env = validate({
+      MONGODB_MAX_POOL_SIZE: '25',
+      MONGODB_SERVER_SELECTION_TIMEOUT_MS: '1500',
+      TELEMETRY_RAW_RETENTION_DAYS: '7',
+    });
+    expect(env.MONGODB_MAX_POOL_SIZE).toBe(25);
+    expect(env.MONGODB_SERVER_SELECTION_TIMEOUT_MS).toBe(1500);
+    expect(env.TELEMETRY_RAW_RETENTION_DAYS).toBe(7);
+  });
+});
