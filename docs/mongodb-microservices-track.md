@@ -21,7 +21,7 @@ To avoid confusion with the other roadmaps, stages are always called **Learning 
 | L3    | Indexing + query performance         | A: MongoDB            | Done    | `ba1960f` |
 | L4    | MongoDB querying                     | A: MongoDB            | Done    | `8139735` |
 | L5    | Aggregation pipeline                 | A: MongoDB            | Done    | `4e945c3` |
-| L6    | Geospatial features                  | A: MongoDB            | Done    | (pending) |
+| L6    | Geospatial features                  | A: MongoDB            | Done    | `ff5b7ff` |
 | L7    | NestJS + MongoDB                     | B: Telemetry workload | Planned | —         |
 | L8    | First telemetry prototype            | B: Telemetry workload | Planned | —         |
 | L9    | Microservices concepts               | C: Microservices      | Planned | —         |
@@ -431,7 +431,7 @@ Part A is about MongoDB itself. **No FleetOps code changes.** Exercises run agai
 
 ### Learning Stage 6 — Geospatial features
 
-**Status:** Done (pending)
+**Status:** Done (`ff5b7ff`)
 
 **Goal:** learn the location features that GPS tracking would need.
 
