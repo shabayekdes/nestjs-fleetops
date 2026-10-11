@@ -19,7 +19,7 @@ To avoid confusion with the other roadmaps, stages are always called **Learning 
 | L1    | MongoDB fundamentals                 | A: MongoDB            | Done    | `fe09f1b` |
 | L2    | MongoDB data modeling                | A: MongoDB            | Done    | `518497c` |
 | L3    | Indexing + query performance         | A: MongoDB            | Done    | `ba1960f` |
-| L4    | MongoDB querying                     | A: MongoDB            | Planned | —         |
+| L4    | MongoDB querying                     | A: MongoDB            | Done    | (pending) |
 | L5    | Aggregation pipeline                 | A: MongoDB            | Planned | —         |
 | L6    | Geospatial features                  | A: MongoDB            | Planned | —         |
 | L7    | NestJS + MongoDB                     | B: Telemetry workload | Planned | —         |
@@ -329,13 +329,52 @@ Part A is about MongoDB itself. **No FleetOps code changes.** Exercises run agai
 
 ### Learning Stage 4 — MongoDB querying
 
-**Status:** Planned
+**Status:** Done (pending)
 
 **Goal:** write the queries a telemetry workload needs.
 
 **Topics:** comparison and logical operators; array and nested document queries; `$in`, `$nin`, `$exists`, `$elemMatch`; update operators; atomic single-document updates; upserts; bulk operations (`bulkWrite`, ordered vs unordered).
 
-**Exercises (fleet telemetry):** readings above a speed limit in a time range; vehicles with missing fuel level; upsert a "latest position" document per vehicle; bulk-insert a batch of readings and handle a partial failure.
+**What was learned** (details in [`learning/mongodb/l4-querying/NOTES.md`](../learning/mongodb/l4-querying/NOTES.md))
+
+- Missing, `null` and wrong types are different. `{ field: null }` matches both null and missing. `{ $not: { $type: 'number' } }` finds every unusable value. Comparisons never match another type: `{ $gt: 50 }` skips the string `"85"`.
+- Wrong operators give wrong results with no error:
+  - a JavaScript filter with the same key twice keeps only the second;
+  - two dot-notation conditions on an array can match different elements, where `$elemMatch` requires one element to match both.
+- `$not` and "missing vs null" cannot be answered from the index alone. `$not: { $type: 'number' }` examined 1 800 keys and documents to return 38.
+- Read-modify-write lost an update (2 readings counted as 1). `$inc` did not.
+- The latest-position upsert needs a timestamp guard in its filter _and_ a unique index:
+  - without the guard, a late reading overwrote a newer one;
+  - without the unique index, the guarded upsert inserted a duplicate document instead of failing.
+  - With both, 1 800 readings delivered in random order left 0 wrong positions.
+- Bulk writes are not transactions. Unordered `insertMany` with a natural unique key makes retries safe: treat `11000` as "already stored", and keep other per-document errors in a rejected-readings collection. Batching: 743 ms one by one vs 34 ms with `insertMany` for 2 000 readings.
+
+**Built**
+
+- Four `mongosh` exercises in `learning/mongodb/l4-querying/`:
+  - operators;
+  - arrays and nested documents;
+  - atomic updates and upserts;
+  - bulk writes.
+- Each exercise has worked examples, "your turn" tasks and runnable solutions.
+- A shared seed (`lib/telemetry.js`) with deliberately messy readings: missing, null and string fuel levels, and diagnostics arrays.
+- `NOTES.md`: operator pitfalls, index use per operator, the upsert pattern, bulk-write error handling, and what L8 should use.
+
+**Decisions**
+
+1. **Ingestion pattern for L8:**
+   - Unordered batch inserts with a natural key of `organizationId`, `vehicleId` and `timestamp`.
+   - `11000` counts as success.
+   - Other per-document errors are kept, not retried.
+2. **Latest position for L8:** a guarded upsert with a unique index on `{ organizationId, vehicleId }`. Counters are not kept in the guarded update.
+3. No change to the FleetOps PostgreSQL schema, and no FleetOps code.
+
+**Deferred**
+
+- Aggregations, such as daily averages and `$filter` over arrays (L5).
+- Schema validation, so bad types are rejected on insert (L7).
+- Safe retries into a time series collection, which cannot have the natural-key unique index (L13).
+- Multi-document atomicity for readings + latest position (L14).
 
 ### Learning Stage 5 — Aggregation pipeline
 

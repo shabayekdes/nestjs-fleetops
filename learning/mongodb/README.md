@@ -42,7 +42,8 @@ Each exercise has three parts:
 | L1    | [`l1-fundamentals/`](l1-fundamentals/)   | Done   |
 | L2    | [`l2-data-modeling/`](l2-data-modeling/) | Done   |
 | L3    | [`l3-indexing/`](l3-indexing/)           | Done   |
-| L4–L6 | Added when each stage is approved        | —      |
+| L4    | [`l4-querying/`](l4-querying/)           | Done   |
+| L5–L6 | Added when each stage is approved        | —      |
 
 ### L1 — MongoDB fundamentals
 
@@ -82,3 +83,15 @@ Exercises use the `learning_l2` database: `docker compose exec mongo mongosh --q
 | [`NOTES.md`](l3-indexing/NOTES.md) | Reading explain, index design rules, measurements, the telemetry-shape decision  |
 
 Exercises use the `learning_l3` database: `docker compose exec mongo mongosh --quiet learning_l3 /learning/l3-indexing/01-explain-basics.js`. Each exercise loads 144 000 synthetic readings (a few seconds). Solution 06 needs exercise 06 to have run first.
+
+### L4 — MongoDB querying
+
+| File                               | Topic                                                                                       |
+| ---------------------------------- | ------------------------------------------------------------------------------------------- |
+| `01-operators.js`                  | Speeding queries, `$or`/`$in`/`$nin`, missing vs null vs wrong type, index use per operator |
+| `02-arrays-and-nested.js`          | `$elemMatch` vs dot notation, `$all`/`$size`, positional updates, bounded `$push`           |
+| `03-atomic-updates-and-upserts.js` | Update operators, lost updates, `findOneAndUpdate`, the guarded latest-position upsert      |
+| `04-bulk-writes.js`                | Ordered vs unordered, partial failures, safe retries, `bulkWrite`, batching                 |
+| [`NOTES.md`](l4-querying/NOTES.md) | Operator pitfalls, index use, the upsert pattern, bulk-write error handling                 |
+
+Exercises use the `learning_l4` database: `docker compose exec mongo mongosh --quiet learning_l4 /learning/l4-querying/01-operators.js`.
