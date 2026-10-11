@@ -44,7 +44,7 @@ Each exercise has three parts:
 | L3    | [`l3-indexing/`](l3-indexing/)           | Done   |
 | L4    | [`l4-querying/`](l4-querying/)           | Done   |
 | L5    | [`l5-aggregation/`](l5-aggregation/)     | Done   |
-| L6    | Added when the stage is approved         | —      |
+| L6    | [`l6-geospatial/`](l6-geospatial/)       | Done   |
 
 ### L1 — MongoDB fundamentals
 
@@ -108,3 +108,17 @@ Exercises use the `learning_l4` database: `docker compose exec mongo mongosh --q
 | [`NOTES.md`](l5-aggregation/NOTES.md) | Pipeline rules, SQL comparison, time zones, window functions, stored summaries           |
 
 Exercises use the `learning_l5` database: `docker compose exec mongo mongosh --quiet learning_l5 /learning/l5-aggregation/01-pipeline-basics.js`. Solution 04 needs exercise 04 to have run first.
+
+### L6 — Geospatial features
+
+| File                                 | Topic                                                                                           |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| `01-geojson-and-near.js`             | GeoJSON rules, tenant-first `2dsphere` index, `$near` / `$geoNear`, history near a point        |
+| `02-geowithin-geofences.js`          | `$geoWithin`, `$geoIntersects`, polygons with holes, invalid polygons, circular fences          |
+| `03-geofence-events.js`              | Enter/exit events: batch (`$geoNear` + `$shift`) and at ingestion, flapping, debouncing, visits |
+| `04-location-history.js`             | GPS distance vs odometer, trips with `LineString` routes, thinning paths, privacy               |
+| [`NOTES.md`](l6-geospatial/NOTES.md) | Operator choice, tenant isolation, event design, location history, what v2.x needs              |
+
+Exercises use the `learning_l6` database: `docker compose exec mongo mongosh --quiet learning_l6 /learning/l6-geospatial/01-geojson-and-near.js`. All locations are synthetic. Solution 03 needs exercise 03 to have run first.
+
+Part A (L1–L6) is complete. Part B (L7 onward) adds code to FleetOps and does not use this folder.

@@ -21,7 +21,7 @@ To avoid confusion with the other roadmaps, stages are always called **Learning 
 | L3    | Indexing + query performance         | A: MongoDB            | Done    | `ba1960f` |
 | L4    | MongoDB querying                     | A: MongoDB            | Done    | `8139735` |
 | L5    | Aggregation pipeline                 | A: MongoDB            | Done    | `4e945c3` |
-| L6    | Geospatial features                  | A: MongoDB            | Planned | —         |
+| L6    | Geospatial features                  | A: MongoDB            | Done    | (pending) |
 | L7    | NestJS + MongoDB                     | B: Telemetry workload | Planned | —         |
 | L8    | First telemetry prototype            | B: Telemetry workload | Planned | —         |
 | L9    | Microservices concepts               | C: Microservices      | Planned | —         |
@@ -431,26 +431,61 @@ Part A is about MongoDB itself. **No FleetOps code changes.** Exercises run agai
 
 ### Learning Stage 6 — Geospatial features
 
-**Status:** Planned
+**Status:** Done (pending)
 
 **Goal:** learn the location features that GPS tracking would need.
 
 **Topics:** GeoJSON (`Point`, `Polygon`; coordinates are `[longitude, latitude]`); `2dsphere` indexes; `$near`, `$geoWithin`, `$geoNear`; nearby-vehicle queries; geofencing concepts (inside/outside a polygon, entry/exit as a change between two readings); location history.
 
-Example document:
+**What was learned** (details in [`learning/mongodb/l6-geospatial/NOTES.md`](../learning/mongodb/l6-geospatial/NOTES.md))
 
-```json
-{
-  "organizationId": "…",
-  "vehicleId": "…",
-  "timestamp": "2026-10-05T08:30:00.000Z",
-  "location": { "type": "Point", "coordinates": [31.2357, 30.0444] },
-  "speed": 82,
-  "fuelLevel": 61
-}
-```
+- **Tenant-first geo indexes protect against leaks.**
+  - With `{ organizationId: 1, location: '2dsphere' }`, a `$geoNear` without `organizationId` fails.
+  - With a plain geo index, the same query returned another organization's vehicles that were in the same street.
+- **Choosing the operator:**
+  - `$geoNear` for nearest N with distances; it must be the first stage, with the tenant in `query`.
+  - `$geoWithin` for counts and filters.
+  - `$geoIntersects` on fence polygons for "which fences contain this point".
+  - `$geoIntersects` on `LineString` routes for "which trips crossed this area".
+- **No point-in-polygon expression:** geo operators take literal geometries and only work in query filters. Fences cannot be joined to readings in one pipeline, and "was the previous reading inside" cannot be computed for polygons in a pipeline.
+- **Enter and exit events are best computed at ingestion,** per vehicle and in time order:
+  - Each reading is checked against the organization's fences with `$geoIntersects` and compared with the vehicle's stored state.
+  - A batch alternative works for circular fences: `$geoNear` plus `$shift`.
+  - GPS noise on a fence edge produced 27 events in an hour from a parked vehicle; requiring 3 readings in a row cut it to 4, at the cost of 3 minutes of latency.
+  - Out-of-order delivery lost 9 of 12 events.
+- **GPS distance is not the odometer:** it was about 0.78 of the odometer distance, and parked jitter adds distance never driven. Trip boundaries are a modeling decision: leaving out the arrival reading hid half the trips to a zone.
+- **Polygon rules are enforced by the index:** closed rings, no crossing edges, and holes strictly inside the outer ring.
 
-**Not yet:** a GPS product, device integration, live tracking or real location data. This stage is for experimentation.
+**Built**
+
+- Four `mongosh` exercises in `learning/mongodb/l6-geospatial/`:
+  - GeoJSON and nearest vehicles;
+  - `$geoWithin` and geofences;
+  - geofence events;
+  - location history.
+- Each exercise has worked examples, "your turn" tasks and runnable solutions.
+- A synthetic seed (`lib/geo.js`): two depots and two shared customer zones around Cairo, with vehicles driving curved routes and GPS jitter when parked.
+- `NOTES.md`: GeoJSON rules, operator choice, tenant isolation, event design, location history and privacy, and what v2.x needs.
+
+**Decisions**
+
+1. **Geo indexes always start with `organizationId`.** This covers latest positions, readings, geofences and trips.
+2. **Geofence events (for L8 and v2.x):**
+   - Computed at ingestion, per vehicle, in time order, and debounced.
+   - Stored as event documents, not recomputed per request.
+   - Polygons are validated when they are saved.
+3. **Location history is kept as trips with `LineString` routes plus summaries.** Raw readings expire, and analytics use rounded coordinates.
+4. No change to the FleetOps PostgreSQL schema, and no FleetOps code.
+
+**Not done (by design):** a GPS product, device integration, live tracking, road snapping, a map UI or real location data.
+
+**Deferred**
+
+- Ordered per-vehicle processing for events, and recomputation after late readings (L12, L13).
+- Caching fences in the telemetry service (L8).
+- Location access rules per role and per organization policy (decided when a GPS product exists).
+
+**Part A (L1–L6) is complete.** The next stage, L7, is the first to add code to FleetOps.
 
 ---
 
