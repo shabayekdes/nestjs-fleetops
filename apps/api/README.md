@@ -196,6 +196,13 @@ docker compose up -d --wait mongo   # from the repo root: MongoDB 7.0 on 127.0.0
 npm run mongo:setup                 # create/reconcile collections and indexes (idempotent; drops only indexes listed as retired)
 ```
 
+```bash
+npm run mongo:seed                  # development telemetry: ~7 days of synthetic readings for the Acme Logistics vehicles
+npm run mongo:seed -- --days=3      # a different window (1 to TELEMETRY_RAW_RETENTION_DAYS - 1)
+```
+
+`npm run mongo:seed` is a development tool and needs `npm run db:seed` (it reads the `acme-logistics` organization and its vehicles from PostgreSQL, read-only) and `npm run mongo:setup`. It refuses to run with `NODE_ENV=production` or `test`, with telemetry disabled, or when the schema check fails, and prints only the database name, never the connection string. The data is synthetic (routes around Cairo: shifts from about 08:00 to 18:00 `Africa/Cairo` with a lunch stop, a reading per minute while driving, sparse readings overnight). It is idempotent: it deletes only the readings and latest status of those vehicles in that organization, then inserts again and rebuilds `vehicle_latest_status`; other organizations and vehicles are untouched and collections are never dropped. Re-running moves the window to "now". Try `GET /api/v1/telemetry/latest`, `/latest/near?latitude=30.05&longitude=31.24&radiusMeters=20000` and `/vehicles/:id/daily?from=...&to=...&timezone=Africa/Cairo`.
+
 MongoDB has no migration system: the schema lives in `src/telemetry/mongo/telemetry-schema.ts` and `npm run mongo:setup` applies it (run it after enabling telemetry and whenever the schema code changes). `npm run mongo:setup` runs `nest build`, so it needs dev dependencies; in a runtime image the step is `node dist/scripts/mongo-setup.js`. No deploy runs it today because telemetry is disabled in production. It creates the `telemetry_readings` time series collection (retention from `TELEMETRY_RAW_RETENTION_DAYS`) and the `vehicle_latest_status` collection with a closed `$jsonSchema` validator plus a `(organizationId, 2dsphere location)` index for proximity queries. It also drops the retired index `meta_1_timestamp_1` that MongoDB creates automatically on time series collections (nothing can use it and it costs 5-12% insert time) and reports it as `dropped`. **After pulling L8, re-run `npm run mongo:setup` (and `npm run mongo:test:setup`) on every existing database: the new index is required and the API refuses to boot without it.**
 
 When `MONGODB_URI` is set, the API fails fast at startup if MongoDB is unreachable or the schema is missing or does not match (the error says to run `npm run mongo:setup`). The boot check is read-only; retention and validator differences do not fail the boot.

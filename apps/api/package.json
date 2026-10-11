@@ -31,6 +31,7 @@
     "db:studio": "prisma studio",
     "db:test:migrate": "NODE_ENV=test prisma migrate deploy",
     "mongo:setup": "nest build && node dist/scripts/mongo-setup.js",
+    "mongo:seed": "nest build && node dist/scripts/mongo-seed.js",
     "mongo:test:setup": "nest build && NODE_ENV=test node dist/scripts/mongo-setup.js",
     "db:test:e2e-cleanup": "NODE_ENV=test tsx prisma/e2e-cleanup.ts"
   },
